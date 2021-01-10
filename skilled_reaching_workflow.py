@@ -4,36 +4,71 @@ import glob
 import deeplabcut
 
 
-def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type='*.avi', gputouse=0):
+def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type='.avi', gputouse=0):
     '''
 
     :param folders_to_analyze:
     :param view_config_paths:
     :param cropped_vid_type:
     :param gputouse:
-    :return:
+    :return: scorernames - dictionary with keys 'direct' and 'mirror'
     '''
 
     view_list = folders_to_analyze.keys()
+    scorernames = {'direct': '', 'mirror': ''}
     for view in view_list:
         if 'direct' in view:
-            config_path = view_config_paths['direct']
+            dlc_network = 'direct'
         elif 'mirror' in view:
-            config_path = view_config_paths['mirror']
+            dlc_network = 'mirror'
         else:
             print(view + ' does not contain the keyword "direct" or "mirror"')
             continue
+
+        config_path = view_config_paths[dlc_network]
         current_view_folders = folders_to_analyze[view]
 
         for current_folder in current_view_folders:
             cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
-            deeplabcut.analyze_videos(config_path,
+            scorername = deeplabcut.analyze_videos(config_path,
                                       cropped_video_list,
                                       videotype=cropped_vid_type,
                                       gputouse=gputouse)
+            scorernames[dlc_network] = scorername
+
+
+def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cropped_vid_type='.avi')
+    '''
+    
+    :param folders_to_analyze: 
+    :param view_config_paths: 
+    :param scorernames: dictionary with keys 'direct' and 'mirror'
+    :param cropped_vid_type: 
+    :return: 
+    '''
+    view_list = folders_to_analyze.keys()
+
+    for view in view_list:
+        if 'direct' in view:
+            dlc_network = 'direct'
+        elif 'mirror' in view:
+            dlc_network = 'mirror'
+        else:
+            print(view + ' does not contain the keyword "direct" or "mirror"')
+            continue
+        config_path = view_config_paths[dlc_network]
+        scorername = scorernames[dlc_network]
+        current_view_folders = folders_to_analyze[view]
+
+        for current_folder in current_view_folders:
+            cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
+            deeplabcut.create_video_with_all_detections(config_path, cropped_video_list, scorername)
+
 
 
 if __name__ == '__main__':
+
+    label_videos = True
 
     gputouse = 2
     # step 1: preprocess videos to extract left mirror, right mirror, and direct views
@@ -66,6 +101,9 @@ if __name__ == '__main__':
     # in case there are some previously cropped videos that need to be analyzed
     folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_vids_parent, view_list=view_list)
 
-    analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type=cropped_vid_type, gputouse=gputouse)
+    scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type=cropped_vid_type, gputouse=gputouse)
+
+    if label_videos:
+        create_labeled_videos(view_config_paths, scorernames, cropped_vid_type=cropped_vid_type)
 
     # step 3: make sure calibration has been run for these sessions

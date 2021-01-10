@@ -19,7 +19,7 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_ty
         if 'direct' in view:
             config_path = view_config_paths['direct']
         elif 'mirror' in view:
-            config_path = view_config_paths['direct']
+            config_path = view_config_paths['mirror']
         else:
             print(view + ' does not contain the keyword "direct" or "mirror"')
             continue

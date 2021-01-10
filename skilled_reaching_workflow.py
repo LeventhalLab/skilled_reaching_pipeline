@@ -37,7 +37,7 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_ty
             scorernames[dlc_network] = scorername
 
 
-def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cropped_vid_type='.avi')
+def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cropped_vid_type='.avi'):
     '''
     
     :param folders_to_analyze: 

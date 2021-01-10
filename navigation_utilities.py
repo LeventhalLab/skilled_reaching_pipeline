@@ -112,12 +112,14 @@ def find_folders_to_analyze(cropped_vids_parent, view_list=('direct', 'leftmirro
 def parse_cropped_video_name(cropped_video_name):
     '''
     extract metadata information from the video name
-    :param cropped_video_name: video name with expected format RXXXX_yyyymmdd_HH-MM-SS_[view]_l-r-t-b.avi
+    :param cropped_video_name: video name with expected format RXXXX_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
         where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
         cropping windows from the original video
     :return: vid_metadata: dictionary containing the following keys
         ratID - rat ID as a string RXXXX
         triggertime - datetime object with when the trigger event occurred (date and time)
+        vid_number - number of the video (ZZZ in the filename). This number is not necessarily unique within a session
+            if it had to be restarted partway through
         vid_type - video type (e.g., '.avi', '.mp4', etc)
         crop_window - 4-element list [left, right, top, bottom] in pixels
     '''
@@ -125,6 +127,7 @@ def parse_cropped_video_name(cropped_video_name):
     cropped_vid_metadata = {
         'ratID': '',
         'triggertime': datetime.datetime(),
+        'vid_number': 0,
         'vid_type': '',
         'crop_window': []
     }
@@ -138,10 +141,11 @@ def parse_cropped_video_name(cropped_video_name):
     datetime_str = metadata_list[1] + '_' + metadata_list[2]
     cropped_vid_metadata['triggertime'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
 
+    cropped_vid_metadata['vid_number'] = int(metadata_list[3])
     cropped_vid_metadata['vid_type'] = vid_type
-    cropped_vid_metadata['view'] = metadata_list[3]
+    cropped_vid_metadata['view'] = metadata_list[4]
 
-    left, right, top, bottom = list(map(int, metadata_list[4].split('-')))
+    left, right, top, bottom = list(map(int, metadata_list[5].split('-')))
     cropped_vid_metadata['crop_window'].extend(left, right, top, bottom)
 
     return cropped_vid_metadata

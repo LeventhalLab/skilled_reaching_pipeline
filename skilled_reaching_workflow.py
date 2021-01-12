@@ -11,7 +11,8 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_ty
     :param view_config_paths:
     :param cropped_vid_type:
     :param gputouse:
-    :return: scorernames - dictionary with keys 'direct' and 'mirror'
+    :return: scorernames - dictionary with keys 'direct' and 'mirror' containing the scorername strings returned by
+        deeplabcut.analyze_videos
     '''
 
     view_list = folders_to_analyze.keys()
@@ -35,6 +36,8 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_ty
                                       videotype=cropped_vid_type,
                                       gputouse=gputouse)
             scorernames[dlc_network] = scorername
+
+    return scorernames
 
 
 def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cropped_vid_type='.avi'):

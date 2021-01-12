@@ -104,6 +104,6 @@ if __name__ == '__main__':
     scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type=cropped_vid_type, gputouse=gputouse)
 
     if label_videos:
-        create_labeled_videos(view_config_paths, scorernames, cropped_vid_type=cropped_vid_type)
+        create_labeled_videos(view_config_paths, view_config_paths, scorernames, cropped_vid_type=cropped_vid_type)
 
     # step 3: make sure calibration has been run for these sessions

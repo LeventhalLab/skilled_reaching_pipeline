@@ -1,6 +1,8 @@
 from crop_videos import preprocess_videos
 import navigation_utilities
 import glob
+import os
+import shutil
 import deeplabcut
 
 
@@ -40,13 +42,15 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_ty
     return scorernames
 
 
-def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cropped_vid_type='.avi'):
+def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cropped_vid_type='.avi', move_to_new_folder=True):
     '''
     
     :param folders_to_analyze: 
     :param view_config_paths: 
     :param scorernames: dictionary with keys 'direct' and 'mirror'
-    :param cropped_vid_type: 
+    :param cropped_vid_type:
+    :param move_to_new_folder: if True, create a new folder in which the marked videos and analysis files are stored
+        to make it easier to move them to another computer without taking the original videos with them
     :return: 
     '''
     view_list = folders_to_analyze.keys()
@@ -67,6 +71,18 @@ def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cr
             cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
             deeplabcut.create_video_with_all_detections(config_path, cropped_video_list, scorername)
 
+            if move_to_new_folder:
+                new_dir = current_folder + '_marked'
+                if not os.path.isdir(new_dir):
+                    os.mkdir(new_dir)
+                test_name = os.path.join(current_folder, '*' + scorername + '*.mp4')
+                marked_vid_list = glob.glob(test_name)
+                pickle_list = glob.glob(os.path.join(current_folder, '*.pickle'))
+
+                for marked_vid in marked_vid_list:
+                    shutil.move(marked_vid, new_dir)
+                for pickle_file in pickle_list:
+                    shutil.move(pickle_file, new_dir)
 
 
 if __name__ == '__main__':
@@ -107,6 +123,6 @@ if __name__ == '__main__':
     scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type=cropped_vid_type, gputouse=gputouse)
 
     if label_videos:
-        create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cropped_vid_type=cropped_vid_type)
+        create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cropped_vid_type=cropped_vid_type, move_to_new_folder=True)
 
     # step 3: make sure calibration has been run for these sessions

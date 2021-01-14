@@ -33,6 +33,7 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_ty
 
         for current_folder in current_view_folders:
             cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
+            #todo: skip if analysis already done and stored in the _marked folder
             scorername = deeplabcut.analyze_videos(config_path,
                                       cropped_video_list,
                                       videotype=cropped_vid_type,
@@ -80,9 +81,15 @@ def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cr
                 pickle_list = glob.glob(os.path.join(current_folder, '*.pickle'))
 
                 for marked_vid in marked_vid_list:
-                    shutil.move(marked_vid, new_dir)
+                    # if the file already exists in the marked_vid directory, don't move it
+                    _, marked_vid_name = os.path.split(marked_vid)
+                    if not os.path.isfile(os.path.join(new_dir, marked_vid_name)):
+                        shutil.move(marked_vid, new_dir)
                 for pickle_file in pickle_list:
-                    shutil.move(pickle_file, new_dir)
+                    # if the file already exists in the marked_vid directory, don't move it
+                    _, pickle_name = os.path.split(pickle_file)
+                    if not os.path.isfile(os.path.join(new_dir, pickle_name)):
+                        shutil.move(pickle_file, new_dir)
 
 
 if __name__ == '__main__':

@@ -117,6 +117,8 @@ def parse_cropped_video_name(cropped_video_name):
         cropping windows from the original video
     :return: vid_metadata: dictionary containing the following keys
         ratID - rat ID as a string RXXXX
+        boxnum - box number the session was run in. useful for making sure we used the right calibration. If unknown,
+            set to 99
         triggertime - datetime object with when the trigger event occurred (date and time)
         vid_number - number of the video (ZZZ in the filename). This number is not necessarily unique within a session
             if it had to be restarted partway through
@@ -126,6 +128,7 @@ def parse_cropped_video_name(cropped_video_name):
 
     cropped_vid_metadata = {
         'ratID': '',
+        'boxnum': 99,
         'triggertime': datetime.datetime(),
         'vid_number': 0,
         'vid_type': '',
@@ -138,14 +141,22 @@ def parse_cropped_video_name(cropped_video_name):
 
     cropped_vid_metadata['ratID'] = metadata_list[0]
 
-    datetime_str = metadata_list[1] + '_' + metadata_list[2]
+    # if box number is stored in file name, then extract it
+    if 'box' in metadata_list[1]:
+        #todo: split off last two digits from the box number part of the file name
+        cropped_vid_metadata['boxnum'] =
+        next_metadata_idx = 2
+    else:
+        next_metadata_idx = 1
+
+    datetime_str = metadata_list[1] + '_' + metadata_list[next_metadata_idx]
     cropped_vid_metadata['triggertime'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
 
-    cropped_vid_metadata['vid_number'] = int(metadata_list[3])
+    cropped_vid_metadata['vid_number'] = int(metadata_list[next_metadata_idx + 1])
     cropped_vid_metadata['vid_type'] = vid_type
-    cropped_vid_metadata['view'] = metadata_list[4]
+    cropped_vid_metadata['view'] = metadata_list[next_metadata_idx + 2]
 
-    left, right, top, bottom = list(map(int, metadata_list[5].split('-')))
+    left, right, top, bottom = list(map(int, metadata_list[next_metadata_idx + 3].split('-')))
     cropped_vid_metadata['crop_window'].extend(left, right, top, bottom)
 
     return cropped_vid_metadata

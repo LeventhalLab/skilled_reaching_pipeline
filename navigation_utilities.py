@@ -143,8 +143,7 @@ def parse_cropped_video_name(cropped_video_name):
 
     # if box number is stored in file name, then extract it
     if 'box' in metadata_list[1]:
-        #todo: split off last two digits from the box number part of the file name
-        cropped_vid_metadata['boxnum'] =
+        cropped_vid_metadata['boxnum'] = int(metadata_list[1][3:])
         next_metadata_idx = 2
     else:
         next_metadata_idx = 1

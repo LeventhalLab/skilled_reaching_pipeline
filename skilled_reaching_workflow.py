@@ -43,7 +43,7 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_ty
     return scorernames
 
 
-def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cropped_vid_type='.avi', move_to_new_folder=True):
+def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cropped_vid_type='.avi', move_to_new_folder=True, skipdirect=False, skipmirror=False):
     '''
     
     :param folders_to_analyze: 
@@ -58,8 +58,12 @@ def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cr
 
     for view in view_list:
         if 'direct' in view:
+            if skipdirect:
+                continue
             dlc_network = 'direct'
         elif 'mirror' in view:
+            if skipmirror:
+                continue
             dlc_network = 'mirror'
         else:
             print(view + ' does not contain the keyword "direct" or "mirror"')
@@ -95,6 +99,8 @@ def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cr
 if __name__ == '__main__':
 
     label_videos = True
+    skipdirectlabel = False
+    skipmirrorlabel = True
 
     gputouse = 2
     # step 1: preprocess videos to extract left mirror, right mirror, and direct views
@@ -130,6 +136,12 @@ if __name__ == '__main__':
     scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type=cropped_vid_type, gputouse=gputouse)
 
     if label_videos:
-        create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cropped_vid_type=cropped_vid_type, move_to_new_folder=True)
+        create_labeled_videos(folders_to_analyze,
+                              view_config_paths,
+                              scorernames,
+                              cropped_vid_type=cropped_vid_type,
+                              move_to_new_folder=True,
+                              skipdirect=skipdirectlabel,
+                              skipmirror=skipmirrorlabel)
 
     # step 3: make sure calibration has been run for these sessions

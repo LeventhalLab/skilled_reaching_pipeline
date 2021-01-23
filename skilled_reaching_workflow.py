@@ -99,8 +99,10 @@ def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cr
 if __name__ == '__main__':
 
     label_videos = True
+
+    # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
-    skipmirrorlabel = True
+    skipmirrorlabel = False
 
     gputouse = 2
     # step 1: preprocess videos to extract left mirror, right mirror, and direct views

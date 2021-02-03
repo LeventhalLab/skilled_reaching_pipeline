@@ -159,3 +159,22 @@ def parse_cropped_video_name(cropped_video_name):
     cropped_vid_metadata['crop_window'].extend(left, right, top, bottom)
 
     return cropped_vid_metadata
+
+
+def create_marked_vids_folder(cropped_vid_folder, cropped_vids_parent, marked_vids_parent):
+    '''
+    :param cropped_vid_folder:
+    :param cropped_vids_parent:
+    :param marked_vids_parent:
+    :return:
+    '''
+
+    # find the string 'cropped_videos' in cropped_vid_folder; everything after that is the relative path to create the marked_vids_folder
+    cropped_vid_relpath = os.path.relpath(cropped_vid_folder, start=cropped_vids_parent)
+    marked_vid_relpath = cropped_vid_relpath + 'marked'
+    marked_vids_folder = os.path.join(marked_vids_parent, marked_vid_relpath)
+
+    if not os.path.isdir(marked_vids_folder):
+        os.mkdir(marked_vids_folder)
+
+    return marked_vids_folder

@@ -43,7 +43,12 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_ty
     return scorernames
 
 
-def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cropped_vid_type='.avi', move_to_new_folder=True, skipdirect=False, skipmirror=False):
+def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_paths, scorernames,
+                          cropped_vid_type='.avi',
+                          skipdirect=False,
+                          skipmirror=False,
+                          view_list=('direct', 'leftmirror', 'rightmirror')
+):
     '''
     
     :param folders_to_analyze: 
@@ -54,7 +59,9 @@ def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cr
         to make it easier to move them to another computer without taking the original videos with them
     :return: 
     '''
-    view_list = folders_to_analyze.keys()
+    # in case there are some previously cropped videos that need to be analyzed
+    folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_vids_parent, view_list=view_list)
+    # view_list = folders_to_analyze.keys()
 
     for view in view_list:
         if 'direct' in view:
@@ -76,24 +83,24 @@ def create_labeled_videos(folders_to_analyze, view_config_paths, scorernames, cr
             cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
             deeplabcut.create_video_with_all_detections(config_path, cropped_video_list, scorername)
 
-            if move_to_new_folder:
-                new_dir = current_folder + '_marked'
-                if not os.path.isdir(new_dir):
-                    os.mkdir(new_dir)
-                test_name = os.path.join(current_folder, '*' + scorername + '*.mp4')
-                marked_vid_list = glob.glob(test_name)
-                pickle_list = glob.glob(os.path.join(current_folder, '*.pickle'))
+            # current_basename = os.path.basename(current_folder)
+            new_dir =  navigation_utilities.create_marked_vids_folder(current_folder, cropped_vids_parent, marked_vids_parent)
+            #    os.path.join(marked_vids_parent, current_basename + '_marked')
 
-                for marked_vid in marked_vid_list:
-                    # if the file already exists in the marked_vid directory, don't move it
-                    _, marked_vid_name = os.path.split(marked_vid)
-                    if not os.path.isfile(os.path.join(new_dir, marked_vid_name)):
-                        shutil.move(marked_vid, new_dir)
-                for pickle_file in pickle_list:
-                    # if the file already exists in the marked_vid directory, don't move it
-                    _, pickle_name = os.path.split(pickle_file)
-                    if not os.path.isfile(os.path.join(new_dir, pickle_name)):
-                        shutil.move(pickle_file, new_dir)
+            test_name = os.path.join(current_folder, '*' + scorername + '*.mp4')
+            marked_vid_list = glob.glob(test_name)
+            pickle_list = glob.glob(os.path.join(current_folder, '*.pickle'))
+
+            for marked_vid in marked_vid_list:
+                 # if the file already exists in the marked_vid directory, don't move it
+                 _, marked_vid_name = os.path.split(marked_vid)
+                 if not os.path.isfile(os.path.join(new_dir, marked_vid_name)):
+                      shutil.move(marked_vid, new_dir)
+                 for pickle_file in pickle_list:
+                      # if the file already exists in the marked_vid directory, don't move it
+                      _, pickle_name = os.path.split(pickle_file)
+                      if not os.path.isfile(os.path.join(new_dir, pickle_name)):
+                           shutil.move(pickle_file, new_dir)
 
 
 if __name__ == '__main__':
@@ -116,12 +123,13 @@ if __name__ == '__main__':
     }
     cropped_vid_type = '.avi'
 
-    video_root_folder = '/home/levlab/Public/DLC_DKL/videos_to_analyze/videos_to_crop'
+    vids_parent = '/home/levlab/Public/DLC_DKL/videos_to_analyze'
+    video_root_folder = os.path.join(vids_parent, 'videos_to_crop')
+    cropped_vids_parent = os.path.join(vids_parent, 'cropped_videos')
+    marked_vids_parent = os.path.join(vids_parent, 'marked_videos')
+
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
-
-    cropped_vids_parent = '/home/levlab/Public/DLC_DKL/videos_to_analyze'
-
     cropped_video_directories = preprocess_videos(video_folder_list, cropped_vids_parent, crop_params_dict, view_list, vidtype='avi')
 
     # step 2: run the vids through DLC
@@ -131,19 +139,18 @@ if __name__ == '__main__':
         'direct': '/home/levlab/Public/DLC_DKL/skilled_reaching_direct-Dan_Leventhal-2020-10-19/config.yaml',
         'mirror': '/home/levlab/Public/DLC_DKL/skilled_reaching_mirror-Dan_Leventhal-2020-10-19/config.yaml'
     }
-
-    # in case there are some previously cropped videos that need to be analyzed
     folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_vids_parent, view_list=view_list)
 
     scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type=cropped_vid_type, gputouse=gputouse)
 
     if label_videos:
-        create_labeled_videos(folders_to_analyze,
+        create_labeled_videos(cropped_vids_parent,
+                              marked_vids_parent,
                               view_config_paths,
                               scorernames,
                               cropped_vid_type=cropped_vid_type,
-                              move_to_new_folder=True,
                               skipdirect=skipdirectlabel,
-                              skipmirror=skipmirrorlabel)
+                              skipmirror=skipmirrorlabel,
+                              view_list=view_list)
 
     # step 3: make sure calibration has been run for these sessions

@@ -3,6 +3,7 @@ from moviepy.editor import *
 import subprocess
 import cv2
 import shutil
+import skilled_reaching_calibration
 import navigation_utilities
 
 
@@ -16,7 +17,6 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params_dict, view_
     """
 
     cropped_video_directories = navigation_utilities.create_cropped_video_destination_list(cropped_vids_parent, video_folder_list, view_list)
-
     # make sure vidtype starts with a '.'
     if vidtype[0] != '.':
         vidtype = '.' + vidtype

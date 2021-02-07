@@ -1,5 +1,6 @@
 from crop_videos import preprocess_videos
 import navigation_utilities
+import skilled_reaching_calibration
 import glob
 import os
 import shutil
@@ -105,6 +106,12 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
 
 if __name__ == '__main__':
 
+    test_csv = '/Volumes/Untitled/for_creating_3d_vids/calibration_images/2019/201909_calibration/201909_manually_marked/GridCalibration_box99_20190904_00-00-01_1.csv'
+    cb_points = skilled_reaching_calibration.import_fiji_csv(test_csv)
+
+
+
+
     label_videos = True
 
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
@@ -127,6 +134,7 @@ if __name__ == '__main__':
     video_root_folder = os.path.join(vids_parent, 'videos_to_crop')
     cropped_vids_parent = os.path.join(vids_parent, 'cropped_videos')
     marked_vids_parent = os.path.join(vids_parent, 'marked_videos')
+    calibration_parent = os.path.join(vids_parent, 'calibration_files')
 
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)

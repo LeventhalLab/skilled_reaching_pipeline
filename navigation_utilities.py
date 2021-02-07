@@ -4,13 +4,13 @@ from datetime import datetime
 
 
 def get_video_folders_to_crop(video_root_folder):
-    '''
+    """
     find all the lowest level directories within video_root_folder, which are presumably the lowest level folders that
     contain the videos to be cropped
 
     :param video_root_folder: root directory from which to extract the list of folders that contain videos to crop
     :return: crop_dirs - list of lowest level directories within video_root_folder
-    '''
+    """
 
     crop_dirs = []
 
@@ -23,13 +23,13 @@ def get_video_folders_to_crop(video_root_folder):
 
 
 def create_cropped_video_destination_list(cropped_vids_parent, video_folder_list, view_list):
-    '''
+    """
     create subdirectory trees in which to store the cropped videos. Directory structure is ratID-->[direct_view or
         mirror_views]-->ratID-->[sessionID_direct/leftmirror/rightmirror]
     :param cropped_vids_parent: parent directory in which to create directory tree
     :param video_folder_list: list of lowest level directories containing the original videos
     :return: cropped_video_directories
-    '''
+    """
 
     cropped_video_directories = [[], [], []]
     for crop_dir in video_folder_list:
@@ -56,12 +56,12 @@ def create_cropped_video_destination_list(cropped_vids_parent, video_folder_list
 
 
 def parse_session_dir_name(session_dir):
-    '''
+    """
 
     :param session_dir - session directory name assumed to be of the form RXXXX_yyyymmddz, where XXXX is the rat number,
         yyyymmdd is the date, and z is a letter identifying distinct sessions on the same day (i.e., "a", "b", etc.)
     :return:
-    '''
+    """
 
     dir_name_parts = session_dir.split('_')
     ratID = dir_name_parts[0]
@@ -71,14 +71,14 @@ def parse_session_dir_name(session_dir):
 
 
 def find_folders_to_analyze(cropped_vids_parent, view_list=('direct', 'leftmirror', 'rightmirror')):
-    '''
+    """
     get the full list of directories containing cropped videos in the videos_to_analyze folder
     :param cropped_vids_parent: parent directory with subfolders direct_view and mirror_views, which have subfolders
         RXXXX-->RXXXXyyyymmddz[direct/leftmirror/rightmirror] (assuming default view list)
     :param view_list:
     :return: folders_to_analyze: dictionary containing a key for each member of view_list. Each key holds a list of
         folders to run through deeplabcut
-    '''
+    """
 
     folders_to_analyze = dict(zip(view_list, ([] for _ in view_list)))
 
@@ -110,7 +110,7 @@ def find_folders_to_analyze(cropped_vids_parent, view_list=('direct', 'leftmirro
 
 
 def parse_cropped_video_name(cropped_video_name):
-    '''
+    """
     extract metadata information from the video name
     :param cropped_video_name: video name with expected format RXXXX_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
         where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
@@ -124,7 +124,7 @@ def parse_cropped_video_name(cropped_video_name):
             if it had to be restarted partway through
         vid_type - video type (e.g., '.avi', '.mp4', etc)
         crop_window - 4-element list [left, right, top, bottom] in pixels
-    '''
+    """
 
     cropped_vid_metadata = {
         'ratID': '',
@@ -162,12 +162,12 @@ def parse_cropped_video_name(cropped_video_name):
 
 
 def create_marked_vids_folder(cropped_vid_folder, cropped_vids_parent, marked_vids_parent):
-    '''
+    """
     :param cropped_vid_folder:
     :param cropped_vids_parent:
     :param marked_vids_parent:
     :return:
-    '''
+    """
 
     # find the string 'cropped_videos' in cropped_vid_folder; everything after that is the relative path to create the marked_vids_folder
     cropped_vid_relpath = os.path.relpath(cropped_vid_folder, start=cropped_vids_parent)
@@ -180,4 +180,27 @@ def create_marked_vids_folder(cropped_vid_folder, cropped_vids_parent, marked_vi
     return marked_vids_folder
 
 
-def find_calibration_files(calibration_vids_parent)
+def create_calibration_file_tree(calibration_parent, vid_metadata):
+    """
+
+    :param calibration_parent:
+    :param vid_metadata: dictionary containing the following keys
+        ratID - rat ID as a string RXXXX
+        boxnum - box number the session was run in. useful for making sure we used the right calibration. If unknown,
+            set to 99
+        triggertime - datetime object with when the trigger event occurred (date and time)
+        vid_number - number of the video (ZZZ in the filename). This number is not necessarily unique within a session
+            if it had to be restarted partway through
+        vid_type - video type (e.g., '.avi', '.mp4', etc)
+        crop_window - 4-element list [left, right, top, bottom] in pixels
+    :return:
+    """
+
+    year_folder = 'calibration_files_' + datetime.strftime(vid_metadata['triggertime'], '%Y')
+    month_folder = 'calibration_files_' + datetime.strftime(vid_metadata['triggertime'], '%Y%m')
+    day_folder = 'calibration_files_' + datetime.strftime(vid_metadata['triggertime'], '%Y%m%d')
+    box_folder = day_folder + '_box{:2d}'.format(vid_metadata['boxnum'])
+
+    calibration_file_tree = os.path.join(calibration_parent, year_folder, month_folder, day_folder, box_folder)
+
+    return calibration_file_tree

@@ -1,5 +1,6 @@
 from crop_videos import preprocess_videos
 import navigation_utilities
+import reconstruct_3d
 import skilled_reaching_calibration
 import glob
 import os
@@ -61,7 +62,7 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
     :return: 
     '''
     # in case there are some previously cropped videos that need to be analyzed
-    folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_vids_parent, view_list=view_list)
+    folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent, view_list=view_list)
     # view_list = folders_to_analyze.keys()
 
     for view in view_list:
@@ -85,7 +86,7 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
             deeplabcut.create_video_with_all_detections(config_path, cropped_video_list, scorername)
 
             # current_basename = os.path.basename(current_folder)
-            new_dir =  navigation_utilities.create_marked_vids_folder(current_folder, cropped_vids_parent, marked_vids_parent)
+            new_dir =  navigation_utilities.create_marked_vids_folder(current_folder, cropped_videos_parent, marked_vids_parent)
             #    os.path.join(marked_vids_parent, current_basename + '_marked')
 
             test_name = os.path.join(current_folder, '*' + scorername + '*.mp4')
@@ -106,11 +107,11 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
 
 if __name__ == '__main__':
 
-    test_csv = '/Volumes/Untitled/for_creating_3d_vids/calibration_images/2019/201909_calibration/201909_manually_marked/GridCalibration_box99_20190904_00-00-01_1.csv'
-    cb_points = skilled_reaching_calibration.import_fiji_csv(test_csv)
-
-
-
+    # test_calibration_file = '/Volumes/Untitled/DLC_output/calibration_images/2020/202012_calibration/202012_calibration_files/SR_boxCalibration_box04_20201217.mat'
+    # test_pickle_file = '/Users/dan/Documents/deeplabcut/cropped_vids/R0382/R0382_20201216c_direct/R0382_20201216_17-23-50_005_direct_700-1350-270-935DLC_resnet50_skilled_reaching_directOct19shuffle1_200000_full.pickle'
+    # skilled_reaching_calibration.read_matlab_calibration(test_calibration_file)
+    # pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name(test_pickle_file)
+    test_video_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/videos_to_crop/R0382/R0382_20201216c/R0382_20201216_17-31-47_010.avi'
 
     label_videos = True
 
@@ -130,15 +131,19 @@ if __name__ == '__main__':
     }
     cropped_vid_type = '.avi'
 
-    vids_parent = '/home/levlab/Public/DLC_DKL/videos_to_analyze'
-    video_root_folder = os.path.join(vids_parent, 'videos_to_crop')
-    cropped_vids_parent = os.path.join(vids_parent, 'cropped_videos')
-    marked_vids_parent = os.path.join(vids_parent, 'marked_videos')
-    calibration_parent = os.path.join(vids_parent, 'calibration_files')
+    videos_parent = '/home/levlab/Public/DLC_DKL/videos_to_analyze'   # on the lambda machine
+    videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
+    video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
+    cropped_videos_parent = os.path.join(videos_parent, 'cropped_videos')
+    marked_videos_parent = os.path.join(videos_parent, 'marked_videos')
+    calibration_parent = os.path.join(videos_parent, 'calibration_files')
+
+    video_metadata = navigation_utilities.parse_video_name(test_video_file)
+    reconstruct_3d.triangulate_video(test_video_file, marked_videos_parent, calibration_parent, view_list=view_list)
 
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
-    cropped_video_directories = preprocess_videos(video_folder_list, cropped_vids_parent, crop_params_dict, view_list, vidtype='avi')
+    cropped_video_directories = preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_dict, view_list, vidtype='avi')
 
     # step 2: run the vids through DLC
     # parameters for running DLC
@@ -147,13 +152,13 @@ if __name__ == '__main__':
         'direct': '/home/levlab/Public/DLC_DKL/skilled_reaching_direct-Dan_Leventhal-2020-10-19/config.yaml',
         'mirror': '/home/levlab/Public/DLC_DKL/skilled_reaching_mirror-Dan_Leventhal-2020-10-19/config.yaml'
     }
-    folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_vids_parent, view_list=view_list)
+    folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent, view_list=view_list)
 
     scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type=cropped_vid_type, gputouse=gputouse)
 
     if label_videos:
-        create_labeled_videos(cropped_vids_parent,
-                              marked_vids_parent,
+        create_labeled_videos(cropped_videos_parent,
+                              marked_videos_parent,
                               view_config_paths,
                               scorernames,
                               cropped_vid_type=cropped_vid_type,

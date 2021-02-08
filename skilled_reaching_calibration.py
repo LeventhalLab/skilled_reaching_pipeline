@@ -1,6 +1,7 @@
 import navigation_utilities
 import os
 import csv
+import scipy.io as sio
 import numpy as np
 
 
@@ -56,7 +57,7 @@ def sort_points_to_boards(cb_pts):
     :param cb_pts: n x 2 numpy array containing (distorted) checkerboard points from the calibration cubes
     :return:
     """
-    
+    #todo: can probably eliminate this - relic from when we were calibrating with cubes instead of videos of checkerboards in a single plane
 
 
 def fundamental_matrix_from_mirrors(x1, x2):
@@ -105,3 +106,10 @@ def fundamental_matrix_from_mirrors(x1, x2):
 def select_correct_essential_matrix():
 
     pass
+
+
+def read_matlab_calibration(mat_calibration_name):
+
+    mat_cal = sio.loadmat(mat_calibration_name)
+
+    return mat_cal

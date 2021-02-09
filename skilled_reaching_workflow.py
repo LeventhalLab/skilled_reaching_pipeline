@@ -111,7 +111,7 @@ if __name__ == '__main__':
     # test_pickle_file = '/Users/dan/Documents/deeplabcut/cropped_vids/R0382/R0382_20201216c_direct/R0382_20201216_17-23-50_005_direct_700-1350-270-935DLC_resnet50_skilled_reaching_directOct19shuffle1_200000_full.pickle'
     # skilled_reaching_calibration.read_matlab_calibration(test_calibration_file)
     # pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name(test_pickle_file)
-    test_video_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/videos_to_crop/R0382/R0382_20201216c/R0382_20201216_17-31-47_010.avi'
+    test_video_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/videos_to_crop/R0382/R0382_20201216c/R0382_box02_20201216_17-31-47_010.avi'
 
     label_videos = True
 

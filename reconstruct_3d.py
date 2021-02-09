@@ -17,6 +17,7 @@ def triangulate_video(video_name, marked_videos_parent, calibration_parent, view
         dlc_output[view] = skilled_reaching_io.read_pickle(dlc_output_pickle_names[view])
         dlc_metadata[view] = skilled_reaching_io.read_pickle(dlc_metadata_pickle_names[view])
 
+    calibration_file = navigation_utilities.find_calibration_file(video_metadata, calibration_parent)
     pass
 
 
@@ -28,3 +29,5 @@ def translate_points_to_full_frame():
 def bodyparts_from_metadata(dlc_metadata):
 
     bodyparts = dlc_metadata['data']['DLC-model-config file']['all_joints_names']
+
+    return bodyparts

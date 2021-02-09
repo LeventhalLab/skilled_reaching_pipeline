@@ -391,3 +391,21 @@ def construct_dlc_output_pickle_names(video_metadata, view):
 
     return pickle_name_full, pickle_name_meta
 
+
+def find_calibration_file(video_metadata, calibration_parent):
+
+    date_string = video_metadata['triggertime'].strftime('%Y%m%d')
+    year_folder = os.path.join(calibration_parent, date_string[0:4])
+    month_folder = os.path.join(year_folder, date_string[0:6] + '_calibration')
+    calibration_folder = os.path.join(month_folder, date_string[0:6] + '_calibration_files')
+
+    test_name = 'SR_boxCalibration_box{:02d}_{}.mat'.format(video_metadata['boxnum'], date_string)
+    test_name = os.path.join(calibration_folder, test_name)
+
+    if os.path.exists(test_name):
+        return test_name
+    else:
+        sys.exit('No calibration file found for ' + video_metadata[''])
+
+
+    pass

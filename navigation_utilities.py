@@ -274,7 +274,7 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
 
     pickle_metadata['crop_window'].extend((left, right, top, bottom))
 
-    #todo: write the scorername into the pickle metadata dictionary
+    #todo: write the scorername into the pickle metadata dictionary. It's also in the metadata pickle file
     pickle_metadata['scorername']
 
     return pickle_metadata
@@ -393,7 +393,12 @@ def construct_dlc_output_pickle_names(video_metadata, view):
 
 
 def find_calibration_file(video_metadata, calibration_parent):
+    """
 
+    :param video_metadata:
+    :param calibration_parent:
+    :return:
+    """
     date_string = video_metadata['triggertime'].strftime('%Y%m%d')
     year_folder = os.path.join(calibration_parent, date_string[0:4])
     month_folder = os.path.join(year_folder, date_string[0:6] + '_calibration')
@@ -405,7 +410,14 @@ def find_calibration_file(video_metadata, calibration_parent):
     if os.path.exists(test_name):
         return test_name
     else:
-        sys.exit('No calibration file found for ' + video_metadata[''])
+        sys.exit('No calibration file found for ' + video_metadata['video_name'])
 
 
-    pass
+def create_trajectory_filename(video_metadata):
+
+    trajectory_name = video_metadata['ratID'] + '_' + \
+        'box{:02d}'.format(video_metadata['boxnum']) + '_' + \
+        video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S') + '_' + \
+        '{:03d}'.format(video_metadata['video_number']) + '_3dtrajectory'
+
+    return trajectory_name

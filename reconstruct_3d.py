@@ -7,17 +7,30 @@ def triangulate_video(video_name, marked_videos_parent, calibration_parent, view
 
     video_metadata = navigation_utilities.parse_video_name(video_name)
     dlc_output_pickle_names, dlc_metadata_pickle_names = navigation_utilities.find_dlc_output_pickles(video_metadata, marked_videos_parent, view_list=view_list)
+    # above line will not complete if all pickle files with DLC output data are not found
 
     # find the calibration files
+    calibration_file = navigation_utilities.find_calibration_file(video_metadata, calibration_parent)
+    calibration_params = skilled_reaching_io.read_matlab_calibration(calibration_file)
+    # above lines will not complete if a calibration file is not found
 
     # read in the pickle files
     dlc_output = {view: None for view in view_list}
     dlc_metadata = {view: None for view in view_list}
+    pickle_name_metadata = {view: None for view in view_list}
     for view in view_list:
         dlc_output[view] = skilled_reaching_io.read_pickle(dlc_output_pickle_names[view])
         dlc_metadata[view] = skilled_reaching_io.read_pickle(dlc_metadata_pickle_names[view])
+        pickle_name_metadata[view] = navigation_utilities.parse_dlc_output_pickle_name(dlc_output_pickle_names[view])
 
-    calibration_file = navigation_utilities.find_calibration_file(video_metadata, calibration_parent)
+    trajectory_filename = navigation_utilities.create_trajectory_filename(video_metadata)
+
+    trajectory_metadata = extract_trajectory_metadata(dlc_metadata, pickle_name_metadata)
+
+    dlc_data = extract_data_from_dlc_output(dlc_output, trajectory_metadata)
+    #todo: preprocessing to get rid of "invalid" points
+
+
     pass
 
 
@@ -26,8 +39,51 @@ def translate_points_to_full_frame():
     pass
 
 
-def bodyparts_from_metadata(dlc_metadata):
+def extract_trajectory_metadata(dlc_metadata, name_metadata):
 
-    bodyparts = dlc_metadata['data']['DLC-model-config file']['all_joints_names']
+    view_list = dlc_metadata.keys()
+    trajectory_metadata = {view: None for view in view_list}
 
-    return bodyparts
+    for view in view_list:
+        trajectory_metadata[view] = {'bodyparts': dlc_metadata[view]['data']['DLC-model-config file']['all_joints_names'],
+                                     'num_frames': dlc_metadata[view]['data']['nframes'],
+                                     'crop_window': name_metadata[view]['crop_window']
+                                     }
+    # todo:check that number of frames and bodyparts are the same in each view
+
+    return trajectory_metadata
+
+
+def translate_and_undistort_points():
+
+    pass
+
+
+def extract_data_from_dlc_output(dlc_output, trajectory_metadata):
+
+    view_list = dlc_output.keys()
+
+    dlc_data = {view: None for view in view_list}
+    for view in view_list:
+        # initialize dictionaries for each bodypart
+        num_frames = trajectory_metadata[view]['num_frames']
+        dlc_data[view] = {bp: None for bp in trajectory_metadata[view]['bodyparts']}
+        for i_bp, bp in enumerate(trajectory_metadata[view]['bodyparts']):
+
+            dlc_data[view][bp] = {'coordinates': np.empty(num_frames, 2),
+                                  'confidence': np.empty(num_frames, 1),
+                                  }
+
+            for i_frame in range(num_frames):
+                frame_key = 'frame{:04d}'.format(i_frame)
+
+                dlc_data[view][bp]['coordinates'][i_frame,:] = dlc_output[view][frame_key]['coordinates'][i_bp]
+
+                pass
+
+
+
+            pass
+
+
+    pass

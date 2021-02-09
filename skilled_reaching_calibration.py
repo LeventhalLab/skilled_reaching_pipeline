@@ -108,8 +108,3 @@ def select_correct_essential_matrix():
     pass
 
 
-def read_matlab_calibration(mat_calibration_name):
-
-    mat_cal = sio.loadmat(mat_calibration_name)
-
-    return mat_cal

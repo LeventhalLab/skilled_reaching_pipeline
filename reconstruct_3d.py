@@ -32,6 +32,7 @@ def triangulate_video(video_name, marked_videos_parent, calibration_parent, view
 
     # translate and undistort points
     dlc_data = translate_points_to_full_frame(dlc_data, trajectory_metadata)
+    dlc_data = undistort_points(dlc_data)
     pass
 
 
@@ -52,18 +53,19 @@ def extract_trajectory_metadata(dlc_metadata, name_metadata):
 
 def translate_points_to_full_frame(dlc_data, trajectory_metadata):
 
-    view_list = dlc_metadata.keys()
+    view_list = trajectory_metadata.keys()
 
     for view in view_list:
         for bp in trajectory_metadata[view]['bodyparts']:
             # translate point
             for i_frame in range(trajectory_metadata[view]['num_frames']):
-                if not np.all([view][bp]['coordinates'][i_frame] == 0):
+                if not np.all(dlc_data[view][bp]['coordinates'][i_frame] == 0):
                     # a point was found in this frame (coordinate == 0 if no point found)
                     #todo: check that the x's and y's are matching up properly
-                    dlc_data[view][bp]['coordinates'][i_frame] += trajectory_metadata[view]['crop_window'][0:2]
+                    dlc_data[view][bp]['coordinates'][i_frame] += [trajectory_metadata[view]['crop_window'][0], trajectory_metadata[view]['crop_window'][2]]
+                    dlc_data[view][bp]['coordinates'][i_frame] -= 1
 
-    pass
+    return dlc_data
 
 
 def extract_data_from_dlc_output(dlc_output, trajectory_metadata):
@@ -93,3 +95,8 @@ def extract_data_from_dlc_output(dlc_output, trajectory_metadata):
                     pass
 
     return dlc_data
+
+
+def undistort_points(dlc_data, camera_intrinsics):
+
+    pass

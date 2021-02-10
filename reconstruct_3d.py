@@ -70,20 +70,20 @@ def extract_data_from_dlc_output(dlc_output, trajectory_metadata):
         dlc_data[view] = {bp: None for bp in trajectory_metadata[view]['bodyparts']}
         for i_bp, bp in enumerate(trajectory_metadata[view]['bodyparts']):
 
-            dlc_data[view][bp] = {'coordinates': np.empty(num_frames, 2),
-                                  'confidence': np.empty(num_frames, 1),
+            dlc_data[view][bp] = {'coordinates': np.empty((num_frames, 2)),
+                                  'confidence': np.empty((num_frames, 1)),
                                   }
 
             for i_frame in range(num_frames):
                 frame_key = 'frame{:04d}'.format(i_frame)
 
-                dlc_data[view][bp]['coordinates'][i_frame,:] = dlc_output[view][frame_key]['coordinates'][i_bp]
-
-                pass
-
-
-
-            pass
-
+                try:
+                    dlc_data[view][bp]['coordinates'][i_frame, :] = dlc_output[view][frame_key]['coordinates'][0][i_bp][0]
+                    dlc_data[view][bp]['confidence'][i_frame] = dlc_output[view][frame_key]['confidence'][i_bp][0][0]
+                except:
+                    # 'coordinates' array and 'confidence' array at this frame are empty - must be a peculiarity of deeplabcut
+                    # just leave the dlc_data arrays as empty
+                    pass
+        pass
 
     pass

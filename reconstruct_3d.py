@@ -30,12 +30,8 @@ def triangulate_video(video_name, marked_videos_parent, calibration_parent, view
     dlc_data = extract_data_from_dlc_output(dlc_output, trajectory_metadata)
     #todo: preprocessing to get rid of "invalid" points
 
-
-    pass
-
-
-def translate_points_to_full_frame():
-
+    # translate and undistort points
+    dlc_data = translate_points_to_full_frame(dlc_data, trajectory_metadata)
     pass
 
 
@@ -54,7 +50,18 @@ def extract_trajectory_metadata(dlc_metadata, name_metadata):
     return trajectory_metadata
 
 
-def translate_and_undistort_points():
+def translate_points_to_full_frame(dlc_data, trajectory_metadata):
+
+    view_list = dlc_metadata.keys()
+
+    for view in view_list:
+        for bp in trajectory_metadata[view]['bodyparts']:
+            # translate point
+            for i_frame in range(trajectory_metadata[view]['num_frames']):
+                if not np.all([view][bp]['coordinates'][i_frame] == 0):
+                    # a point was found in this frame (coordinate == 0 if no point found)
+                    #todo: check that the x's and y's are matching up properly
+                    dlc_data[view][bp]['coordinates'][i_frame] += trajectory_metadata[view]['crop_window'][0:2]
 
     pass
 
@@ -84,6 +91,5 @@ def extract_data_from_dlc_output(dlc_output, trajectory_metadata):
                     # 'coordinates' array and 'confidence' array at this frame are empty - must be a peculiarity of deeplabcut
                     # just leave the dlc_data arrays as empty
                     pass
-        pass
 
-    pass
+    return dlc_data

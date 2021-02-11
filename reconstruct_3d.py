@@ -11,7 +11,7 @@ def triangulate_video(video_name, marked_videos_parent, calibration_parent, view
 
     # find the calibration files
     calibration_file = navigation_utilities.find_calibration_file(video_metadata, calibration_parent)
-    calibration_params = skilled_reaching_io.read_matlab_calibration(calibration_file)
+    camera_params = skilled_reaching_io.read_matlab_calibration(calibration_file)
     # above lines will not complete if a calibration file is not found
 
     # read in the pickle files
@@ -32,7 +32,7 @@ def triangulate_video(video_name, marked_videos_parent, calibration_parent, view
 
     # translate and undistort points
     dlc_data = translate_points_to_full_frame(dlc_data, trajectory_metadata)
-    dlc_data = undistort_points(dlc_data)
+    dlc_data = undistort_points(dlc_data, camera_params)
     pass
 
 
@@ -97,6 +97,20 @@ def extract_data_from_dlc_output(dlc_output, trajectory_metadata):
     return dlc_data
 
 
-def undistort_points(dlc_data, camera_intrinsics):
+def undistort_points(dlc_data, camera_params):
 
-    pass
+    view_list = dlc_data.keys()
+
+    for view in view_list:
+        bodyparts = dlc_data[view].keys()
+
+        for bp in bodyparts:
+            coords = dlc_data[view][bp]['coordinates']
+            for i_row, row in enumerate(coords):
+                if not np.all(row == 0):
+                    # a point was found in this frame (coordinate == 0 if no point found)
+                    norm_pt_ud = cv2.undistortPoints(row, camera_params['mtx'], np.array([0.,0.,0.,0.,0.,]))
+                    dlc_data[view][bp][i_row, :]
+                    pass
+
+                #todo: write code to normalize and unnormalize points

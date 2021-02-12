@@ -33,12 +33,18 @@ def read_matlab_calibration(mat_calibration_name):
 
     # transpose intrinsic, camera matrices from matlab file
     # there are 3 camera matrices: top mirror, left mirror, right mirror (stored in that order)
-    Pn = np.zeros((3, 4, 4))
+    Pn = np.zeros((3, 4, 3))
+    F = np.zeros((3, 3, 3))
+    E = np.zeros((3, 3, 3))
     for i_view in range(0, 3):
         Pn[:, :, i_view] = mat_cal['Pn'][:, :, i_view].transpose()
+        F[:, :, i_view] = mat_cal['F'][:, :, i_view]            #todo: check if F and E also should be transposed. I don't think so
+        E[:, :, i_view] = mat_cal['E'][:, :, i_view]
 
     camera_params = {'mtx': mat_cal['K'].transpose(),
-                     'Pn': Pn
+                     'Pn': Pn,
+                     'F': F,
+                     'E': E
                      }
 
     return camera_params

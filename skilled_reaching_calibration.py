@@ -1,8 +1,10 @@
 import navigation_utilities
+import skilled_reaching_io
 import os
 import csv
-import scipy.io as sio
 import numpy as np
+import cv2
+import glob
 
 
 def import_fiji_csv(fname):
@@ -108,3 +110,64 @@ def select_correct_essential_matrix():
     pass
 
 
+def calibrate_camera_from_video(camera_calibration_vid_name, calibration_parent, cb_size=(6, 9)):
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+
+    video_object = cv2.VideoCapture(camera_calibration_vid_name)
+
+    im_size = (int(video_object.get(cv2.CAP_PROP_FRAME_WIDTH)),
+               int(video_object.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+
+    # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+    cbrow = cb_size[0]
+    cbcol = cb_size[1]
+    objp = np.zeros((cbrow * cbcol, 3), np.float32)
+    objp[:, :2] = np.mgrid[0:cbcol, 0:cbrow].T.reshape(-1, 2)
+
+    objpoints = []
+    imgpoints = []
+    frame_counter = 0
+    while True:
+        video_object.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
+        ret, cur_img = video_object.read()
+
+        if ret:
+            frame_counter += 1
+
+            cur_img_gray = cv2.cvtColor(cur_img, cv2.COLOR_BGR2GRAY)
+            found_valid_chessboard, corners = cv2.findChessboardCorners(cur_img_gray, cb_size)
+
+            if found_valid_chessboard:
+                # refine the points, then save the checkerboard image and a metadata file to disk
+                corners2 = cv2.cornerSubPix(cur_img_gray, corners, (11, 11), (-1, -1), criteria)
+                imgpoints.append(corners2)
+                objpoints.append(objp)
+            # else:
+            # this is for showing the corners that weren't properly identified if the plotting lines below are commented in
+            #     corners2 = corners
+
+            # below is for checking if corners were correctly identified
+            # corners_img = cv2.drawChessboardCorners(cur_img, cb_size, corners2, found_valid_chessboard)
+            # # cv2.imwrite(corners_img_name, corners_img)
+            # cv2.imshow('image', corners_img)
+            # cv2.waitKey(0)
+
+        else:
+            # finished with the last frame
+            break
+
+    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, im_size, None, None)
+
+    stereo_params = {
+        'mtx': mtx,
+        'dist': dist,
+        'rvecs': rvecs,
+        'tvecs': tvecs,
+        'im_size': im_size
+    }
+
+    calibration_metadata = navigation_utilities.parse_camera_calibration_video_name(camera_calibration_vid_name)
+
+    calibration_name = navigation_utilities.create_calibration_filename(calibration_metadata, calibration_parent)
+
+    skilled_reaching_io.write_pickle(calibration_name, stereo_params)

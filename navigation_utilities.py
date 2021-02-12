@@ -421,3 +421,80 @@ def create_trajectory_filename(video_metadata):
         '{:03d}'.format(video_metadata['video_number']) + '_3dtrajectory'
 
     return trajectory_name
+
+
+def find_camera_calibration_video(video_metadata, calibration_parent):
+    """
+
+    :param video_metadata:
+    :param calibration_parent:
+    :return:
+    """
+    date_string = video_metadata['triggertime'].strftime('%Y%m%d')
+    year_folder = os.path.join(calibration_parent, date_string[0:4])
+    month_folder = os.path.join(year_folder, date_string[0:6] + '_calibration')
+    calibration_video_folder = os.path.join(month_folder, 'camera_calibration_videos_' + date_string[0:6])
+
+    test_name = 'CameraCalibration_box{:02d}_{}_*.mat'.format(video_metadata['boxnum'], date_string)
+    test_name = os.path.join(calibration_video_folder, test_name)
+
+    calibration_video_list = glob.glob(test_name)
+
+    if len(calibration_video_list) == 0:
+        sys.exit('No camera calibration video found for ' + video_metadata['video_name'])
+
+    if len(calibration_video_list) == 1:
+        return calibration_video_list[0]
+
+    # more than one potential video was found
+    # find the last relevant calibration video collected before the current reaching video
+    vid_times = []
+    for cal_vid in calibration_video_list:
+        cam_cal_md = parse_camera_calibration_video_name(cal_vid)
+        vid_times.append(cam_cal_md['time'])
+
+    last_time_prior_to_video = max(d for d in vid_times if d < video_metadata['triggertime'])
+
+    calibration_video_name = calibration_video_list[vid_times.index(last_time_prior_to_video)]
+
+    return calibration_video_name
+
+
+def parse_camera_calibration_video_name(calibration_video_name):
+    """
+
+    :param calibration_video_name: form of CameraCalibration_boxXX_YYYYMMDD_HH-mm-ss.avi
+    :return:
+    """
+    camera_calibration_metadata = {
+        'boxnum': 99,
+        'time': datetime(1, 1, 1)
+    }
+    _, cal_vid_name = os.path.split(calibration_video_name)
+    cal_vid_name, _ = os.path.splitext(cal_vid_name)
+
+    cal_vid_name_parts = cal_vid_name.split('_')
+
+    camera_calibration_metadata['boxnum'] = int(cal_vid_name_parts[1][3:])
+
+    datetime_str = cal_vid_name_parts[2] + '_' + cal_vid_name_parts[3]
+    camera_calibration_metadata['time'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
+
+    return camera_calibration_metadata
+
+
+def create_calibration_filename(calibration_metadata, calibration_parent):
+
+    date_string = calibration_metadata['time'].strftime('%Y%m%d')
+    datetime_string = calibration_metadata['time'].strftime('%Y%m%d_%H-%M-%S')
+    year_folder = os.path.join(calibration_parent, date_string[0:4])
+    month_folder = os.path.join(year_folder, date_string[0:6] + '_calibration')
+    calibration_folder = os.path.join(month_folder, date_string[0:6] + '_calibration_files')
+
+    if not os.path.isdir(calibration_folder):
+        os.makedirs(calibration_folder)
+
+    calibration_name = 'calibration_box{:02d}_{}.pickle'.format(calibration_metadata['boxnum'], datetime_string)
+    calibration_name = os.path.join(calibration_folder, calibration_name)
+
+    return calibration_name

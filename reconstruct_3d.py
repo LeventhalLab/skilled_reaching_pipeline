@@ -110,7 +110,20 @@ def undistort_points(dlc_data, camera_params):
                 if not np.all(row == 0):
                     # a point was found in this frame (coordinate == 0 if no point found)
                     norm_pt_ud = cv2.undistortPoints(row, camera_params['mtx'], np.array([0.,0.,0.,0.,0.,]))
+                    pt_ud = unnormalize_points(norm_pt_ud, camera_params['mtx'])
                     dlc_data[view][bp][i_row, :]
                     pass
 
                 #todo: write code to normalize and unnormalize points
+
+def normalize_points(pts, mtx):
+
+    pass
+
+def unnormalize_points(pts, mtx):
+
+    homogeneous_pts = np.squeeze(cv2.convertPointsToHomogeneous(pts))
+    unnormalized_pts = np.matmul(mtx, homogeneous_pts)
+    unnormalized_pts = cv2.convertPointsFromHomogeneous(np.array([unnormalized_pts]))
+
+    return unnormalized_pts

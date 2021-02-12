@@ -8,7 +8,7 @@ import shutil
 import deeplabcut
 
 
-def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type='.avi', gputouse=0):
+def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type='.avi', gputouse=0, save_as_csv=True):
     '''
 
     :param folders_to_analyze:
@@ -39,7 +39,8 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_ty
             scorername = deeplabcut.analyze_videos(config_path,
                                       cropped_video_list,
                                       videotype=cropped_vid_type,
-                                      gputouse=gputouse)
+                                      gputouse=gputouse,
+                                      save_as_csv=save_as_csv)
             scorernames[dlc_network] = scorername
 
     return scorernames
@@ -112,8 +113,8 @@ if __name__ == '__main__':
     # test_pickle_file = '/Users/dan/Documents/deeplabcut/cropped_vids/R0382/R0382_20201216c_direct/R0382_20201216_17-23-50_005_direct_700-1350-270-935DLC_resnet50_skilled_reaching_directOct19shuffle1_200000_full.pickle'
     # skilled_reaching_calibration.read_matlab_calibration(test_calibration_file)
     # pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name(test_pickle_file)
-    test_video_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/videos_to_crop/R0382/R0382_20201216c/R0382_box02_20201216_17-31-47_010.avi'
-    test_calibration_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/calibration_files/2021/202102_calibration/camera_calibration_videos_202102/CameraCalibration_box02_20210211_14-33-25.avi'
+    # test_video_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/videos_to_crop/R0382/R0382_20201216c/R0382_box02_20201216_17-31-47_010.avi'
+    # test_calibration_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/calibration_files/2021/202102_calibration/camera_calibration_videos_202102/CameraCalibration_box02_20210211_14-33-25.avi'
 
     label_videos = True
 
@@ -134,7 +135,7 @@ if __name__ == '__main__':
     cropped_vid_type = '.avi'
 
     videos_parent = '/home/levlab/Public/DLC_DKL/videos_to_analyze'   # on the lambda machine
-    videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
+    # videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
     video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
     cropped_videos_parent = os.path.join(videos_parent, 'cropped_videos')
     marked_videos_parent = os.path.join(videos_parent, 'marked_videos')
@@ -142,12 +143,12 @@ if __name__ == '__main__':
 
     # skilled_reaching_calibration.calibrate_camera_from_video(test_calibration_file, calibration_parent, cb_size=cb_size)
 
-    video_metadata = navigation_utilities.parse_video_name(test_video_file)
-    reconstruct_3d.triangulate_video(test_video_file, marked_videos_parent, calibration_parent, view_list=view_list)
+    # video_metadata = navigation_utilities.parse_video_name(test_video_file)
+    # reconstruct_3d.triangulate_video(test_video_file, marked_videos_parent, calibration_parent, view_list=view_list)
 
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
-    cropped_video_directories = preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_dict, view_list, vidtype='avi')
+    # cropped_video_directories = preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_dict, view_list, vidtype='avi')
 
     # step 2: run the vids through DLC
     # parameters for running DLC
@@ -158,7 +159,7 @@ if __name__ == '__main__':
     }
     folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent, view_list=view_list)
 
-    scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type=cropped_vid_type, gputouse=gputouse)
+    scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
 
     if label_videos:
         create_labeled_videos(cropped_videos_parent,

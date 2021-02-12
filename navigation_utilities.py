@@ -83,31 +83,46 @@ def find_folders_to_analyze(cropped_videos_parent, view_list=('direct', 'leftmir
 
     folders_to_analyze = dict(zip(view_list, ([] for _ in view_list)))
 
-    for view in view_list:
-        if 'direct' in view:
-            view_folder = os.path.join(cropped_videos_parent, 'direct_view')
-        elif 'mirror' in view:
-            view_folder = os.path.join(cropped_videos_parent, 'mirror_views')
-        else:
-            print(view + ' does not contain the keyword "direct" or "mirror"')
-            continue
-
-        rat_folder_list = glob.glob(os.path.join(view_folder + '/R*'))
-
-        for rat_folder in rat_folder_list:
-            # make sure it's actually a folder
-            if os.path.isdir(rat_folder):
-                # assume the rat_folder directory name is the same as ratID (i.e., form of RXXXX)
-                _, ratID = os.path.split(rat_folder)
-                session_name = ratID + '_*_' + view
-                session_dir_list = glob.glob(rat_folder + '/' + session_name)
-
-                # make sure we only include directories (just in case there are some stray files with the right names)
-                session_dir_list = [session_dir for session_dir in session_dir_list if os.path.isdir(session_dir)]
-
-                folders_to_analyze[view].extend(session_dir_list)
+    rat_folder_list = glob.glob(os.path.join(cropped_videos_parent, 'R*'))
+    for rat_folder in rat_folder_list:
+        if os.path.isdir(rat_folder):
+            # assume the rat_folder directory name is the same as ratID (i.e., form of RXXXX)
+            _, ratID = os.path.split(rat_folder)
+            session_name = ratID + '_*'
+            session_dir_list = glob.glob(rat_folder + '/' + session_name)
+            # make sure we only include directories (just in case there are some stray files with the right names)
+            session_dir_list = [session_dir for session_dir in session_dir_list if os.path.isdir(session_dir)]
+            for session_dir in session_dir_list:
+                _, cur_session = os.path.split(session_dir)
+                for view in view_list:
+                    view_folder = os.path.join(session_dir, cur_session + '_' + view)
+                    if os.path.isdir(view_folder):
+                        folders_to_analyze[view].extend([view_folder])
 
     return folders_to_analyze
+
+    # for view in view_list:
+    #
+    #     if 'direct' in view:
+    #         view_folder = os.path.join(cropped_videos_parent, 'direct_view')
+    #     elif 'mirror' in view:
+    #         view_folder = os.path.join(cropped_videos_parent, 'mirror_views')
+    #     else:
+    #         print(view + ' does not contain the keyword "direct" or "mirror"')
+    #         continue
+    #
+    #     rat_folder_list = glob.glob(os.path.join(view_folder + '/R*'))
+    #
+    #     for rat_folder in rat_folder_list:
+    #         # make sure it's actually a folder
+    #         if os.path.isdir(rat_folder):
+    #             # assume the rat_folder directory name is the same as ratID (i.e., form of RXXXX)
+    #             _, ratID = os.path.split(rat_folder)
+    #             session_name = ratID + '_*_' + view
+    #             session_dir_list = glob.glob(rat_folder + '/' + session_name)
+    #
+    #             # make sure we only include directories (just in case there are some stray files with the right names)
+    #             session_dir_list = [session_dir for session_dir in session_dir_list if os.path.isdir(session_dir)]
 
 
 def parse_cropped_video_name(cropped_video_name):

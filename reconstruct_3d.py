@@ -109,9 +109,9 @@ def undistort_points(dlc_data, camera_params):
             for i_row, row in enumerate(coords):
                 if not np.all(row == 0):
                     # a point was found in this frame (coordinate == 0 if no point found)
-                    norm_pt_ud = cv2.undistortPoints(row, camera_params['mtx'], np.array([0.,0.,0.,0.,0.,]))
+                    norm_pt_ud = cv2.undistortPoints(row, camera_params['mtx'], np.array([0.01,0.,0.,0.,0.,]))   # todo: account for distortion coefficients
                     pt_ud = unnormalize_points(norm_pt_ud, camera_params['mtx'])
-                    dlc_data[view][bp][i_row, :]
+                    dlc_data[view][bp]['coordinates'][i_row, :] = np.squeeze(pt_ud)
                     pass
 
                 #todo: write code to normalize and unnormalize points
@@ -124,6 +124,6 @@ def unnormalize_points(pts, mtx):
 
     homogeneous_pts = np.squeeze(cv2.convertPointsToHomogeneous(pts))
     unnormalized_pts = np.matmul(mtx, homogeneous_pts)
-    unnormalized_pts = cv2.convertPointsFromHomogeneous(np.array([unnormalized_pts]))
+    unnormalized_pts = cv2.convertPointsFromHomogeneous(np.array([unnormalized_pts]))    # np.array needed to make dimensions work for the function call
 
     return unnormalized_pts

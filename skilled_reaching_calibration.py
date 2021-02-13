@@ -52,6 +52,8 @@ def read_cube_calibration_points(calibration_folder, pts_per_board=12):
     for calib_file in calibration_files:
         cb_pts = import_fiji_csv(calib_file)
 
+        # still working on this, but probably will never actually need it
+
 
 def sort_points_to_boards(cb_pts):
     """
@@ -155,6 +157,8 @@ def calibrate_camera_from_video(camera_calibration_vid_name, calibration_parent,
         else:
             # finished with the last frame
             break
+
+    video_object.release()
 
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, im_size, None, None)
 

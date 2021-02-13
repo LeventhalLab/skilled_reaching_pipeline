@@ -1,4 +1,5 @@
 import pickle
+import pandas as pd
 import numpy as np
 import scipy.io as sio
 
@@ -44,7 +45,32 @@ def read_matlab_calibration(mat_calibration_name):
     camera_params = {'mtx': mat_cal['K'].transpose(),
                      'Pn': Pn,
                      'F': F,
-                     'E': E
+                     'E': E,
+                     'dist': np.squeeze(mat_cal['dist'])
                      }
 
     return camera_params
+
+
+def read_rat_csv_database(csv_name):
+
+    rat_db = pd.read_csv(csv_name)
+
+    return rat_db
+    # # determine how many lines are in the .csv file
+    # with open(csv_name, newline='\n') as csv_file:
+    #     num_lines = sum(1 for row in csv_file)
+    #
+    # with open(csv_name, newline='\n') as csv_file:
+    #     csv_reader = csv.reader(csv_file, delimiter=',')
+    #     cb_points = np.empty((num_lines-1, 2))
+    #     for i_row, row in enumerate(csv_reader):
+    #         if i_row == 0:
+    #             # check to make sure the header was read in properly
+    #             print(f'Column names are {", ".join(row)}')
+    #         else:
+    #             # read in the rows of checkerboard points
+    #             print('testing')
+    #             pass
+    #
+    # return cb_points

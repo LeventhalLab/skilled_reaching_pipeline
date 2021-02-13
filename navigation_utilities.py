@@ -144,6 +144,7 @@ def parse_cropped_video_name(cropped_video_name):
 
     cropped_vid_metadata = {
         'ratID': '',
+        'rat_num': 0,
         'boxnum': 99,
         'triggertime': datetime(1,1,1),
         'video_number': 0,
@@ -159,6 +160,8 @@ def parse_cropped_video_name(cropped_video_name):
     metadata_list = vid_name.split('_')
 
     cropped_vid_metadata['ratID'] = metadata_list[0]
+    num_string = ''.join(filter(lambda i: i.isdigit(), cropped_vid_metadata['ratID']))
+    cropped_vid_metadata['rat_num'] = int(num_string)
 
     # if box number is stored in file name, then extract it
     if 'box' in metadata_list[1]:
@@ -198,6 +201,7 @@ def parse_video_name(video_name):
 
     video_metadata = {
         'ratID': '',
+        'rat_num': 0,
         'session_name': '',
         'boxnum': 99,
         'triggertime': datetime(1,1,1),
@@ -214,6 +218,8 @@ def parse_video_name(video_name):
     metadata_list = vid_name.split('_')
 
     video_metadata['ratID'] = metadata_list[0]
+    num_string = ''.join(filter(lambda i: i.isdigit(), video_metadata['ratID']))
+    video_metadata['rat_num'] = int(num_string)
 
     # if box number is stored in file name, then extract it
     if 'box' in metadata_list[1]:
@@ -250,6 +256,7 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
 
     pickle_metadata = {
         'ratID': '',
+        'rat_num': 0,
         'boxnum': 99,
         'triggertime': datetime(1,1,1),
         'video_number': 0,
@@ -265,6 +272,8 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
     metadata_list = pickle_name.split('_')
 
     pickle_metadata['ratID'] = metadata_list[0]
+    num_string = ''.join(filter(lambda i: i.isdigit(), pickle_metadata['ratID']))
+    pickle_metadata['rat_num'] = int(num_string)
 
     # if box number is stored in file name, then extract it
     if 'box' in metadata_list[1]:
@@ -513,3 +522,21 @@ def create_calibration_filename(calibration_metadata, calibration_parent):
     calibration_name = os.path.join(calibration_folder, calibration_name)
 
     return calibration_name
+
+
+def create_mat_fname_dlc_output(video_metadata, dlc_mat_output_parent):
+
+    mat_path = os.path.join(dlc_mat_output_parent,
+                            video_metadata['ratID'],
+                            video_metadata['session_name'])
+
+    if not os.path.isdir(mat_path):
+        os.makedirs(mat_path)
+
+    mat_name = '{}_box{:02d}_{}_dlc-out.mat'.format(video_metadata['ratID'],
+                                                    video_metadata['boxnum'],
+                                                    video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S')
+                                                    )
+    mat_name = os.path.join(mat_path, mat_name)
+
+    return mat_name

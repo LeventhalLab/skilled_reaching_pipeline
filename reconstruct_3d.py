@@ -10,13 +10,19 @@ def triangulate_video(video_name, marked_videos_parent, calibration_parent, dlc_
                       view_list=('direct', 'leftmirror', 'rightmirror'),
                       min_confidence=0.95):
 
-    video_metadata = navigation_utilities.parse_video_name(video_name)
+    if isinstance(video_name, str):
+        video_metadata = navigation_utilities.parse_video_name(video_name)
+    else:
+        video_metadata = video_name
     video_metadata['paw_pref'] = rat_df[rat_df['ratID'] == video_metadata['rat_num']]['pawPref'].values[0]
     dlc_output_pickle_names, dlc_metadata_pickle_names = navigation_utilities.find_dlc_output_pickles(video_metadata, marked_videos_parent, view_list=view_list)
     # above line will not complete if all pickle files with DLC output data are not found
 
     # find the calibration files
     calibration_file = navigation_utilities.find_calibration_file(video_metadata, calibration_parent)
+    if calibration_file == '':
+        return
+
     camera_params = skilled_reaching_io.read_matlab_calibration(calibration_file)
     # above lines will not complete if a calibration file is not found
 
@@ -46,7 +52,7 @@ def triangulate_video(video_name, marked_videos_parent, calibration_parent, dlc_
     # test_pt_alignment(video_name, dlc_data)
 
     # reconstruct 3D points
-    reconstruct_trajectories(dlc_data, camera_params)
+    # reconstruct_trajectories(dlc_data, camera_params)
     pass
 
 
@@ -185,22 +191,24 @@ def test_pt_alignment(video_name, dlc_data):
 
     video_object = cv2.VideoCapture(video_name)
 
-    frame_counter = 300
+    frame_counter = 683
     video_object.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
     ret, cur_img = video_object.read()
 
+    bp_to_view = ['leftdig4']
     for view in view_list:
         for bp in bodyparts:
-            if 'left' in bp:
-                circ_color = (0, 0, 255)
-            elif 'right' in bp:
-                circ_color = (0, 255, 0)
-            else:
-                circ_color = (255, 0, 0)
-            x, y = dlc_data[view][bp]['coordinates'][frame_counter]
-            x = int(round(x))
-            y = int(round(y))
-            cur_img = cv2.circle(cur_img, (x,y), circ_r, circ_color, thickness=circ_t)
+            if bp in bp_to_view:
+                if 'left' in bp:
+                    circ_color = (0, 0, 255)
+                elif 'right' in bp:
+                    circ_color = (0, 255, 0)
+                else:
+                    circ_color = (255, 0, 0)
+                x, y = dlc_data[view][bp]['coordinates'][frame_counter]
+                x = int(round(x))
+                y = int(round(y))
+                cur_img = cv2.circle(cur_img, (x,y), circ_r, circ_color, thickness=circ_t)
 
     cv2.imshow('image', cur_img)
     cv2.waitKey(0)
@@ -227,7 +235,13 @@ def package_data_into_mat(dlc_data, video_metadata, trajectory_metadata):
         direct_pts_ud[i_bp, :, :] = dlc_data['direct'][bp]['coordinates']
         mirror_pts_ud[i_bp, :, :] = dlc_data[mirrorview][bp]['coordinates']
         direct_p[i_bp, :] = dlc_data['direct'][bp]['confidence'].T
-        mirror_p[i_bp, :] = dlc_data['direct'][bp]['confidence'].T
+        mirror_p[i_bp, :] = dlc_data[mirrorview][bp]['confidence'].T
+
+    # crop_window is [left, right, top, bottom]
+    # ROIs are [left, top, width, height]
+    ROI_direct = convert_lrtb_to_ltwh(trajectory_metadata['direct']['crop_window'])
+    ROI_mirror = convert_lrtb_to_ltwh(trajectory_metadata[mirrorview]['crop_window'])
+    ROIs = np.vstack((ROI_direct, ROI_mirror))
 
     mat_data = {'direct_pts_ud': direct_pts_ud,
                 'mirror_pts_ud': mirror_pts_ud,
@@ -235,7 +249,26 @@ def package_data_into_mat(dlc_data, video_metadata, trajectory_metadata):
                 'mirror_bp': trajectory_metadata[mirrorview]['bodyparts'],
                 'direct_p': direct_p,
                 'mirror_p': mirror_p,
-                'paw_pref': video_metadata['paw_pref']
+                'paw_pref': video_metadata['paw_pref'],
+                'im_size': video_metadata['im_size'],
+                'video_number': video_metadata['video_number'],
+                'ROIs': ROIs
                 }
 
     return mat_data
+
+
+def convert_lrtb_to_ltwh(crop_window):
+
+    # crop_window is [left, right, top, bottom]
+    # ROIs are [left, top, width, height]
+
+    ROI = np.zeros(4)
+    ROI[0] = crop_window[0]
+    ROI[1] = crop_window[2]
+    w = crop_window[1] - crop_window[0] + 1
+    h = crop_window[3] - crop_window[2] + 1
+    ROI[2] = w
+    ROI[3] = h
+
+    return ROI

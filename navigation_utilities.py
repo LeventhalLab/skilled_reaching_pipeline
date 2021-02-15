@@ -1,6 +1,8 @@
 import os
 import glob
 import sys
+import cv2
+import pandas as pd
 from datetime import datetime
 
 
@@ -207,8 +209,15 @@ def parse_video_name(video_name):
         'triggertime': datetime(1,1,1),
         'video_number': 0,
         'video_type': '',
-        'video_name': ''
+        'video_name': '',
+        'im_size': (1024, 2040)
     }
+
+    if os.path.exists(video_name):
+        video_object = cv2.VideoCapture(video_name)
+        video_metadata['im_size'] = (int(video_object.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                   int(video_object.get(cv2.CAP_PROP_FRAME_WIDTH)))
+
     vid_path, vid_name = os.path.split(video_name)
     video_metadata['video_name'] = vid_name
     # the last folder in the tree should have the session name
@@ -401,17 +410,28 @@ def construct_dlc_output_pickle_names(video_metadata, view):
     :param view: string containing 'direct', 'leftmirror', or 'rightmirror'
     :return:
     """
-    pickle_name_full = video_metadata['ratID'] + '_' + \
-                  'box{:02d}'.format(video_metadata['boxnum']) + '_' + \
-                  video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S') + '_' + \
-                  '{:03d}'.format(video_metadata['video_number']) + '_' + \
-                  view + '_*_full.pickle'
+    if video_metadata['boxnum'] == 99:
+        pickle_name_full = video_metadata['ratID'] + '_' + \
+                           video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S') + '_' + \
+                           '{:03d}'.format(video_metadata['video_number']) + '_' + \
+                           view + '_*_full.pickle'
 
-    pickle_name_meta = video_metadata['ratID'] + '_' + \
-                       'box{:02d}'.format(video_metadata['boxnum']) + '_' + \
-                       video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S') + '_' + \
-                       '{:03d}'.format(video_metadata['video_number']) + '_' + \
-                       view + '_*_meta.pickle'
+        pickle_name_meta = video_metadata['ratID'] + '_' + \
+                           video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S') + '_' + \
+                           '{:03d}'.format(video_metadata['video_number']) + '_' + \
+                           view + '_*_meta.pickle'
+    else:
+        pickle_name_full = video_metadata['ratID'] + '_' + \
+                      'box{:02d}'.format(video_metadata['boxnum']) + '_' + \
+                      video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S') + '_' + \
+                      '{:03d}'.format(video_metadata['video_number']) + '_' + \
+                      view + '_*_full.pickle'
+
+        pickle_name_meta = video_metadata['ratID'] + '_' + \
+                           'box{:02d}'.format(video_metadata['boxnum']) + '_' + \
+                           video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S') + '_' + \
+                           '{:03d}'.format(video_metadata['video_number']) + '_' + \
+                           view + '_*_meta.pickle'
 
     return pickle_name_full, pickle_name_meta
 
@@ -434,7 +454,8 @@ def find_calibration_file(video_metadata, calibration_parent):
     if os.path.exists(test_name):
         return test_name
     else:
-        sys.exit('No calibration file found for ' + video_metadata['video_name'])
+        return ''
+        # sys.exit('No calibration file found for ' + video_metadata['video_name'])
 
 
 def create_trajectory_filename(video_metadata):
@@ -540,3 +561,83 @@ def create_mat_fname_dlc_output(video_metadata, dlc_mat_output_parent):
     mat_name = os.path.join(mat_path, mat_name)
 
     return mat_name
+
+
+def find_marked_vids_for_3d_reconstruction(marked_vids_parent, dlc_mat_output_parent, rat_df):
+
+    # find marked vids for which we have both relevant views (eventually, need all 3 views)
+    marked_rat_folders = glob.glob(os.path.join(marked_vids_parent, 'R*'))
+
+    # return a list of video_metadata dictionaries
+    metadata_list = []
+    for rat_folder in marked_rat_folders:
+        if os.path.isdir(rat_folder):
+            _, ratID = os.path.split(rat_folder)
+            rat_num = int(ratID[1:])
+            paw_pref = rat_df[rat_df['ratID'] == rat_num]['pawPref'].values[0]
+            if paw_pref == 'right':
+                mirrorview = 'leftmirror'
+            else:
+                mirrorview = 'rightmirror'
+            # find the paw preference for this rat
+
+            session_folders = glob.glob(os.path.join(rat_folder, ratID + '_*'))
+
+            for session_folder in session_folders:
+                if os.path.isdir(session_folder):
+                    _, session_name = os.path.split(session_folder)
+
+                    # check that there is a direct_marked folder for this session
+                    direct_marked_folder = os.path.join(session_folder, session_name + '_direct_marked')
+                    mirror_marked_folder = os.path.join(session_folder, session_name + '_' + mirrorview + '_marked')
+
+                    if not os.path.isdir(mirror_marked_folder):
+                        continue
+
+                    if os.path.isdir(direct_marked_folder):
+                        # find all the full_pickle and metadata_pickle files in the folder, and look to see if there are
+                        # matching files in the appropriate mirror view folder
+                        test_name = ratID + '_*_full.pickle'
+                        full_pickle_list = glob.glob(os.path.join(direct_marked_folder, test_name))
+
+                        for full_pickle_file in full_pickle_list:
+                            # is there a matching metadata file, as well as matching metadata files in the mirror folder?
+                            _, pickle_name = os.path.split(full_pickle_file)
+                            pickle_metadata = parse_dlc_output_pickle_name(pickle_name)
+                            # crop_window_string = '{:d}-{:d}-{:d}-{:d}'.format(pickle_metadata['crop_window'][0],
+                            #                                                   pickle_metadata['crop_window'][1],
+                            #                                                   pickle_metadata['crop_window'][2],
+                            #                                                   pickle_metadata['crop_window'][3]
+                            #                                                   )
+                            meta_direct_file = os.path.join(direct_marked_folder, pickle_name.replace('full', 'meta'))
+                            vid_prefix = pickle_name[:pickle_name.find('direct')]
+                            test_mirror_name = vid_prefix + '*_full.pickle'
+                            full_mirror_name_list = glob.glob(os.path.join(mirror_marked_folder, test_mirror_name))
+                            if len(full_mirror_name_list) == 1:
+                                full_mirror_file = full_mirror_name_list[0]
+                                _, full_mirror_name = os.path.split(full_mirror_file)
+                                meta_mirror_file = os.path.join(mirror_marked_folder, full_mirror_name.replace('full', 'meta'))
+                                if os.path.exists(meta_direct_file) and os.path.exists(meta_mirror_file):
+
+                                    video_name = '{}_box{:02d}_{}_{:03d}.avi'.format(ratID,
+                                                                                     pickle_metadata['boxnum'],
+                                                                                     pickle_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S'),
+                                                                                     pickle_metadata['video_number'])
+                                    video_metadata = {
+                                        'ratID': ratID,
+                                        'rat_num': rat_num,
+                                        'session_name': session_name,
+                                        'boxnum': pickle_metadata['boxnum'],
+                                        'triggertime': pickle_metadata['triggertime'],
+                                        'video_number': pickle_metadata['video_number'],
+                                        'video_type': '.avi',
+                                        'video_name': video_name,
+                                        'im_size': (1024, 2040)
+                                    }
+                                    mat_output_name = create_mat_fname_dlc_output(video_metadata, dlc_mat_output_parent)
+                                    # check if these files have already been processed
+                                    if not os.path.exists(mat_output_name):
+                                        # .mat file doesn't already exist
+                                        metadata_list.append(video_metadata)
+
+    return metadata_list

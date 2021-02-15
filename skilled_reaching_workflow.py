@@ -10,7 +10,7 @@ import pandas as pd
 import deeplabcut
 
 
-def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type='.avi', gputouse=0, save_as_csv=True):
+def analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_vids_parent, cropped_vid_type='.avi', gputouse=0, save_as_csv=True):
     '''
 
     :param folders_to_analyze:
@@ -44,6 +44,15 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_ty
                                       gputouse=gputouse,
                                       save_as_csv=save_as_csv)
             scorernames[dlc_network] = scorername
+
+            new_dir = navigation_utilities.create_marked_vids_folder(current_folder, cropped_videos_parent,
+                                                                     marked_vids_parent)
+            pickle_list = glob.glob(os.path.join(current_folder, '*.pickle'))
+            for pickle_file in pickle_list:
+                # if the file already exists in the marked_vid directory, don't move it
+                _, pickle_name = os.path.split(pickle_file)
+                if not os.path.isfile(os.path.join(new_dir, pickle_name)):
+                    shutil.copy(pickle_file, new_dir)
 
     return scorernames
 
@@ -110,12 +119,12 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
 
 if __name__ == '__main__':
 
-    cb_size = (6,9)
+    cb_size = (6, 9)
     # test_calibration_file = '/Volumes/Untitled/DLC_output/calibration_images/2020/202012_calibration/202012_calibration_files/SR_boxCalibration_box04_20201217.mat'
     # test_pickle_file = '/Users/dan/Documents/deeplabcut/cropped_vids/R0382/R0382_20201216c_direct/R0382_20201216_17-23-50_005_direct_700-1350-270-935DLC_resnet50_skilled_reaching_directOct19shuffle1_200000_full.pickle'
     # skilled_reaching_calibration.read_matlab_calibration(test_calibration_file)
     # pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name(test_pickle_file)
-    test_video_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/videos_to_crop/R0382/R0382_20201216c/R0382_box02_20201216_17-31-47_010.avi'
+    # test_video_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/videos_to_crop/R0382/R0382_20201216c/R0382_box02_20201216_17-31-47_010.avi'
     # test_calibration_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/calibration_files/2021/202102_calibration/camera_calibration_videos_202102/CameraCalibration_box02_20210211_14-33-25.avi'
     rat_database_name = '/Users/dan/Documents/deeplabcut/videos_to_analyze/SR_rat_database.csv'
     label_videos = True
@@ -149,8 +158,13 @@ if __name__ == '__main__':
 
     # skilled_reaching_calibration.calibrate_camera_from_video(test_calibration_file, calibration_parent, cb_size=cb_size)
 
-    video_metadata = navigation_utilities.parse_video_name(test_video_file)
-    reconstruct_3d.triangulate_video(test_video_file, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df, view_list=view_list)
+    # video_metadata = navigation_utilities.parse_video_name(test_video_file)
+
+
+    metadata_list = navigation_utilities.find_marked_vids_for_3d_reconstruction(marked_videos_parent, dlc_mat_output_parent, rat_df)
+
+    for md in metadata_list:
+        reconstruct_3d.triangulate_video(md, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df, view_list=view_list)
 
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
@@ -165,7 +179,7 @@ if __name__ == '__main__':
     }
     folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent, view_list=view_list)
 
-    scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
+    scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_videos_parent, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
 
     if label_videos:
         create_labeled_videos(cropped_videos_parent,
@@ -178,3 +192,5 @@ if __name__ == '__main__':
                               view_list=view_list)
 
     # step 3: make sure calibration has been run for these sessions
+
+    # step 4: reconstruct the 3d trajectories

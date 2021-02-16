@@ -6,14 +6,18 @@ import skilled_reaching_io
 import pandas as pd
 import scipy.io as sio
 
-def triangulate_video(video_name, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df,
-                      view_list=('direct', 'leftmirror', 'rightmirror'),
+def triangulate_video(video_id, videos_parent, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df,
+                      view_list=None,
                       min_confidence=0.95):
 
-    if isinstance(video_name, str):
-        video_metadata = navigation_utilities.parse_video_name(video_name)
+    if view_list is None:
+        view_list = ('direct', 'leftmirror', 'rightmirror')
+
+    if isinstance(video_id, str):
+        video_metadata = navigation_utilities.parse_video_name(video_id)
     else:
-        video_metadata = video_name
+        video_metadata = video_id
+
     video_metadata['paw_pref'] = rat_df[rat_df['ratID'] == video_metadata['rat_num']]['pawPref'].values[0]
     dlc_output_pickle_names, dlc_metadata_pickle_names = navigation_utilities.find_dlc_output_pickles(video_metadata, marked_videos_parent, view_list=view_list)
     # above line will not complete if all pickle files with DLC output data are not found
@@ -48,8 +52,11 @@ def triangulate_video(video_name, marked_videos_parent, calibration_parent, dlc_
 
     mat_data = package_data_into_mat(dlc_data, video_metadata, trajectory_metadata)
     mat_name = navigation_utilities.create_mat_fname_dlc_output(video_metadata, dlc_mat_output_parent)
-    sio.savemat(mat_name, mat_data)
+
+    # video_name = navigation_utilities.build_video_name(video_metadata, videos_parent)
     # test_pt_alignment(video_name, dlc_data)
+
+    sio.savemat(mat_name, mat_data)
 
     # reconstruct 3D points
     # reconstruct_trajectories(dlc_data, camera_params)
@@ -132,8 +139,8 @@ def extract_data_from_dlc_output(dlc_output, trajectory_metadata):
         dlc_data[view] = {bp: None for bp in trajectory_metadata[view]['bodyparts']}
         for i_bp, bp in enumerate(trajectory_metadata[view]['bodyparts']):
 
-            dlc_data[view][bp] = {'coordinates': np.empty((num_frames, 2)),
-                                  'confidence': np.empty((num_frames, 1)),
+            dlc_data[view][bp] = {'coordinates': np.zeros((num_frames, 2)),
+                                  'confidence': np.zeros((num_frames, 1)),
                                   }
 
             for i_frame in range(num_frames):
@@ -191,11 +198,11 @@ def test_pt_alignment(video_name, dlc_data):
 
     video_object = cv2.VideoCapture(video_name)
 
-    frame_counter = 683
+    frame_counter = 310
     video_object.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
     ret, cur_img = video_object.read()
 
-    bp_to_view = ['leftdig4']
+    bp_to_view = bodyparts
     for view in view_list:
         for bp in bodyparts:
             if bp in bp_to_view:
@@ -206,9 +213,12 @@ def test_pt_alignment(video_name, dlc_data):
                 else:
                     circ_color = (255, 0, 0)
                 x, y = dlc_data[view][bp]['coordinates'][frame_counter]
-                x = int(round(x))
-                y = int(round(y))
-                cur_img = cv2.circle(cur_img, (x,y), circ_r, circ_color, thickness=circ_t)
+                try:
+                    x = int(round(x))
+                    y = int(round(y))
+                    cur_img = cv2.circle(cur_img, (x,y), circ_r, circ_color, thickness=circ_t)
+                except:
+                    pass
 
     cv2.imshow('image', cur_img)
     cv2.waitKey(0)

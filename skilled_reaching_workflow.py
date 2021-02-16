@@ -164,7 +164,7 @@ if __name__ == '__main__':
     metadata_list = navigation_utilities.find_marked_vids_for_3d_reconstruction(marked_videos_parent, dlc_mat_output_parent, rat_df)
 
     for md in metadata_list:
-        reconstruct_3d.triangulate_video(md, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df, view_list=view_list)
+        reconstruct_3d.triangulate_video(md, videos_parent, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df, view_list=view_list)
 
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)

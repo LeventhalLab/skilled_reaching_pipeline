@@ -73,7 +73,7 @@ def parse_session_dir_name(session_dir):
     return ratID, session_name
 
 
-def find_folders_to_analyze(cropped_videos_parent, view_list=('direct', 'leftmirror', 'rightmirror')):
+def find_folders_to_analyze(cropped_videos_parent, view_list=None):
     """
     get the full list of directories containing cropped videos in the videos_to_analyze folder
     :param cropped_videos_parent: parent directory with subfolders direct_view and mirror_views, which have subfolders
@@ -82,6 +82,9 @@ def find_folders_to_analyze(cropped_videos_parent, view_list=('direct', 'leftmir
     :return: folders_to_analyze: dictionary containing a key for each member of view_list. Each key holds a list of
         folders to run through deeplabcut
     """
+
+    if view_list is None:
+        view_list = ('direct', 'leftmirror', 'rightmirror')
 
     folders_to_analyze = dict(zip(view_list, ([] for _ in view_list)))
 
@@ -246,6 +249,16 @@ def parse_video_name(video_name):
     return video_metadata
 
 
+def build_video_name(video_metadata, videos_parent):
+
+    video_name = '{}_box{:02d}_{}_{:03d}.avi'.format(video_metadata['ratID'],
+                                                  video_metadata['boxnum'],
+                                                  video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S'),
+                                                  video_metadata['video_number'])
+    video_name = os.path.join(videos_parent, 'videos_to_crop', video_metadata['ratID'], video_metadata['session_name'], video_name)
+    return video_name
+
+
 def parse_dlc_output_pickle_name(dlc_output_pickle_name):
     """
     extract metadata information from the pickle file name
@@ -358,7 +371,7 @@ def create_calibration_file_tree(calibration_parent, vid_metadata):
     return calibration_file_tree
 
 
-def find_dlc_output_pickles(video_metadata, marked_videos_parent, view_list=('direct', 'leftmirror', 'rightmirror')):
+def find_dlc_output_pickles(video_metadata, marked_videos_parent, view_list=None):
     """
 
     :param video_metadata:
@@ -366,6 +379,9 @@ def find_dlc_output_pickles(video_metadata, marked_videos_parent, view_list=('di
     :param view_list:
     :return:
     """
+    if view_list is None:
+        view_list = ('direct', 'leftmirror', 'rightmirror')
+
     session_name = video_metadata['session_name']
     rat_pickle_folder = os.path.join(marked_videos_parent, video_metadata['ratID'])
     session_pickle_folder = os.path.join(rat_pickle_folder, session_name)

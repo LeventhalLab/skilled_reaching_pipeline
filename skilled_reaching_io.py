@@ -63,7 +63,7 @@ def read_rat_csv_database(csv_name):
     #
     # with open(csv_name, newline='\n') as csv_file:
     #     csv_reader = csv.reader(csv_file, delimiter=',')
-    #     cb_points = np.empty((num_lines-1, 2))
+    #     cb_points = np.zeros((num_lines-1, 2))
     #     for i_row, row in enumerate(csv_reader):
     #         if i_row == 0:
     #             # check to make sure the header was read in properly

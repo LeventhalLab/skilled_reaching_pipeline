@@ -570,10 +570,11 @@ def create_mat_fname_dlc_output(video_metadata, dlc_mat_output_parent):
     if not os.path.isdir(mat_path):
         os.makedirs(mat_path)
 
-    mat_name = '{}_box{:02d}_{}_dlc-out.mat'.format(video_metadata['ratID'],
-                                                    video_metadata['boxnum'],
-                                                    video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S')
-                                                    )
+    mat_name = '{}_box{:02d}_{}_{:03d}_dlc-out.mat'.format(video_metadata['ratID'],
+                                                           video_metadata['boxnum'],
+                                                           video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S'),
+                                                           video_metadata['video_number']
+                                                           )
     mat_name = os.path.join(mat_path, mat_name)
 
     return mat_name

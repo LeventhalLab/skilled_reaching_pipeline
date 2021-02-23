@@ -53,7 +53,7 @@ def triangulate_video(video_id, videos_parent, marked_videos_parent, calibration
     mat_data = package_data_into_mat(dlc_data, video_metadata, trajectory_metadata)
     mat_name = navigation_utilities.create_mat_fname_dlc_output(video_metadata, dlc_mat_output_parent)
 
-    # video_name = navigation_utilities.build_video_name(video_metadata, videos_parent)
+    video_name = navigation_utilities.build_video_name(video_metadata, videos_parent)
     # test_pt_alignment(video_name, dlc_data)
 
     sio.savemat(mat_name, mat_data)
@@ -198,7 +198,7 @@ def test_pt_alignment(video_name, dlc_data):
 
     video_object = cv2.VideoCapture(video_name)
 
-    frame_counter = 310
+    frame_counter = 250
     video_object.set(cv2.CAP_PROP_POS_FRAMES, frame_counter)
     ret, cur_img = video_object.read()
 

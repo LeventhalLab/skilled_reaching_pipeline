@@ -35,9 +35,10 @@ def triangulate_video(video_id, videos_parent, marked_videos_parent, calibration
     dlc_metadata = {view: None for view in view_list}
     pickle_name_metadata = {view: None for view in view_list}
     for view in view_list:
-        dlc_output[view] = skilled_reaching_io.read_pickle(dlc_output_pickle_names[view])
-        dlc_metadata[view] = skilled_reaching_io.read_pickle(dlc_metadata_pickle_names[view])
-        pickle_name_metadata[view] = navigation_utilities.parse_dlc_output_pickle_name(dlc_output_pickle_names[view])
+        if not dlc_output_pickle_names[view] is None:
+            dlc_output[view] = skilled_reaching_io.read_pickle(dlc_output_pickle_names[view])
+            dlc_metadata[view] = skilled_reaching_io.read_pickle(dlc_metadata_pickle_names[view])
+            pickle_name_metadata[view] = navigation_utilities.parse_dlc_output_pickle_name(dlc_output_pickle_names[view])
 
     trajectory_filename = navigation_utilities.create_trajectory_filename(video_metadata)
 
@@ -79,6 +80,8 @@ def extract_trajectory_metadata(dlc_metadata, name_metadata):
     trajectory_metadata = {view: None for view in view_list}
 
     for view in view_list:
+        if name_metadata[view] is None:
+            continue
         trajectory_metadata[view] = {'bodyparts': dlc_metadata[view]['data']['DLC-model-config file']['all_joints_names'],
                                      'num_frames': dlc_metadata[view]['data']['nframes'],
                                      'crop_window': name_metadata[view]['crop_window']
@@ -93,6 +96,9 @@ def translate_points_to_full_frame(dlc_data, trajectory_metadata):
     view_list = tuple(trajectory_metadata.keys())
 
     for view in view_list:
+        if trajectory_metadata[view] is None:
+            continue
+
         if view == 'rightmirror':
             crop_width = trajectory_metadata[view]['crop_window'][1] - trajectory_metadata[view]['crop_window'][0] + 1
             # images were reversed after cropping, so need to reverse back before undistorting. Also, left and right
@@ -135,6 +141,8 @@ def extract_data_from_dlc_output(dlc_output, trajectory_metadata):
     dlc_data = {view: None for view in view_list}
     for view in view_list:
         # initialize dictionaries for each bodypart
+        if trajectory_metadata[view] is None:
+            continue
         num_frames = trajectory_metadata[view]['num_frames']
         dlc_data[view] = {bp: None for bp in trajectory_metadata[view]['bodyparts']}
         for i_bp, bp in enumerate(trajectory_metadata[view]['bodyparts']):
@@ -162,8 +170,11 @@ def undistort_points(dlc_data, camera_params):
     view_list = dlc_data.keys()
 
     for view in view_list:
-        bodyparts = dlc_data[view].keys()
 
+        if dlc_data[view] is None:
+            continue
+
+        bodyparts = dlc_data[view].keys()
         for bp in bodyparts:
             for i_row, row in enumerate(dlc_data[view][bp]['coordinates']):
                 if not np.all(row == 0):

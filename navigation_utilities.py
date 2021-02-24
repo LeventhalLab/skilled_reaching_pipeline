@@ -407,11 +407,13 @@ def find_dlc_output_pickles(video_metadata, marked_videos_parent, view_list=None
 
         if len(pickle_full_list) == 0:
             # no pickle file for this view
-            sys.exit('No dlc output file found for {}'.format(video_metadata['video_name']))
+            print('No dlc output file found for {}, {} view'.format(video_metadata['video_name'], view))
+            continue
 
         if len(pickle_meta_list) == 0:
             # no pickle file for this view
-            sys.exit('No dlc output metadata file found for {}'.format(video_metadata['video_name']))
+            print('No dlc output metadata file found for {}, {} view'.format(video_metadata['video_name'], view))
+            continue
 
         dlc_output_pickle_names[view] = pickle_full_list[0]
         dlc_metadata_pickle_names[view] = pickle_meta_list[0]

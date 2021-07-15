@@ -175,3 +175,6 @@ def calibrate_camera_from_video(camera_calibration_vid_name, calibration_parent,
     calibration_name = navigation_utilities.create_calibration_filename(calibration_metadata, calibration_parent)
 
     skilled_reaching_io.write_pickle(calibration_name, stereo_params)
+
+
+def calibration_multi_camera(calibration_vids, calibration_parent, cb_size=(6,9))

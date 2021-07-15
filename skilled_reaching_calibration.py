@@ -177,4 +177,72 @@ def calibrate_camera_from_video(camera_calibration_vid_name, calibration_parent,
     skilled_reaching_io.write_pickle(calibration_name, stereo_params)
 
 
-def calibration_multi_camera(calibration_vids, calibration_parent, cb_size=(6,9))
+def multi_camera_calibration(calibration_vids, calibration_parent, cb_size=(10,7)):
+
+    imgpoints, objpoints = collect_cb_corners(calibration_vids, cb_size=cb_size)
+    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, im_size, None, None)
+    pass
+
+def collect_cb_corners(calibration_vids, cb_size):
+
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+    video_object = []
+    num_frames = []
+    for i_vid, cal_vid in enumerate(calibration_vids):
+        video_object.append(cv2.VideoCapture(cal_vid))
+        num_frames.append(video_object[i_vid].get(cv2.CAP_PROP_FRAME_COUNT))
+
+    num_frames = [int(nf) for nf in num_frames]
+    if all(nf == num_frames[0] for nf in num_frames):
+        # check that there are the same number of frames in each calibration video
+
+        # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+        cbrow = cb_size[0]
+        cbcol = cb_size[1]
+        objp = np.zeros((cbrow * cbcol, 3), np.float32)
+        objp[:, :2] = np.mgrid[0:cbcol, 0:cbrow].T.reshape(-1, 2)
+
+        objpoints = []
+        imgpoints = [[] for ii in calibration_vids]
+        ret = [[] for ii in calibration_vids]
+
+        valid_frames = [False for frame_num in range(num_frames[0])]
+        for i_frame in range(num_frames[0]):
+            print(i_frame)
+            cur_img = [[] for ii in calibration_vids]
+            for i_vid, vid_obj in enumerate(video_object):
+
+                vid_obj.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
+                ret[i_vid], cur_img[i_vid] = vid_obj.read()
+
+            cur_img_gray = []
+            found_valid_chessboard = [[] for ii in calibration_vids]
+            corners = [[] for ii in calibration_vids]
+            if all(ret):
+                # matching frames were loaded from each video
+                for i_vid, vid_obj in enumerate(video_object):
+                    cur_img_gray.append(cv2.cvtColor(cur_img[i_vid], cv2.COLOR_BGR2GRAY))
+                    found_valid_chessboard[i_vid], corners[i_vid] = cv2.findChessboardCorners(cur_img_gray[i_vid], cb_size)
+
+                    # corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners[i_vid],
+                    #                                         found_valid_chessboard[i_vid])
+                    # cv2.imshow('image', corners_img)
+                    # cv2.waitKey(0)
+
+                if all(found_valid_chessboard):
+
+                    corners2 = []
+                    for i_vid, vid_obj in enumerate(video_object):
+                        # refine the points, then save the checkerboard image and a metadata file to disk
+                        corners2.append(cv2.cornerSubPix(cur_img_gray[i_vid], corners[i_vid], (11, 11), (-1, -1), criteria))
+                        imgpoints[i_vid].append(corners2)
+                        objpoints.append(objp)
+
+                        # # below is for checking if corners were correctly identified
+                        # corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid], found_valid_chessboard[i_vid])
+                        # # cv2.imwrite(corners_img_name, corners_img)
+                        # cv2.imshow('image', corners_img)
+                        # cv2.waitKey(0)
+
+
+        return imgpoints, objpoints

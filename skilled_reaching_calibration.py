@@ -177,13 +177,35 @@ def calibrate_camera_from_video(camera_calibration_vid_name, calibration_parent,
     skilled_reaching_io.write_pickle(calibration_name, stereo_params)
 
 
-def multi_camera_calibration(calibration_vids, calibration_parent, cb_size=(10,7)):
+def multi_camera_calibration(calibration_vids, cal_data_parent, cb_size=(10,7)):
 
-    imgpoints, objpoints = collect_cb_corners(calibration_vids, cb_size=cb_size)
-    # save the imgpoints and objpoints along with metadata
+    vid_name_parts = navigation_utilities.parse_Burgess_calibration_vid_name(calibration_vids[0])
+    cal_data_name = navigation_utilities.create_calibration_data_name(cal_data_parent,
+                                                                      vid_name_parts['session_datetime'])
+
+    if not os.path.exists(cal_data_name):
+        calibration_data = collect_cb_corners(calibration_vids, cb_size=cb_size)
+        # save the imgpoints and objpoints along with metadata
+        skilled_reaching_io.write_pickle(cal_data_name, calibration_data)
+    else:
+        calibration_data = skilled_reaching_io.read_pickle(cal_data_name)
+
+    # verify_checkerboard_points(calibration_vids, calibration_data)
+
+    # first, calibrate each camera individually
+    # initialize arrays to hold camera intrinsics, distortion coefficients, rotation, translation vectors
+    mtx = [[] for ii in calibration_data['cam_objpoints']]
+    dist = [[] for ii in calibration_data['cam_objpoints']]
+    for i_cam, objpoints in enumerate(calibration_data['cam_objpoints']):
+        imgpoints = calibration_data['cam_imgpoints'][i_cam]
+        im_size = calibration_data['im_size'][i_cam]
+        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, im_size, None, None)
+        pass
+
 
     retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T, E, F = cv2.stereoCalibrate(objpoints, imgpoints[0], imgpoints[1], im_size, None, None)
     pass
+
 
 def collect_cb_corners(calibration_vids, cb_size):
 
@@ -191,9 +213,11 @@ def collect_cb_corners(calibration_vids, cb_size):
 
     video_object = []
     num_frames = []
+    im_size = []
     for i_vid, cal_vid in enumerate(calibration_vids):
         video_object.append(cv2.VideoCapture(cal_vid))
         num_frames.append(video_object[i_vid].get(cv2.CAP_PROP_FRAME_COUNT))
+        im_size.append((int(video_object[i_vid].get(cv2.CAP_PROP_FRAME_WIDTH)), int(video_object[i_vid].get(cv2.CAP_PROP_FRAME_HEIGHT))))
 
     num_frames = [int(nf) for nf in num_frames]
     if all(nf == num_frames[0] for nf in num_frames):
@@ -212,7 +236,8 @@ def collect_cb_corners(calibration_vids, cb_size):
 
         valid_frames = [[False for frame_num in range(num_frames[0])] for ii in calibration_vids]
 
-        for i_frame in range(num_frames[0]):
+        # for i_frame in range(num_frames[0]):
+        for i_frame in range(10):   # take this out later
             print(i_frame)
 
             corners2 = [[] for ii in calibration_vids]
@@ -238,16 +263,48 @@ def collect_cb_corners(calibration_vids, cb_size):
                     stereo_imgpoints[i_vid].append(corner_pts)
 
             # todo: test that the checkerboard points in each imgpoint array are correct
-            # below is for checking if corners were correctly identified
-            corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid], found_valid_chessboard)
-            # cv2.imwrite(corners_img_name, corners_img)
-            cv2.imshow('image', corners_img)
-            cv2.waitKey(0)
+            # # below is for checking if corners were correctly identified
+            # corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid], found_valid_chessboard)
+            # # cv2.imwrite(corners_img_name, corners_img)
+            # cv2.imshow('image', corners_img)
+            # cv2.waitKey(0)
 
-        return imgpoints, objpoints
+        calibration_data = {
+            'cam_objpoints': cam_objpoints,
+            'cam_imgpoints': cam_imgpoints,
+            'stereo_objpoints': stereo_imgpoints,
+            'stereo_imgpoints': stereo_objpoints,
+            'valid_frames': valid_frames,
+            'im_size': im_size,
+            'cb_size': cb_size
+        }
+
+        return calibration_data
 
     else:
         # calibration videos have different numbers of frames, so not clear how to line them up
 
-        return none, none
+        return none, none, none, none
+
+
+def verify_checkerboard_points(calibration_vids, calibration_data):
+
+    for i_vid, cal_vid in enumerate(calibration_vids):
+
+        vid_obj = cv2.VideoCapture(cal_vid)
+        num_frames = int(vid_obj.get(cv2.CAP_PROP_FRAME_COUNT))
+        valid_frame_counter = 0
+        for i_frame in range(num_frames):
+
+            if calibration_data['valid_frames'][i_vid][i_frame]:
+
+                vid_obj.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
+                ret, cur_img = vid_obj.read()
+
+                corners = calibration_data['cam_imgpoints'][i_vid][valid_frame_counter]
+                valid_frame_counter += 1
+
+                corners_img = cv2.drawChessboardCorners(cur_img, calibration_data['cb_size'], corners, calibration_data['valid_frames'][i_vid][i_frame])
+                cv2.imshow('image', corners_img)
+                cv2.waitKey(0)
 

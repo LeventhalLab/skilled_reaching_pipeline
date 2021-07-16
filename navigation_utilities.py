@@ -660,3 +660,90 @@ def find_marked_vids_for_3d_reconstruction(marked_vids_parent, dlc_mat_output_pa
                                         metadata_list.append(video_metadata)
 
     return metadata_list
+
+
+
+def find_Burgess_calibration_folder(calibration_parent, session_datetime):
+
+    session_year = session_datetime.strftime('%Y')
+    session_month = session_datetime.strftime('%m')
+
+    year_folder = 'calibration_vids_' + session_year
+    month_folder = year_folder + session_month
+
+    calibration_folder = os.path.join(calibration_parent, year_folder, month_folder)
+
+    if os.path.exists(calibration_folder):
+        return calibration_folder
+    else:
+        return none
+
+
+def find_Burgess_calibration_vids(cal_vid_parent, session_datetime, cam_list=(1, 2)):
+
+    cal_vid_folder = find_Burgess_calibration_folder(cal_vid_parent, session_datetime)
+
+    basename = 'calibration_cam'
+    full_paths = []
+
+    for i_cam in cam_list:
+        vid_name = basename + '{:02d}_{date_string}.avi'.format(i_cam, date_string=datetime_to_string_for_fname(session_datetime))
+        full_paths.append(os.path.join(cal_vid_folder, vid_name))
+
+    return full_paths
+
+
+def parse_Burgess_calibration_vid_name(cal_vid_name):
+
+    _, cal_vid_name = os.path.split(cal_vid_name)
+    bare_name, _ = os.path.splitext(cal_vid_name)
+
+    name_parts_list = bare_name.split('_')
+
+    cal_name_parts = {
+        'cam_num': int(name_parts_list[1][3:]),
+        'session_datetime': fname_string_to_datetime(name_parts_list[2] + '_' + name_parts_list[3])
+    }
+
+    return cal_name_parts
+
+
+def create_calibration_data_name(cal_data_parent, session_datetime):
+
+    basename = 'calibration_data'
+    cal_data_name = basename + '_' + datetime_to_string_for_fname(session_datetime) + '.pickle'
+
+    cal_data_folder = create_calibration_data_folder(cal_data_parent, session_datetime)
+    cal_data_name = os.path.join(cal_data_folder, cal_data_name)
+
+    return cal_data_name
+
+
+def create_calibration_data_folder(cal_data_parent, session_datetime):
+
+    year_folder = 'calibration_data_' + session_datetime.strftime('%Y')
+    month_folder = year_folder + session_datetime.strftime('%m')
+
+    cal_data_folder = os.path.join(cal_data_parent, year_folder, month_folder)
+
+    if not os.path.exists(cal_data_folder):
+        os.makedirs(cal_data_folder)
+
+    return cal_data_folder
+
+
+def datetime_to_string_for_fname(date_to_convert):
+
+    format_string = '%Y%m%d_%H-%M-%S'
+
+    datetime_string = date_to_convert.strftime('%Y%m%d_%H-%M-%S')
+
+    return datetime_string
+
+
+def fname_string_to_datetime(string_to_convert):
+    format_string = '%Y%m%d_%H-%M-%S'
+
+    datetime_from_fname = datetime.strptime(string_to_convert, format_string)
+
+    return datetime_from_fname

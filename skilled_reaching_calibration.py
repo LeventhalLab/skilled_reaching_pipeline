@@ -177,7 +177,9 @@ def calibrate_camera_from_video(camera_calibration_vid_name, calibration_parent,
     skilled_reaching_io.write_pickle(calibration_name, stereo_params)
 
 
-def multi_camera_calibration(calibration_vids, cal_data_parent, cb_size=(10,7)):
+def multi_camera_calibration(calibration_vids, cal_data_parent, cb_size=(10, 7)):
+
+    flags = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST   # how to constrain fx=fy?
 
     vid_name_parts = navigation_utilities.parse_Burgess_calibration_vid_name(calibration_vids[0])
     cal_data_name = navigation_utilities.create_calibration_data_name(cal_data_parent,
@@ -190,6 +192,7 @@ def multi_camera_calibration(calibration_vids, cal_data_parent, cb_size=(10,7)):
     else:
         calibration_data = skilled_reaching_io.read_pickle(cal_data_name)
 
+
     # verify_checkerboard_points(calibration_vids, calibration_data)
 
     # first, calibrate each camera individually
@@ -200,6 +203,8 @@ def multi_camera_calibration(calibration_vids, cal_data_parent, cb_size=(10,7)):
         imgpoints = calibration_data['cam_imgpoints'][i_cam]
         im_size = calibration_data['im_size'][i_cam]
         ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, im_size, None, None)
+
+        #todo: figure out the best way to compute the intrinsic matrices - probably constrain fx and fy to be equal, tangential distortion to be zero, constrain principal point to be at the center
         pass
 
 
@@ -279,12 +284,15 @@ def collect_cb_corners(calibration_vids, cb_size):
             'cb_size': cb_size
         }
 
+        for vid_obj in video_object:
+            vid_obj.release()
+
         return calibration_data
 
     else:
         # calibration videos have different numbers of frames, so not clear how to line them up
 
-        return none, none, none, none
+        return none
 
 
 def verify_checkerboard_points(calibration_vids, calibration_data):

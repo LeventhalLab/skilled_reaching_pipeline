@@ -193,16 +193,33 @@ def multi_camera_calibration(calibration_vids, cal_data_parent, cb_size=(10, 7))
         calibration_data = skilled_reaching_io.read_pickle(cal_data_name)
 
 
-    # verify_checkerboard_points(calibration_vids, calibration_data)
+    # if calibration already performed for individual cameras (at least one), skip initializing variables
 
-    # first, calibrate each camera individually
-    # initialize arrays to hold camera intrinsics, distortion coefficients, rotation, translation vectors
-    mtx = [[] for ii in calibration_data['cam_objpoints']]
-    dist = [[] for ii in calibration_data['cam_objpoints']]
+    if 'mtx' not in calibration_data.keys():
+        # first, calibrate each camera individually
+        # initialize arrays to hold camera intrinsics, distortion coefficients, rotation, translation vectors
+        mtx = [[] for ii in calibration_data['cam_objpoints']]
+        dist = [[] for ii in calibration_data['cam_objpoints']]
+        rvecs = [[] for ii in calibration_data['cam_objpoints']]
+        tvecs = [[] for ii in calibration_data['cam_objpoints']]
+
     for i_cam, objpoints in enumerate(calibration_data['cam_objpoints']):
-        imgpoints = calibration_data['cam_imgpoints'][i_cam]
-        im_size = calibration_data['im_size'][i_cam]
-        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, im_size, None, None)
+
+        # has mtx already been calculated for this camera?
+        if len(calibration_data['mtx'][i_cam])==0:
+            # the intrinsic matrix has not yet been calculated for i_cam
+            imgpoints = calibration_data['cam_imgpoints'][i_cam]
+            im_size = calibration_data['im_size'][i_cam]
+
+            print('calibrating camera {:02d}'.format(i_cam + 1))
+            ret, mtx[i_cam], dist[i_cam], rvecs[i_cam], tvecs[i_cam] = cv2.calibrateCamera(objpoints[:10], imgpoints[:10], im_size, None, None,
+                                                                                           flags=flags)
+            calibration_data['mtx'] = mtx
+            calibration_data['dist'] = dist
+            calibration_data['rvecs'] = rvecs
+            calibration_data['tvecs'] = tvecs
+
+            skilled_reaching_io.write_pickle(cal_data_name, calibration_data)
 
         #todo: figure out the best way to compute the intrinsic matrices - probably constrain fx and fy to be equal, tangential distortion to be zero, constrain principal point to be at the center
         pass
@@ -241,8 +258,7 @@ def collect_cb_corners(calibration_vids, cb_size):
 
         valid_frames = [[False for frame_num in range(num_frames[0])] for ii in calibration_vids]
 
-        # for i_frame in range(num_frames[0]):
-        for i_frame in range(10):   # take this out later
+        for i_frame in range(num_frames[0]):
             print(i_frame)
 
             corners2 = [[] for ii in calibration_vids]

@@ -179,7 +179,8 @@ def calibrate_camera_from_video(camera_calibration_vid_name, calibration_parent,
 
 def multi_camera_calibration(calibration_vids, cal_data_parent, cb_size=(10, 7)):
 
-    flags = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST   # how to constrain fx=fy?
+    cam_cal_flags = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST
+    stereo_cal_flags = cv2.CALIB_FIX_INTRINSIC
 
     vid_name_parts = navigation_utilities.parse_Burgess_calibration_vid_name(calibration_vids[0])
     cal_data_name = navigation_utilities.create_calibration_data_name(cal_data_parent,
@@ -194,6 +195,7 @@ def multi_camera_calibration(calibration_vids, cal_data_parent, cb_size=(10, 7))
 
 
     # if calibration already performed for individual cameras (at least one), skip initializing variables
+    # or better yet, let's calibrate the two cameras once well, then just to the stereo calibration on subsequent days
 
     if 'mtx' not in calibration_data.keys():
         # first, calibrate each camera individually
@@ -203,29 +205,52 @@ def multi_camera_calibration(calibration_vids, cal_data_parent, cb_size=(10, 7))
         rvecs = [[] for ii in calibration_data['cam_objpoints']]
         tvecs = [[] for ii in calibration_data['cam_objpoints']]
 
-    for i_cam, objpoints in enumerate(calibration_data['cam_objpoints']):
-
-        # has mtx already been calculated for this camera?
-        if len(calibration_data['mtx'][i_cam])==0:
-            # the intrinsic matrix has not yet been calculated for i_cam
+        for i_cam, objpoints in enumerate(calibration_data['cam_objpoints']):
+            # intrinsics haven't been calculated yet for either camera
             imgpoints = calibration_data['cam_imgpoints'][i_cam]
             im_size = calibration_data['im_size'][i_cam]
 
             print('calibrating camera {:02d}'.format(i_cam + 1))
             ret, mtx[i_cam], dist[i_cam], rvecs[i_cam], tvecs[i_cam] = cv2.calibrateCamera(objpoints[:10], imgpoints[:10], im_size, None, None,
-                                                                                           flags=flags)
+                                                                                           flags=cam_cal_flags)
             calibration_data['mtx'] = mtx
             calibration_data['dist'] = dist
             calibration_data['rvecs'] = rvecs
             calibration_data['tvecs'] = tvecs
 
             skilled_reaching_io.write_pickle(cal_data_name, calibration_data)
+    else:
+        for i_cam, objpoints in enumerate(calibration_data['cam_objpoints']):
+
+            # has mtx already been calculated for this camera? it's possible that an empty intrinsics was saved on a previous run
+            if len(calibration_data['mtx'][i_cam]) == 0:
+                # the intrinsic matrix has not yet been calculated for i_cam
+                imgpoints = calibration_data['cam_imgpoints'][i_cam]
+                im_size = calibration_data['im_size'][i_cam]
+
+                print('calibrating camera {:02d}'.format(i_cam + 1))
+                ret, mtx[i_cam], dist[i_cam], rvecs[i_cam], tvecs[i_cam] = cv2.calibrateCamera(objpoints[:10], imgpoints[:10], im_size, None, None,
+                                                                                               flags=cam_cal_flags)
+                calibration_data['mtx'] = mtx
+                calibration_data['dist'] = dist
+                calibration_data['rvecs'] = rvecs
+                calibration_data['tvecs'] = tvecs
+
+                skilled_reaching_io.write_pickle(cal_data_name, calibration_data)
 
         #todo: figure out the best way to compute the intrinsic matrices - probably constrain fx and fy to be equal, tangential distortion to be zero, constrain principal point to be at the center
         pass
 
 
-    retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T, E, F = cv2.stereoCalibrate(objpoints, imgpoints[0], imgpoints[1], im_size, None, None)
+    objpoints = calibration_data['stereo_objpoints']
+    imgpoints = calibration_data['stereo_imgpoints']
+
+    print('performing stereo calibration')
+    retval, cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, R, T, E, F = cv2.stereoCalibrate(objpoints, imgpoints[0], imgpoints[1],
+                                                                                                     calibration_data['mtx'][0], calibration_data['dist'][0],
+                                                                                                     calibration_data['mtx'][1], calibration_data['dist'][1],
+                                                                                                     im_size,
+                                                                                                     flags=stereo_cal_flags)
     pass
 
 
@@ -293,8 +318,8 @@ def collect_cb_corners(calibration_vids, cb_size):
         calibration_data = {
             'cam_objpoints': cam_objpoints,
             'cam_imgpoints': cam_imgpoints,
-            'stereo_objpoints': stereo_imgpoints,
-            'stereo_imgpoints': stereo_objpoints,
+            'stereo_objpoints': stereo_objpoints,
+            'stereo_imgpoints': stereo_imgpoints,
             'valid_frames': valid_frames,
             'im_size': im_size,
             'cb_size': cb_size

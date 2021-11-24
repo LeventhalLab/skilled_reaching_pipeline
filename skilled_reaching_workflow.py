@@ -148,9 +148,9 @@ if __name__ == '__main__':
     }
     cropped_vid_type = '.avi'
 
-    videos_parent = '/home/levlab/Public/DLC_DKL/videos_to_analyze'   # on the lambda machine
-    videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
-    videos_parent = '/Volumes/Untitled/videos_to_analyze'
+    videos_parent = '/home/levlab/Public/rat_SR_videos_to_analyze'   # on the lambda machine
+    # videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
+    # videos_parent = '/Volumes/Untitled/videos_to_analyze'
     video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
     cropped_videos_parent = os.path.join(videos_parent, 'cropped_videos')
     marked_videos_parent = os.path.join(videos_parent, 'marked_videos')

@@ -27,8 +27,8 @@ def get_video_folders_to_crop(video_root_folder):
 
 def create_cropped_video_destination_list(cropped_vids_parent, video_folder_list, view_list):
     """
-    create subdirectory trees in which to store the cropped videos. Directory structure is ratID-->[direct_view or
-        mirror_views]-->ratID-->[sessionID_direct/leftmirror/rightmirror]
+    create subdirectory trees in which to store the cropped videos. Directory structure is ratID-->sessionID-->
+        [sessionID_direct/leftmirror/rightmirror]
     :param cropped_vids_parent: parent directory in which to create directory tree
     :param video_folder_list: list of lowest level directories containing the original videos
     :return: cropped_video_directories

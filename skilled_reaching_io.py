@@ -1,7 +1,28 @@
 import pickle
 import pandas as pd
+from datetime import datetime
 import numpy as np
 import scipy.io as sio
+
+
+def read_crop_params_csv(crop_params_filepath):
+    '''
+
+    :param crop_params_filepath: full path to a .csv file containing cropping regions
+    :return:
+    crop_params_df - pandas dateframe with the following columns:
+        date - date in datetime.date format
+        direct_left, direct_right, direct_top, direct_bottom - left, right, top, bottom borders of direct view
+        leftmirror_left, leftmirror_right, leftmirror_top, leftmirror_bottom - left, right, top, bottom borders of left mirror view
+        rightmirror_left, rightmirror_right, rightmirror_top, rightmirror_bottom - left, right, top, bottom borders of right mirror view
+        NOTE - these border coordinates start counting at 1 instead of 0, so should subtract 1 when extracting regions from images
+    '''
+    crop_params_df = pd.read_csv(crop_params_filepath)
+
+    # convert strings in "date" column into datetime objects
+    crop_params_df['date'] = pd.to_datetime(crop_params_df['date'], infer_datetime_format=True).dt.date
+
+    return crop_params_df
 
 
 def read_pickle(filename):

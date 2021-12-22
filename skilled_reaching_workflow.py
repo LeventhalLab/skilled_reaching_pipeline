@@ -130,7 +130,7 @@ if __name__ == '__main__':
     rat_database_name = '/Users/dan/Documents/deeplabcut/videos_to_analyze/SR_rat_database.csv'
     label_videos = True
 
-    rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
+    # rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
 
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
@@ -162,21 +162,21 @@ if __name__ == '__main__':
     # video_metadata = navigation_utilities.parse_video_name(test_video_file)
 
 
-    metadata_list = navigation_utilities.find_marked_vids_for_3d_reconstruction(marked_videos_parent, dlc_mat_output_parent, rat_df)
-
-    for md in metadata_list:
-        reconstruct_3d.triangulate_video(md, videos_parent, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df, view_list=view_list)
+    # metadata_list = navigation_utilities.find_marked_vids_for_3d_reconstruction(marked_videos_parent, dlc_mat_output_parent, rat_df)
+    #
+    # for md in metadata_list:
+    #     reconstruct_3d.triangulate_video(md, videos_parent, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df, view_list=view_list)
 
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
-    # cropped_video_directories = preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_dict, view_list, vidtype='avi')
+    cropped_video_directories = preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_dict, view_list, vidtype='avi')
 
     # step 2: run the vids through DLC
     # parameters for running DLC
     # need to update these paths when moved to the lambda machine
     view_config_paths = {
-        'direct': '/home/levlab/Public/DLC_DKL/skilled_reaching_direct-Dan_Leventhal-2020-10-19/config.yaml',
-        'mirror': '/home/levlab/Public/DLC_DKL/skilled_reaching_mirror-Dan_Leventhal-2020-10-19/config.yaml'
+        'direct': '/home/levlab/Public/skilled_reaching_direct-Dan_Leventhal-2020-10-19/config.yaml',
+        'mirror': '/home/levlab/Public/skilled_reaching_mirror-Dan_Leventhal-2020-10-19/config.yaml'
     }
     folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent, view_list=view_list)
 

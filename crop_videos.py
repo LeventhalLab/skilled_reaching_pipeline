@@ -3,18 +3,25 @@ from moviepy.editor import *
 import subprocess
 import cv2
 import shutil
+import pandas as pd
 import skilled_reaching_calibration
 import navigation_utilities
 
 
-def crop_folders(video_folder_list, cropped_vids_parent, crop_params_dict, view_list, vidtype='avi', filtertype='mjpeg2jpeg'):
+def crop_params_dict_from_df(crop_params_df, session_date, box_num):
+
+    #todo: create this function - find the date and box number that correspond to the current video folder to extract the correct cropping boundaries
+
+def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi', filtertype='mjpeg2jpeg'):
     """
     :param video_folder_list:
     :param cropped_vids_parent:
-    :param crop_params_dict: 4-element list [left, right, top, bottom]
+    :param crop_params: either a dictionary with keys 'direct', 'leftmirror', 'rightmirror', each with a 4-element list [left, right, top, bottom]
+            OR a pandas dataframe with columns 'date', 'box_num', 'direct_left', 'direct_right',...
     :param vidtype:
     :return:
     """
+
 
     cropped_video_directories = navigation_utilities.create_cropped_video_destination_list(cropped_vids_parent, video_folder_list, view_list)
     # make sure vidtype starts with a '.'
@@ -25,14 +32,18 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params_dict, view_
         # find files with extension vidtype
         vids_list = glob.glob(os.path.join(vids_path, '*' + vidtype))
 
+        # if crop_params is a DataFrame object, create a crop_params dictionary based on the current folder
+        if isintance(crop_params, pd.DataFrame):
+            pass#todo: call function to create crop_params dictionary
+
         for i_view, view_name in enumerate(view_list):
+            current_crop_params = crop_params_dict[view_name]
             dest_folder = cropped_video_directories[i_view][i_path]
             if not os.path.isdir(dest_folder):
                 os.makedirs(dest_folder)
 
             for full_vid_path in vids_list:
-                crop_params = crop_params_dict[view_name]
-                dest_name = cropped_vid_name(full_vid_path, dest_folder, view_name, crop_params)
+                dest_name = cropped_vid_name(full_vid_path, dest_folder, view_name, current_crop_params)
 
                 # if video was already cropped, skip it
                 if os.path.exists(dest_name):
@@ -130,8 +141,8 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
         pass
 
 
-def preprocess_videos(vid_folder_list, cropped_vids_parent, crop_params_dict, view_list, vidtype='avi'):
+def preprocess_videos(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi'):
 
-    cropped_video_directories = crop_folders(vid_folder_list, cropped_vids_parent, crop_params_dict, view_list, vidtype='avi')
+    cropped_video_directories = crop_folders(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi')
 
     return cropped_video_directories

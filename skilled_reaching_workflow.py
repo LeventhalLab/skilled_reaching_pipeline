@@ -132,6 +132,8 @@ if __name__ == '__main__':
 
     # rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
 
+
+
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
     skipmirrorlabel = False
@@ -156,6 +158,9 @@ if __name__ == '__main__':
     marked_videos_parent = os.path.join(videos_parent, 'marked_videos')
     calibration_parent = os.path.join(videos_parent, 'calibration_files')
     dlc_mat_output_parent = os.path.join(videos_parent, 'matlab_readable_dlc')
+
+    crop_params_csv_path = os.path.join(video_root_folder, 'SR_video_crop_regions.csv')
+    crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
 
     # skilled_reaching_calibration.calibrate_camera_from_video(test_calibration_file, calibration_parent, cb_size=cb_size)
 

@@ -25,20 +25,19 @@ def crop_params_dict_from_df(crop_params_df, session_date, box_num, view_list=['
     elif date_box_row.shape[0] == 1:
         crop_params_dict = dict.fromkeys(view_list, None)
         for view in view_list:
-            left_edge = date_box_row[view + '_left']
-            right_edge = date_box_row[view + '_right']
-            top_edge = date_box_row[view + '_top']
-            bot_edge = date_box_row[view + '_bottom']
+            left_edge = date_box_row[view + '_left'].values[0]
+            right_edge = date_box_row[view + '_right'].values[0]
+            top_edge = date_box_row[view + '_top'].values[0]
+            bot_edge = date_box_row[view + '_bottom'].values[0]
 
-            if any([pd.isna(left_edge).bool(), pd.isna(right_edge).bool(), pd.isna(top_edge).bool(),  pd.isna(bot_edge).bool()]):
+            if any([pd.isna(left_edge), pd.isna(right_edge), pd.isna(top_edge),  pd.isna(bot_edge)]):
                 crop_params_dict = {}
                 break
             else:
-                crop_params_dict[view] = [left_edge[0] - 1,
-                                          right_edge[0] - 1,
-                                          top_edge[0] - 1,
-                                          bot_edge[0] - 1]
-            # subtract one since Python starts counting at 0
+                crop_params_dict[view] = [left_edge,
+                                          right_edge,
+                                          top_edge,
+                                          bot_edge]
     else:
         # there must be more than one valid row in the table, use default
         # crop_params_dict = {

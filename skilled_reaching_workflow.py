@@ -132,8 +132,6 @@ if __name__ == '__main__':
 
     # rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
 
-
-
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
     skipmirrorlabel = False

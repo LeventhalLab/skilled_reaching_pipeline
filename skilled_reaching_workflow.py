@@ -174,7 +174,7 @@ if __name__ == '__main__':
 
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
-    cropped_video_directories = preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_dict, view_list, vidtype='avi')
+    cropped_video_directories = preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi')
 
     # step 2: run the vids through DLC
     # parameters for running DLC

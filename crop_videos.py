@@ -4,13 +4,52 @@ import subprocess
 import cv2
 import shutil
 import pandas as pd
+from datetime import datetime
 import skilled_reaching_calibration
 import navigation_utilities
 
 
-def crop_params_dict_from_df(crop_params_df, session_date, box_num):
+def crop_params_dict_from_df(crop_params_df, session_date, box_num, view_list=['direct', 'leftmirror', 'rightmirror']):
 
-    #todo: create this function - find the date and box number that correspond to the current video folder to extract the correct cropping boundaries
+
+    # find the row with the relevant session data and box number
+    date_box_row = crop_params_df[(crop_params_df['date']==session_date) & (crop_params_df['box_num']==box_num)]
+
+    if date_box_row.empty:
+        # crop_params_dict = {
+        #     view_list[0]: [700, 1350, 270, 935],
+        #     view_list[1]: [1, 470, 270, 920],
+        #     view_list[2]: [1570, 2040, 270, 920]
+        # }
+        crop_params_dict = {}
+    elif date_box_row.shape[0] == 1:
+        crop_params_dict = dict.fromkeys(view_list, None)
+        for view in view_list:
+            left_edge = date_box_row[view + '_left']
+            right_edge = date_box_row[view + '_right']
+            top_edge = date_box_row[view + '_top']
+            bot_edge = date_box_row[view + '_bottom']
+
+            if any([pd.isna(left_edge).bool(), pd.isna(right_edge).bool(), pd.isna(top_edge).bool(),  pd.isna(bot_edge).bool()]):
+                crop_params_dict = {}
+                break
+            else:
+                crop_params_dict[view] = [left_edge[0] - 1,
+                                          right_edge[0] - 1,
+                                          top_edge[0] - 1,
+                                          bot_edge[0] - 1]
+            # subtract one since Python starts counting at 0
+    else:
+        # there must be more than one valid row in the table, use default
+        # crop_params_dict = {
+        #     view_list[0]: [700, 1350, 270, 935],
+        #     view_list[1]: [1, 470, 270, 920],
+        #     view_list[2]: [1570, 2040, 270, 920]
+        # }
+        crop_params_dict = {}
+
+    return crop_params_dict
+
 
 def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi', filtertype='mjpeg2jpeg'):
     """
@@ -31,10 +70,23 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
     for i_path, vids_path in enumerate(video_folder_list):
         # find files with extension vidtype
         vids_list = glob.glob(os.path.join(vids_path, '*' + vidtype))
+        if not bool(vids_list):
+            # vids_list is empty
+            continue
 
         # if crop_params is a DataFrame object, create a crop_params dictionary based on the current folder
-        if isintance(crop_params, pd.DataFrame):
-            pass#todo: call function to create crop_params dictionary
+        if isinstance(crop_params, pd.DataFrame):
+            # pick an .avi file in this folder
+            test_vid = vids_list[0]
+            vid_metadata = navigation_utilities.parse_video_name(test_vid)
+            session_date = vid_metadata['triggertime'].date()
+            crop_params_dict = crop_params_dict_from_df(crop_params, session_date, vid_metadata['boxnum'])
+        elif isinstance(crop_params, dict):
+            crop_params_dict = crop_params
+
+        if not bool(crop_params_dict):
+            # the crop parameters dictionary is empty, skip to the next folder
+            continue
 
         for i_view, view_name in enumerate(view_list):
             current_crop_params = crop_params_dict[view_name]
@@ -50,7 +102,7 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
                     print(dest_name + ' already exists, skipping')
                     continue
                 else:
-                    crop_video(full_vid_path, dest_name, crop_params, view_name, filtertype=filtertype)
+                    crop_video(full_vid_path, dest_name, current_crop_params, view_name, filtertype=filtertype)
 
     return cropped_video_directories
 
@@ -90,7 +142,7 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
     # crop videos losslessly. Note that the trick of converting the video into a series of jpegs, cropping them, and
     # re-encoding is a trick that only works because our videos are encoded as mjpegs (which apparently is an old format)
 
-    x1, x2, y1, y2 = [cp for cp in crop_params]
+    x1, x2, y1, y2 = [int(cp) for cp in crop_params]
     w = x2 - x1 + 1
     h = y2 - y1 + 1
     vid_root, vid_name = os.path.split(vid_path_out)

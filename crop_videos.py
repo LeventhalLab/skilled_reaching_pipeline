@@ -11,7 +11,6 @@ import navigation_utilities
 
 def crop_params_dict_from_df(crop_params_df, session_date, box_num, view_list=['direct', 'leftmirror', 'rightmirror']):
 
-
     # find the row with the relevant session data and box number
     date_box_row = crop_params_df[(crop_params_df['date']==session_date) & (crop_params_df['box_num']==box_num)]
 
@@ -118,6 +117,7 @@ def cropped_vid_name(full_vid_path, dest_folder, view_name, crop_params):
     vid_root, vid_ext = os.path.splitext(full_vid_path)
     vid_path, vid_name = os.path.split(vid_root)
     # _, vid_folder_name = os.path.split(vid_path)
+    crop_params = [int(cp) for cp in crop_params]
     crop_params_str = '-'.join(map(str, crop_params))
     # dest_folder_name = vid_folder_name + '_' + view_name
 

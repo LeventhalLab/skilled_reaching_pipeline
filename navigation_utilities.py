@@ -363,12 +363,32 @@ def create_calibration_file_tree(calibration_parent, vid_metadata):
 
     year_folder = 'calibration_files_' + datetime.strftime(vid_metadata['triggertime'], '%Y')
     month_folder = 'calibration_files_' + datetime.strftime(vid_metadata['triggertime'], '%Y%m')
-    day_folder = 'calibration_files_' + datetime.strftime(vid_metadata['triggertime'], '%Y%m%d')
-    box_folder = day_folder + '_box{:2d}'.format(vid_metadata['boxnum'])
+    # day_folder = 'calibration_files_' + datetime.strftime(vid_metadata['triggertime'], '%Y%m%d')
+    box_folder = month_folder + '_box{:2d}'.format(vid_metadata['boxnum'])
 
-    calibration_file_tree = os.path.join(calibration_parent, year_folder, month_folder, day_folder, box_folder)
+    calibration_file_tree = os.path.join(calibration_parent, year_folder, month_folder, box_folder)
 
     return calibration_file_tree
+
+
+def find_calibration_vid_folders(calibration_parent):
+    '''
+    find all calibration videos. assume directory structure:
+        calibration_parent-->calibration_files_YYYY-->calibration_files_YYYYMM-->calibration_files_YYYYMM_boxZZ where
+        ZZ is the 2-digit box number
+    :param calibration_parent:
+    :return:
+    '''
+    year_folders = glob.glob(os.path.join(calibration_parent, 'calibration_files_*'))
+    month_folders = []
+    # for yf in year_folders:
+    #     month_folders.extend(glob.glob(os.path.join(yf, 'calibration_files_*')))
+    [month_folders.extend(glob.glob(os.path.join(yf, 'calibration_files_*'))) for yf in year_folders]
+
+    box_folders = []
+    [box_folders.extend(glob.glob(os.path.join(mf, 'calibration_files_*'))) for mf in month_folders]
+
+    return box_folders
 
 
 def find_dlc_output_pickles(video_metadata, marked_videos_parent, view_list=None):
@@ -526,7 +546,7 @@ def find_camera_calibration_video(video_metadata, calibration_parent):
 def parse_camera_calibration_video_name(calibration_video_name):
     """
 
-    :param calibration_video_name: form of CameraCalibration_boxXX_YYYYMMDD_HH-mm-ss.avi
+    :param calibration_video_name: form of GridCalibration_boxXX_YYYYMMDD_HH-mm-ss.avi
     :return:
     """
     camera_calibration_metadata = {

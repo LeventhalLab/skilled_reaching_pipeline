@@ -1,4 +1,4 @@
-from crop_videos import preprocess_videos
+import crop_videos
 from datetime import datetime
 import navigation_utilities
 import reconstruct_3d
@@ -118,6 +118,30 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
                            shutil.move(pickle_file, new_dir)
 
 
+def calibrate_all_sessions(calibration_parent, crop_params_df, cb_size=(6,9), vidtype='.avi'):
+    '''
+    loop through all folders containing calibration videos and store calibration parameters
+    :param calibration_parent:
+    :param crop_params_df: dataframe containing cropping parameters for each box-date
+    :param cb_size:
+    :return:
+    '''
+
+    if vidtype[0] != '.':
+        vidtype = '.' + vidtype
+
+    calib_vid_folders = navigation_utilities.find_calibration_vid_folders(calibration_parent)
+
+    for cf in calib_vid_folders:
+        # crop the calibration videos
+        calib_vids = glob.glob(os.path.join(cf, 'GridCalibration_*' + vidtype))
+
+        for calib_vid in calib_vids:
+            # figure out the box and date
+            skilled_reaching_calibration.crop_calibration_video(calib_vid, crop_params_df)
+            pass
+    pass
+
 if __name__ == '__main__':
 
     cb_size = (6, 9)
@@ -160,6 +184,8 @@ if __name__ == '__main__':
     crop_params_csv_path = os.path.join(video_root_folder, 'SR_video_crop_regions.csv')
     crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
 
+    calibrate_all_sessions(calibration_parent, crop_params_df, cb_size=cb_size)
+
     # skilled_reaching_calibration.calibrate_camera_from_video(test_calibration_file, calibration_parent, cb_size=cb_size)
 
     # video_metadata = navigation_utilities.parse_video_name(test_video_file)
@@ -171,8 +197,9 @@ if __name__ == '__main__':
     #     reconstruct_3d.triangulate_video(md, videos_parent, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df, view_list=view_list)
 
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
+
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
-    cropped_video_directories = preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi')
+    cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi')
 
     # step 2: run the vids through DLC
     # parameters for running DLC

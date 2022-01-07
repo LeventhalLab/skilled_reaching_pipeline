@@ -1,5 +1,7 @@
 import navigation_utilities
 import skilled_reaching_io
+from datetime import datetime
+import crop_videos
 import os
 import csv
 import numpy as np
@@ -357,3 +359,14 @@ def verify_checkerboard_points(calibration_vids, calibration_data):
                 cv2.imshow('image', corners_img)
                 cv2.waitKey(0)
 
+def crop_calibration_video(calib_vid, crop_params_df):
+
+    cc_metadata = navigation_utilities.parse_camera_calibration_video_name(calib_vid)
+    #todo: complete this function - next step is to get the crop params for this box and date, then adjust for the cropped vids
+
+    session_date = cc_metadata['time'].date()
+    crop_params_dict = crop_videos.crop_params_dict_from_df(crop_params_df, session_date, cc_metadata['boxnum'])
+
+    # todo: figure out if crop parameters are being extracted appropriately if there is a relevant line in the crop_params_df dataframe
+    if crop_params_dict:
+        pass

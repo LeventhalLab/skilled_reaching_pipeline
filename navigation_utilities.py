@@ -374,21 +374,57 @@ def create_calibration_file_tree(calibration_parent, vid_metadata):
 def find_calibration_vid_folders(calibration_parent):
     '''
     find all calibration videos. assume directory structure:
-        calibration_parent-->calibration_files_YYYY-->calibration_files_YYYYMM-->calibration_files_YYYYMM_boxZZ where
+        calibration_parent-->calibration_videos__YYYY-->calibration_videos__YYYYMM-->calibration_videos__YYYYMM_boxZZ where
         ZZ is the 2-digit box number
     :param calibration_parent:
     :return:
     '''
-    year_folders = glob.glob(os.path.join(calibration_parent, 'calibration_files_*'))
+    year_folders = glob.glob(os.path.join(calibration_parent, 'calibration_videos_*'))
     month_folders = []
     # for yf in year_folders:
-    #     month_folders.extend(glob.glob(os.path.join(yf, 'calibration_files_*')))
-    [month_folders.extend(glob.glob(os.path.join(yf, 'calibration_files_*'))) for yf in year_folders]
+    #     month_folders.extend(glob.glob(os.path.join(yf, 'calibration_videos_*')))
+    [month_folders.extend(glob.glob(os.path.join(yf, 'calibration_videos_*'))) for yf in year_folders]
 
     box_folders = []
-    [box_folders.extend(glob.glob(os.path.join(mf, 'calibration_files_*'))) for mf in month_folders]
+    [box_folders.extend(glob.glob(os.path.join(mf, 'calibration_videos_*'))) for mf in month_folders]
 
     return box_folders
+
+
+def create_cropped_calib_vid_name(full_calib_vid_name, crop_view, crop_params_dict):
+    '''
+
+    :param full_calib_vid_name: full name of calibration video
+    :param crop_view:
+    :param crop_params_dict:
+    :return:
+    '''
+    full_cropped_path = create_cropped_calib_vids_folder(full_calib_vid_name)
+
+    if not os.path.isdir(full_cropped_path):
+        os.makedirs(full_cropped_path)
+
+    _, vid_name = os.path.split(full_calib_vid_name)
+    vid_name, ext = os.path.splitext(vid_name)
+
+    cp_strings = [str(cp) for cp in crop_params_dict[crop_view]]
+    cp_joined = '-'.join(cp_strings)
+    cropped_vid_name = vid_name + '_' + crop_view + '_' + cp_joined + ext
+
+    full_cropped_vid_name = os.path.join(full_cropped_path, cropped_vid_name)
+
+    return full_cropped_vid_name
+
+
+def create_cropped_calib_vids_folder(full_vid_name):
+
+    full_vid_path, _ = os.path.split(full_vid_name)
+    _, folder_name = os.path.split(full_vid_path)
+
+    cropped_folder_name = folder_name + '_cropped'
+    full_cropped_path = os.path.join(full_vid_path, cropped_folder_name)
+
+    return full_cropped_path
 
 
 def find_dlc_output_pickles(video_metadata, marked_videos_parent, view_list=None):
@@ -474,7 +510,7 @@ def construct_dlc_output_pickle_names(video_metadata, view):
     return pickle_name_full, pickle_name_meta
 
 
-def find_calibration_file(video_metadata, calibration_parent):
+def find_calibration_video(video_metadata, calibration_parent):
     """
 
     :param video_metadata:
@@ -484,7 +520,7 @@ def find_calibration_file(video_metadata, calibration_parent):
     date_string = video_metadata['triggertime'].strftime('%Y%m%d')
     year_folder = os.path.join(calibration_parent, date_string[0:4])
     month_folder = os.path.join(year_folder, date_string[0:6] + '_calibration')
-    calibration_folder = os.path.join(month_folder, date_string[0:6] + '_calibration_files')
+    calibration_folder = os.path.join(month_folder, date_string[0:6] + '_calibration_videos')
 
     test_name = 'SR_boxCalibration_box{:02d}_{}.mat'.format(video_metadata['boxnum'], date_string)
     test_name = os.path.join(calibration_folder, test_name)
@@ -739,6 +775,17 @@ def create_calibration_data_name(cal_data_parent, session_datetime):
     return cal_data_name
 
 
+def create_multiview_calibration_data_name(cal_data_parent, calibration_metadata):
+
+    basename = 'calibration_data'
+    cal_data_name = basename + '_' + datetime_to_string_for_fname(session_datetime) + '.pickle'
+
+    cal_data_folder = create_calibration_data_folder(cal_data_parent, session_datetime)
+    cal_data_name = os.path.join(cal_data_folder, cal_data_name)
+
+    return cal_data_name
+
+
 def create_calibration_data_folder(cal_data_parent, session_datetime):
 
     year_folder = 'calibration_data_' + session_datetime.strftime('%Y')
@@ -767,3 +814,66 @@ def fname_string_to_datetime(string_to_convert):
     datetime_from_fname = datetime.strptime(string_to_convert, format_string)
 
     return datetime_from_fname
+
+
+def parse_cropped_calibration_video_name(cropped_calibration_vid_name):
+    """
+
+    :param cropped_calibration_vid_name: form of GridCalibration_boxXX_YYYYMMDD_HH-mm-ss_view_top-bottom-left-right.avi
+    :return:
+    """
+    cropped_cal_vid_metadata = {
+        'boxnum': 99,
+        'time': datetime(1, 1, 1)
+    }
+    _, cropped_cal_vid_name = os.path.split(cropped_calibration_vid_name)
+    cropped_cal_vid_name, _ = os.path.splitext(cropped_cal_vid_name)
+
+    cal_vid_name_parts = cropped_cal_vid_name.split('_')
+
+    cropped_cal_vid_metadata['boxnum'] = int(cal_vid_name_parts[1][3:])
+
+    datetime_str = cal_vid_name_parts[2] + '_' + cal_vid_name_parts[3]
+    cropped_cal_vid_metadata['time'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
+
+    cropped_cal_vid_metadata['view'] = cal_vid_name_parts[4]
+
+    crop_params_strings = cal_vid_name_parts[5].split('-')
+    crop_params = [int(cp) for cp in crop_params_strings]
+    cropped_cal_vid_metadata['crop_params'] = crop_params
+
+    return cropped_cal_vid_metadata
+
+
+def create_calibration_file_path(calibration_files_parent, calib_metadata):
+
+    year_str = calib_metadata['time'].strftime('%Y')
+    month_str = calib_metadata['time'].strftime('%Y%m')
+    year_folder = os.path.join(calibration_files_parent, 'calibration_files_' + year_str)
+    month_folder = os.path.join(year_folder, 'calibration_files_' + month_str)
+    box_folder = os.path.join(month_folder, 'calibration_files_' + month_str + '_box{:02d}'.format(calib_metadata['boxnum']))
+
+    return box_folder
+
+
+def create_calibration_summary_name(full_calib_vid_name, calibration_files_parent):
+    '''
+
+    :param full_calib_vid_name:
+    :return:
+    '''
+
+    # store the pickle file with the calibration parameters in the same folder as the calibration video
+    calib_vid_path, _ = os.path.split(full_calib_vid_name)
+    calib_metadata = parse_camera_calibration_video_name(full_calib_vid_name)
+
+    calib_file_path = create_calibration_file_path(calibration_files_parent, calib_metadata)
+
+    if not os.path.isdir(calib_file_path):
+        os.makedirs(calib_file_path)
+
+    calib_fname = 'calibrationdata_' + calib_metadata['time'].strftime('%Y%m%d_%H-%M-%S') + '_box{:02d}'.format(calib_metadata['boxnum']) + '.pickle'
+
+    full_calib_fname = os.path.join(calib_file_path, calib_fname)
+
+    return full_calib_fname

@@ -12,7 +12,7 @@ import navigation_utilities
 def crop_params_dict_from_df(crop_params_df, session_date, box_num, view_list=['direct', 'leftmirror', 'rightmirror']):
 
     # find the row with the relevant session data and box number
-    date_box_row = crop_params_df[(crop_params_df['date']==session_date) & (crop_params_df['box_num']==box_num)]
+    date_box_row = crop_params_df[(crop_params_df['date'] == session_date) & (crop_params_df['box_num'] == box_num)]
 
     if date_box_row.empty:
         # crop_params_dict = {
@@ -155,7 +155,7 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
             shutil.rmtree(jpg_temp_folder)
         os.mkdir(jpg_temp_folder)
 
-        full_jpg_path = os.path.join(jpg_temp_folder,'frame_%d.jpg')
+        full_jpg_path = os.path.join(jpg_temp_folder, 'frame_%d.jpg')
         # full_jpg_crop_path = os.path.join(jpg_temp_folder, 'frame_crop_%d.jpg')
         command = (
             f"ffmpeg -i {vid_path_in} "
@@ -189,7 +189,6 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
             f"-c:v h264 -c:a copy {vid_path_out}"
         )
         subprocess.call(command, shell=True)
-        pass
 
 
 def preprocess_videos(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi'):

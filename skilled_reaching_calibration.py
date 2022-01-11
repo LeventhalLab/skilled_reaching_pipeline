@@ -1,5 +1,7 @@
 import navigation_utilities
 import skilled_reaching_io
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from datetime import datetime
 import crop_videos
 import os
@@ -179,14 +181,14 @@ def calibrate_camera_from_video(camera_calibration_vid_name, calibration_parent,
     skilled_reaching_io.write_pickle(calibration_name, stereo_params)
 
 
-def multi_camera_calibration(calibration_vids, cal_data_parent, cb_size=(10, 7)):
+def multi_view_calibration(calibration_vids, cal_data_parent, cb_size=(10, 7)):
 
     cam_cal_flags = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST
     stereo_cal_flags = cv2.CALIB_FIX_INTRINSIC
 
     vid_name_parts = navigation_utilities.parse_Burgess_calibration_vid_name(calibration_vids[0])
-    cal_data_name = navigation_utilities.create_calibration_data_name(cal_data_parent,
-                                                                      vid_name_parts['session_datetime'])
+    cal_data_name = navigation_utilities.create_multiview_calibration_data_name(cal_data_parent,
+                                                                                vid_name_parts['session_datetime'])
 
     if not os.path.exists(cal_data_name):
         calibration_data = collect_cb_corners(calibration_vids, cb_size=cb_size)
@@ -263,10 +265,12 @@ def collect_cb_corners(calibration_vids, cb_size):
     video_object = []
     num_frames = []
     im_size = []
+    cal_vid_metadata = []
     for i_vid, cal_vid in enumerate(calibration_vids):
         video_object.append(cv2.VideoCapture(cal_vid))
         num_frames.append(video_object[i_vid].get(cv2.CAP_PROP_FRAME_COUNT))
         im_size.append((int(video_object[i_vid].get(cv2.CAP_PROP_FRAME_WIDTH)), int(video_object[i_vid].get(cv2.CAP_PROP_FRAME_HEIGHT))))
+        cal_vid_metadata.append(navigation_utilities.parse_cropped_calibration_video_name(cal_vid))
 
     num_frames = [int(nf) for nf in num_frames]
     if all(nf == num_frames[0] for nf in num_frames):
@@ -311,11 +315,13 @@ def collect_cb_corners(calibration_vids, cb_size):
                     stereo_imgpoints[i_vid].append(corner_pts)
 
             # todo: test that the checkerboard points in each imgpoint array are correct
-            # # below is for checking if corners were correctly identified
-            # corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid], found_valid_chessboard)
-            # # cv2.imwrite(corners_img_name, corners_img)
-            # cv2.imshow('image', corners_img)
-            # cv2.waitKey(0)
+            # below is for checking if corners were correctly identified
+            for i_vid in range(3):
+                if valid_frames[i_vid][i_frame]:
+                    corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid], found_valid_chessboard)
+                    # cv2.imwrite(corners_img_name, corners_img)
+                    # plt.imshow(corners_img)
+                    # plt.show()
 
         calibration_data = {
             'cam_objpoints': cam_objpoints,
@@ -324,7 +330,8 @@ def collect_cb_corners(calibration_vids, cb_size):
             'stereo_imgpoints': stereo_imgpoints,
             'valid_frames': valid_frames,
             'im_size': im_size,
-            'cb_size': cb_size
+            'cb_size': cb_size,
+            'cropped_vid_metadata': cal_vid_metadata
         }
 
         for vid_obj in video_object:
@@ -359,14 +366,46 @@ def verify_checkerboard_points(calibration_vids, calibration_data):
                 cv2.imshow('image', corners_img)
                 cv2.waitKey(0)
 
-def crop_calibration_video(calib_vid, crop_params_df):
+        vid_obj.release()
+
+
+def crop_calibration_video(calib_vid, crop_params_df, calib_crop_top=100, filtertype=''):
 
     cc_metadata = navigation_utilities.parse_camera_calibration_video_name(calib_vid)
-    #todo: complete this function - next step is to get the crop params for this box and date, then adjust for the cropped vids
 
     session_date = cc_metadata['time'].date()
     crop_params_dict = crop_videos.crop_params_dict_from_df(crop_params_df, session_date, cc_metadata['boxnum'])
 
-    # todo: figure out if crop parameters are being extracted appropriately if there is a relevant line in the crop_params_df dataframe
+    cropped_vid_names = []
     if crop_params_dict:
-        pass
+        # make sure there is plenty of height. crop_params_dict should have keys 'direct','leftmirror','rightmirror'
+        # top of cropping window is probably too low for the calibration videos if based on the reaching videos
+
+        calibration_crop_params_dict = crop_params_dict
+
+        for key in calibration_crop_params_dict:
+            calibration_crop_params_dict[key][2] = calib_crop_top
+
+            full_cropped_vid_name = navigation_utilities.create_cropped_calib_vid_name(calib_vid, key, calibration_crop_params_dict)
+            cropped_vid_names.append(full_cropped_vid_name)
+            if os.path.isfile(full_cropped_vid_name):
+                # skip if already cropped
+                continue
+
+            crop_videos.crop_video(calib_vid, full_cropped_vid_name, calibration_crop_params_dict[key], key, filtertype=filtertype)
+
+    return cropped_vid_names
+
+
+def multi_mirror_calibration(calibration_data):
+    '''
+    calibrate across multiple views
+    :param calibration_data:
+    :return:
+    '''
+
+    # initialize camera matrices for direct-->leftmirror, direct-->rightmirror, and leftmirror-->rightmirror
+    # todo: initialize camera/fundamental/essential matrices for each set of views and prove that we can reconstruct the
+    # chessboard images
+
+    pass

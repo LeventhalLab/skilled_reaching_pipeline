@@ -8,6 +8,7 @@ import glob
 import os
 import shutil
 import pandas as pd
+import cv2
 import deeplabcut
 
 
@@ -118,10 +119,11 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
                            shutil.move(pickle_file, new_dir)
 
 
-def calibrate_all_sessions(calibration_parent, crop_params_df, cb_size=(6,9), vidtype='.avi'):
+def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=(6, 9), vidtype='.avi'):
     '''
     loop through all folders containing calibration videos and store calibration parameters
-    :param calibration_parent:
+    :param calibration_vids_parent:
+    :param calibration_files_parent:
     :param crop_params_df: dataframe containing cropping parameters for each box-date
     :param cb_size:
     :return:
@@ -130,15 +132,36 @@ def calibrate_all_sessions(calibration_parent, crop_params_df, cb_size=(6,9), vi
     if vidtype[0] != '.':
         vidtype = '.' + vidtype
 
-    calib_vid_folders = navigation_utilities.find_calibration_vid_folders(calibration_parent)
+    calib_vid_folders = navigation_utilities.find_calibration_vid_folders(calibration_vids_parent)
 
     for cf in calib_vid_folders:
         # crop the calibration videos
         calib_vids = glob.glob(os.path.join(cf, 'GridCalibration_*' + vidtype))
 
+        orig_im_size = []
+        cropped_vid_names = []
         for calib_vid in calib_vids:
-            # figure out the box and date
-            skilled_reaching_calibration.crop_calibration_video(calib_vid, crop_params_df)
+            cropped_vid_names.append(skilled_reaching_calibration.crop_calibration_video(calib_vid, crop_params_df))
+            vid_obj = cv2.VideoCapture(calib_vid)
+            orig_im_size.append((int(vid_obj.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_obj.get(cv2.CAP_PROP_FRAME_WIDTH))))
+            vid_obj.release()
+        # cropped_vid_names contains a list of lists; each individual list contains the names of 3 files, one each for
+        # the direct, leftmirror, and rightmirror views
+
+        for i_calib_vid, cropped_vids_set in enumerate(cropped_vid_names):
+            # each cropped_vids_set should contain 3 video names for direct, left, right views
+
+            calibration_summary_name = navigation_utilities.create_calibration_summary_name(calib_vids[i_calib_vid], calibration_files_parent)
+
+            if os.path.isfile(calibration_summary_name):
+                calibration_data = skilled_reaching_io.read_pickle(calibration_summary_name)
+            else:
+                calibration_data = skilled_reaching_calibration.collect_cb_corners(cropped_vids_set, cb_size)
+                calibration_data['orig_im_size'] = orig_im_size[i_calib_vid]
+                skilled_reaching_io.write_pickle(calibration_summary_name, calibration_data)
+
+            # now perform the actual calibration
+            skilled_reaching_calibration.multi_mirror_calibration(calibration_data)
             pass
     pass
 
@@ -178,13 +201,14 @@ if __name__ == '__main__':
     video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
     cropped_videos_parent = os.path.join(videos_parent, 'cropped_videos')
     marked_videos_parent = os.path.join(videos_parent, 'marked_videos')
-    calibration_parent = os.path.join(videos_parent, 'calibration_files')
+    calibration_vids_parent = os.path.join(videos_parent, 'calibration_videos')
+    calibration_files_parent = os.path.join(videos_parent, 'calibration_files')
     dlc_mat_output_parent = os.path.join(videos_parent, 'matlab_readable_dlc')
 
     crop_params_csv_path = os.path.join(video_root_folder, 'SR_video_crop_regions.csv')
     crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
 
-    calibrate_all_sessions(calibration_parent, crop_params_df, cb_size=cb_size)
+    calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=cb_size)
 
     # skilled_reaching_calibration.calibrate_camera_from_video(test_calibration_file, calibration_parent, cb_size=cb_size)
 
@@ -198,8 +222,9 @@ if __name__ == '__main__':
 
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
 
-    video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
-    cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi')
+    #todo: complete the camera calibration algorithms
+    # video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
+    # cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi')
 
     # step 2: run the vids through DLC
     # parameters for running DLC

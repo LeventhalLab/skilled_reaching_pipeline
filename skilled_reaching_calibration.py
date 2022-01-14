@@ -308,6 +308,18 @@ def collect_cb_corners(calibration_vids, cb_size):
                         cam_objpoints[i_vid].append(objp)
                         cam_imgpoints[i_vid].append(corners2[i_vid])
 
+                    corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners,
+                                                            found_valid_chessboard)
+                    vid_path, vid_name = os.path.split(calibration_vids[i_vid])
+                    vid_name, _ = os.path.splitext(vid_name)
+                    frame_path = os.path.join(vid_path, vid_name)
+                    if not os.path.isdir(frame_path):
+                        os.makedirs(frame_path)
+                    frame_name = vid_name + '_frame{:03d}'.format(i_frame) + '.png'
+                    full_frame_name = os.path.join(frame_path, frame_name)
+                    cv2.imwrite(full_frame_name, corners_img)
+
+            # collect all checkerboard points visible in pairs of images
             if valid_frames[0][i_frame] and valid_frames[1][i_frame]:
                 # checkerboards were identified in matching frames
                 stereo_objpoints.append(objp)
@@ -316,9 +328,9 @@ def collect_cb_corners(calibration_vids, cb_size):
 
             # todo: test that the checkerboard points in each imgpoint array are correct
             # below is for checking if corners were correctly identified
-            for i_vid in range(3):
-                if valid_frames[i_vid][i_frame]:
-                    corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid], found_valid_chessboard)
+            # for i_vid in range(3):
+            #     if valid_frames[i_vid][i_frame]:
+            #         corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid], found_valid_chessboard)
                     # cv2.imwrite(corners_img_name, corners_img)
                     # plt.imshow(corners_img)
                     # plt.show()
@@ -397,7 +409,7 @@ def crop_calibration_video(calib_vid, crop_params_df, calib_crop_top=100, filter
     return cropped_vid_names
 
 
-def multi_mirror_calibration(calibration_data):
+def multi_mirror_calibration(calibration_data, calibration_summary_name):
     '''
     calibrate across multiple views
     :param calibration_data:
@@ -407,5 +419,116 @@ def multi_mirror_calibration(calibration_data):
     # initialize camera matrices for direct-->leftmirror, direct-->rightmirror, and leftmirror-->rightmirror
     # todo: initialize camera/fundamental/essential matrices for each set of views and prove that we can reconstruct the
     # chessboard images
+    keys = calibration_data.keys()
+    if 'camera_intrinsics' not in keys:
+        calibration_data = camera_calibration_from_mirror_vids(calibration_data, calibration_summary_name)
+    pass
+
+
+def calibrate_all_Burgess_vids(cal_vid_parent):
+
+
+    cal_vids = navigation_utilities.find_Burgess_calibration_vids(cal_vid_parent)
+
+
+def multi_camera_calibration_Burgess(cal_vids, cal_data_parent, cb_size=(10, 7)):
+    '''
+
+    :param cal_vids:
+    :param cal_data_parent:
+    :param cb_size:
+    :return:
+    '''
+    cal_vids = navigation_utilities.find_Burgess_calibration_vids(cal_vid_parent)
+
+
+def camera_calibration_from_mirror_vids(calibration_data, calibration_summary_name):
+
+    #todo: working here - perform the camera calibration to get the intrinsics
+    CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST
+
+    cb_size = calibration_data['cb_size']
+    im_size = calibration_data['orig_im_size']
+    vf = calibration_data['valid_frames']
+    num_frames = np.shape(vf)[1]
+
+    views = [cvmd['view'] for cvmd in calibration_data['cropped_vid_metadata']]
+    # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+    cbrow = cb_size[0]
+    cbcol = cb_size[1]
+    objp = np.zeros((cbrow * cbcol, 3), np.float32)
+    objp[:, :2] = np.mgrid[0:cbcol, 0:cbrow].T.reshape(-1, 2)
+
+    # loop through all 3 views, find all valid images, translate them into the full image, perform the calibration
+
+    full_view_imgpoints = []
+    for i_view, view in enumerate(views):
+        imgpoints = np.array(calibration_data['cam_imgpoints'][i_view])
+        crop_params = calibration_data['cropped_vid_metadata'][i_view]['crop_params']
+
+        # translate checkerboard points to the original image
+        this_view_imgpoints = imgpoints
+        this_view_imgpoints[:,:,:,0] = imgpoints[:,:,:,0] + crop_params[0] - 1
+        this_view_imgpoints[:,:,:,1] = imgpoints[:,:,:,1] + crop_params[2] - 1
+
+        full_view_imgpoints.append(this_view_imgpoints)
+
+    all_imgpoints = np.concatenate([ip for ip in full_view_imgpoints])
+    num_valid_cb = np.shape(all_imgpoints)[0]
+    all_objpoints = [objp for ii in range(num_valid_cb)]
+
+    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(all_objpoints, all_imgpoints, im_size, None, None, flags=CALIBRATION_FLAGS)
+    calibration_data['camera_intrinsics'] = {'mtx': mtx, 'dist': dist}
+
+    skilled_reaching_io.write_pickle(calibration_summary_name, calibration_data)
+
+    return calibration_data
+
+
+def match_cb_points(cb1, cb2):
 
     pass
+
+
+def extract_valid_cbs_by_frame(calibration_data):
+
+    cb_size = calibration_data['cb_size']
+    vf = calibration_data['valid_frames']
+    _, num_frames = np.shape(vf)
+
+    views = [cvmd['view'] for cvmd in calibration_data['cropped_vid_metadata']]
+    # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+    cbrow = cb_size[0]
+    cbcol = cb_size[1]
+    objp = np.zeros((cbrow * cbcol, 3), np.float32)
+    objp[:, :2] = np.mgrid[0:cbcol, 0:cbrow].T.reshape(-1, 2)
+
+    objpoints = []
+    imgpoints = []
+
+    frame_counter = 0
+
+    # loop through all 3 views, find all valid images, translate them into the full image, perform the calibration
+    num_validframes = [0, 0, 0]
+    for i_frame in range(num_frames):
+        for i_view, view in enumerate(views):
+            if vf[i_view][i_frame]:
+                imgpoints = np.array(calibration_data['cam_imgpoints'][i_view])
+                cur_imgpoints = imgpoints[i_frame,:,:,:]
+                crop_params = calibration_data['cropped_vid_metadata'][i_view]['crop_params']
+
+                num_validframes[i_view] += 1
+
+        # test to see if points match up on original image
+        # vid_name = '/home/levlab/Public/rat_SR_videos_to_analyze/calibration_videos/calibration_videos_2021/calibration_videos_202107/calibration_videos_202107_box02/GridCalibration_box02_20210713_14-30-28.avi'
+        # vid_obj = cv2.VideoCapture(vid_name)
+        # vid_obj.set(cv2.CAP_PROP_POS_FRAMES, 134)
+        # ret, cur_img = vid_obj.read()
+        # corners = full_imgpoints[0,:,:,:]
+        # corners_img = cv2.drawChessboardCorners(cur_img, cb_size, corners,
+        #                                         True)
+        # test_img = '/home/levlab/Public/rat_SR_videos_to_analyze/test_img.png'
+        # cv2.imwrite(test_img, corners_img)
+        # plt.imshow(corners_img)
+        # plt.show()
+        pass

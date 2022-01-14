@@ -161,7 +161,7 @@ def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, cr
                 skilled_reaching_io.write_pickle(calibration_summary_name, calibration_data)
 
             # now perform the actual calibration
-            skilled_reaching_calibration.multi_mirror_calibration(calibration_data)
+            skilled_reaching_calibration.multi_mirror_calibration(calibration_data, calibration_summary_name)
             pass
     pass
 

@@ -723,30 +723,81 @@ def find_Burgess_calibration_folder(calibration_parent, session_datetime):
 
     session_year = session_datetime.strftime('%Y')
     session_month = session_datetime.strftime('%m')
+    session_day = session_datetime.strftime('%d')
 
-    year_folder = 'calibration_vids_' + session_year
+    year_folder = 'mouse_SR_calibrations_' + session_year
     month_folder = year_folder + session_month
+    day_folder = month_folder + session_day
 
-    calibration_folder = os.path.join(calibration_parent, year_folder, month_folder)
+    calibration_folder = os.path.join(calibration_parent, year_folder, month_folder, day_folder)
 
     if os.path.exists(calibration_folder):
         return calibration_folder
     else:
-        return none
+        return None
 
 
-def find_Burgess_calibration_vids(cal_vid_parent, session_datetime, cam_list=(1, 2)):
+def collect_all_Burgess_calibration_vid_folders(calibration_parent):
+    '''
+    find all the calibration subfolders
+    :param calibration_parent:
+    :return:
+    '''
 
-    cal_vid_folder = find_Burgess_calibration_folder(cal_vid_parent, session_datetime)
+    calibration_folders_stem = 'mouse_SR_calibrations'
+    # find all folders within the parent calibration folder
+    year_folders = [yf for yf in glob.glob(os.path.join(calibration_parent, calibration_folders_stem + '*')) if os.path.isdir(yf)]
+    month_folders = []
+    for yf in year_folders:
+        new_mf = [mf for mf in glob.glob(os.path.join(yf, calibration_folders_stem + '*')) if os.path.isdir(mf)]
+        month_folders.extend(new_mf)
 
-    basename = 'calibration_cam'
+    day_folders = []
+    for mf in month_folders:
+        new_df = [df for df in glob.glob(os.path.join(mf, calibration_folders_stem + '*')) if os.path.isdir(df)]
+        day_folders.extend(new_df)
+
+    return day_folders
+
+
+def find_Burgess_calibration_vids(cal_vid_parent, cam_list=(1, 2), vidtype='.avi'):
+
+
+    if vidtype[0] != '.':
+        vidtype = '.' + vidtype
+
+    cal_vid_folders = collect_all_Burgess_calibration_vid_folders(cal_vid_parent)
+    # cal_vid_folder = find_Burgess_calibration_folder(cal_vid_parent, session_datetime)
+
+    basename = 'calibrationvid'
     full_paths = []
 
-    for i_cam in cam_list:
-        vid_name = basename + '{:02d}_{date_string}.avi'.format(i_cam, date_string=datetime_to_string_for_fname(session_datetime))
-        full_paths.append(os.path.join(cal_vid_folder, vid_name))
+    paired_cal_vids = []
+    for cal_vid_folder in cal_vid_folders:
+        vid_list = glob.glob(os.path.join(cal_vid_folder, basename + '*' + vidtype))
 
-    return full_paths
+        vids_already_assigned = []
+        for vid_name in vid_list:
+            if vid_name in vids_already_assigned:
+                continue
+
+            vid_metadata = parse_Burgess_calibration_vid_name(vid_name)
+
+            # is there another video for the other camera at this date and time?
+            for other_vid_name in vid_list:
+                if other_vid_name != vid_name:
+                    other_vid_metadata = parse_Burgess_calibration_vid_name(other_vid_name)
+                    if vid_metadata['session_datetime'] == other_vid_metadata['session_datetime']:
+                        # these calibration videos form a pair
+                        paired_cal_vids.append([vid_name, other_vid_name])
+                        vids_already_assigned.append(vid_name)
+                        vids_already_assigned.append(other_vid_name)
+
+            # for i_cam in cam_list:
+            #     vid_name = basename + '_{}_cam{:02d}.avi'.format(datetime_to_string_for_fname(session_datetime), i_cam)
+            #     full_paths.append(os.path.join(cal_vid_folder, vid_name))
+
+    return paired_cal_vids
 
 
 def parse_Burgess_calibration_vid_name(cal_vid_name):
@@ -757,8 +808,8 @@ def parse_Burgess_calibration_vid_name(cal_vid_name):
     name_parts_list = bare_name.split('_')
 
     cal_name_parts = {
-        'cam_num': int(name_parts_list[1][3:]),
-        'session_datetime': fname_string_to_datetime(name_parts_list[2] + '_' + name_parts_list[3])
+        'cam_num': int(name_parts_list[3][3:]),
+        'session_datetime': fname_string_to_datetime(name_parts_list[1] + '_' + name_parts_list[2])
     }
 
     return cal_name_parts

@@ -801,7 +801,11 @@ def find_Burgess_calibration_vids(cal_vid_parent, cam_list=(1, 2), vidtype='.avi
 
 
 def parse_Burgess_calibration_vid_name(cal_vid_name):
-
+    '''
+    calibration file name of form 'calibrationvid_YYYYmmdd_HH-MM-SS_camZZ.avi' where ZZ is '01' or '02'
+    :param cal_vid_name:
+    :return:
+    '''
     _, cal_vid_name = os.path.split(cal_vid_name)
     bare_name, _ = os.path.splitext(cal_vid_name)
 
@@ -826,9 +830,9 @@ def create_calibration_data_name(cal_data_parent, session_datetime):
     return cal_data_name
 
 
-def create_multiview_calibration_data_name(cal_data_parent, calibration_metadata):
+def create_multiview_calibration_data_name(cal_data_parent, session_datetime):
 
-    basename = 'calibration_data'
+    basename = 'calibrationdata'
     cal_data_name = basename + '_' + datetime_to_string_for_fname(session_datetime) + '.pickle'
 
     cal_data_folder = create_calibration_data_folder(cal_data_parent, session_datetime)

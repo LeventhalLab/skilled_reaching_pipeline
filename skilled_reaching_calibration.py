@@ -425,13 +425,17 @@ def multi_mirror_calibration(calibration_data, calibration_summary_name):
     pass
 
 
-def calibrate_all_Burgess_vids(cal_vid_parent):
+def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(10, 7)):
 
 
-    cal_vids = navigation_utilities.find_Burgess_calibration_vids(cal_vid_parent)
+    paired_cal_vids = navigation_utilities.find_Burgess_calibration_vids(cal_vid_parent)
+
+    for vid_pair in paired_cal_vids:
+        multi_camera_calibration_Burgess(vid_pair, cal_data_parent, cb_size=cb_size)
 
 
-def multi_camera_calibration_Burgess(cal_vids, cal_data_parent, cb_size=(10, 7)):
+
+def multi_camera_calibration_Burgess(vid_pair, cal_data_parent, cb_size=(10, 7)):
     '''
 
     :param cal_vids:
@@ -439,8 +443,33 @@ def multi_camera_calibration_Burgess(cal_vids, cal_data_parent, cb_size=(10, 7))
     :param cb_size:
     :return:
     '''
-    cal_vids = navigation_utilities.find_Burgess_calibration_vids(cal_vid_parent)
 
+    # extract metadata from file names. Note that cam 01 is upside down
+    calibration_metadata = navigation_utilities.parse_Burgess_calibration_vid_name(vid_pair[0])
+    cal_data_name = navigation_utilities.create_multiview_calibration_data_name(cal_data_parent,
+                                                                                calibration_metadata['session_datetime'])
+    if os.path.isfile(cal_data_name):
+        # load file, check to see if individual camera calibrations have already been performed
+        cam_cal = skilled_reaching_io.read_pickle(cal_data_name)
+        # todo: skip if stereo calibration already performed
+        return
+
+        # camera calibrations have been performed, now need to do stereo calibration
+
+    CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST
+
+    # create video objects for each calibration_video
+    vid_obj = []
+    num_frames = []
+    im_size = []
+    for i_vid, vid_name in enumerate(vid_pair):
+        vid_obj.append(cv2.VideoCapture(vid_name))
+        num_frames.append(vid_obj[i_vid].get(cv2.CAP_PROP_FRAME_COUNT))
+        im_size.append((int(vid_obj[i_vid].get(cv2.CAP_PROP_FRAME_WIDTH)), int(vid_obj[i_vid].get(cv2.CAP_PROP_FRAME_HEIGHT))))
+
+    for vo in vid_obj:
+        vo.release()
+    pass
 
 def camera_calibration_from_mirror_vids(calibration_data, calibration_summary_name):
 

@@ -9,6 +9,7 @@ import csv
 import numpy as np
 import cv2
 import glob
+from random import randint
 
 
 def import_fiji_csv(fname):
@@ -431,11 +432,21 @@ def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(10, 7))
     paired_cal_vids = navigation_utilities.find_Burgess_calibration_vids(cal_vid_parent)
 
     for vid_pair in paired_cal_vids:
-        multi_camera_calibration_Burgess(vid_pair, cal_data_parent, cb_size=cb_size)
+        calvid_metadata = [navigation_utilities.parse_Burgess_calibration_vid_name(vid) for vid in vid_pair]
+        cal_data_name = navigation_utilities.create_multiview_calibration_data_name(cal_data_parent,
+                                                                                    calvid_metadata[0][
+                                                                                        'session_datetime'])
+        if not os.path.isfile(cal_data_name):
+            # collect the checkerboard points, write to file
+            collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=cb_size)
+
+        calibrate_Burgess_session(cal_data_name, vid_pair)
+
+        pass
 
 
 
-def multi_camera_calibration_Burgess(vid_pair, cal_data_parent, cb_size=(10, 7)):
+def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(10, 7)):
     '''
 
     :param cal_vids:
@@ -445,18 +456,17 @@ def multi_camera_calibration_Burgess(vid_pair, cal_data_parent, cb_size=(10, 7))
     '''
 
     # extract metadata from file names. Note that cam 01 is upside down
-    calibration_metadata = navigation_utilities.parse_Burgess_calibration_vid_name(vid_pair[0])
+
+    calvid_metadata = [navigation_utilities.parse_Burgess_calibration_vid_name(vid) for vid in vid_pair]
     cal_data_name = navigation_utilities.create_multiview_calibration_data_name(cal_data_parent,
-                                                                                calibration_metadata['session_datetime'])
+                                                                                calvid_metadata[0]['session_datetime'])
     if os.path.isfile(cal_data_name):
-        # load file, check to see if individual camera calibrations have already been performed
-        cam_cal = skilled_reaching_io.read_pickle(cal_data_name)
-        # todo: skip if stereo calibration already performed
+        # if file already exists, assume cb points have already been collected
         return
 
         # camera calibrations have been performed, now need to do stereo calibration
 
-    CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST
+    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 
     # create video objects for each calibration_video
     vid_obj = []
@@ -464,12 +474,195 @@ def multi_camera_calibration_Burgess(vid_pair, cal_data_parent, cb_size=(10, 7))
     im_size = []
     for i_vid, vid_name in enumerate(vid_pair):
         vid_obj.append(cv2.VideoCapture(vid_name))
-        num_frames.append(vid_obj[i_vid].get(cv2.CAP_PROP_FRAME_COUNT))
+        num_frames.append(int(vid_obj[i_vid].get(cv2.CAP_PROP_FRAME_COUNT)))
         im_size.append((int(vid_obj[i_vid].get(cv2.CAP_PROP_FRAME_WIDTH)), int(vid_obj[i_vid].get(cv2.CAP_PROP_FRAME_HEIGHT))))
+
+    if all(nf == num_frames[0] for nf in num_frames):
+        # check that there are the same number of frames in each calibration video
+
+        # Prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
+        cbrow = cb_size[0]
+        cbcol = cb_size[1]
+        objp = np.zeros((cbrow * cbcol, 3), np.float32)
+        objp[:, :2] = np.mgrid[0:cbcol, 0:cbrow].T.reshape(-1, 2)
+
+        cam_objpoints = [[] for ii in vid_pair]
+        stereo_objpoints = []
+        cam_imgpoints = [[] for ii in vid_pair]
+        stereo_imgpoints = [[] for ii in vid_pair]
+
+    # create boolean lists to track which frames have valid checkerboard images. Writing so that can expand to more
+    # views eventually
+    # valid_frames is a list of length num_cameras of lists that each are of length num_frames
+    valid_frames = [[False for frame_num in range(num_frames[0])] for ii in vid_pair]
+
+    for i_frame in range(num_frames[0]):
+        print(i_frame)
+
+        corners2 = [[] for ii in vid_pair]
+        cur_img = [[] for ii in vid_pair]
+        for i_vid, vo in enumerate(vid_obj):
+            vo.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
+            ret, cur_img[i_vid] = vo.read()
+
+            if calvid_metadata[i_vid]['cam_num'] == 1:
+                # rotate the image 180 degrees
+                cur_img[i_vid] = cv2.rotate(cur_img[i_vid], cv2.ROTATE_180)
+
+            # test_img_name = os.path.join(cal_data_parent, 'test_cam{:02d}.jpg'.format(calibration_metadata[i_vid]['cam_num']))
+            # cv2.imwrite(test_img_name, cur_img[i_vid])
+
+            if ret:
+                cur_img_gray = cv2.cvtColor(cur_img[i_vid], cv2.COLOR_BGR2GRAY)
+                found_valid_chessboard, corners = cv2.findChessboardCorners(cur_img_gray, cb_size)
+                valid_frames[i_vid][i_frame] = found_valid_chessboard
+
+                if found_valid_chessboard:
+                    corners2[i_vid] = cv2.cornerSubPix(cur_img_gray, corners, (11, 11), (-1, -1), criteria)
+                    cam_objpoints[i_vid].append(objp)
+                    cam_imgpoints[i_vid].append(corners2[i_vid])
+
+                #     corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid],
+                #                                             found_valid_chessboard)
+                # else:
+                #     corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners,
+                #                                             found_valid_chessboard)
+                # # vid_path, vid_name = os.path.split(calibration_vids[i_vid])
+                # # vid_name, _ = os.path.splitext(vid_name)
+                # # frame_path = os.path.join(vid_path, vid_name)
+                # # if not os.path.isdir(frame_path):
+                # #     os.makedirs(frame_path)
+                #
+                # test_img_name = os.path.join(cal_data_parent,
+                #                              'test_cboard_cam{:02d}_frame{:04d}.jpg'.format(calibration_metadata[i_vid]['cam_num'], i_frame))
+                # frame_name = vid_name + '_frame{:03d}'.format(i_frame) + '.png'
+                #
+                # cv2.imwrite(test_img_name, corners_img)
+
+        # collect all checkerboard points visible in pairs of images
+        if valid_frames[0][i_frame] and valid_frames[1][i_frame]:
+            # checkerboards were identified in matching frames
+            stereo_objpoints.append(objp)
+            for i_vid, corner_pts in enumerate(corners2):
+                stereo_imgpoints[i_vid].append(corner_pts)
+
+        # todo: test that the checkerboard points in each imgpoint array are correct
+        # below is for checking if corners were correctly identified
+        # for i_vid in range(3):
+        #     if valid_frames[i_vid][i_frame]:
+        #         corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid], found_valid_chessboard)
+        # cv2.imwrite(corners_img_name, corners_img)
+        # plt.imshow(corners_img)
+        # plt.show()
+
+    calibration_data = {
+        'cam_objpoints': cam_objpoints,
+        'cam_imgpoints': cam_imgpoints,
+        'stereo_objpoints': stereo_objpoints,
+        'stereo_imgpoints': stereo_imgpoints,
+        'valid_frames': valid_frames,
+        'im_size': im_size,
+        'cb_size': cb_size,
+        'calvid_metadata': calvid_metadata
+    }
+
+    skilled_reaching_io.write_pickle(cal_data_name, calibration_data)
 
     for vo in vid_obj:
         vo.release()
+
+
+def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_intrinsics=50):
+    '''
+
+    :param calibration_data_name:
+    :param num_frames_for_intrinsics:
+    :return:
+    '''
+
+    # create video objects for each calibration_video
+    vid_obj = []
+    for i_vid, vid_name in enumerate(vid_pair):
+        vid_obj.append(cv2.VideoCapture(vid_name))
+
+    CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO
+    # initialize camera intrinsics to have an aspect ratio of 1 and assume the center of the 1280 x 1024 field is [639.5, 511.5]
+    init_mtx = np.array([[2000, 0, 639.5],[0, 2000, 511.5],[0, 0, 1]])
+    cal_data = skilled_reaching_io.read_pickle(calibration_data_name)
+
+    # get intrinsics and distortion for each camera
+    num_cams = len(cal_data['cam_objpoints'])
+    cal_data['mtx'] = []
+    cal_data['dist'] = []
+    cal_data['frame_nums_for_intrinsics'] = []
+    for i_cam in range(num_cams):
+
+        current_cam = cal_data['calvid_metadata'][i_cam]['cam_num']
+
+        session_date_string = navigation_utilities.datetime_to_string_for_fname(cal_data['calvid_metadata'][i_cam]['session_datetime'])
+        print('working on {}, camera {:02d} intrinsics calibration'.format(session_date_string, i_cam))
+
+        # select num_frames_for_intrinsics evenly spaced frames
+        cam_objpoints = cal_data['cam_objpoints'][i_cam]
+        cam_imgpoints = cal_data['cam_imgpoints'][i_cam]
+        objpoints_for_intrinsics, imgpoints_for_intrinsics, frame_numbers = select_cboards_for_calibration(cam_objpoints, cam_imgpoints, num_frames_for_intrinsics)
+
+        # ret, mtx, dist, _, _ = cv2.calibrateCamera(cal_data['cam_objpoints'][i_cam],
+        #                                            cal_data['cam_imgpoints'][i_cam],
+        #                                            cal_data['im_size'][i_cam],
+        #                                            None,
+        #                                            None,
+        #                                            flags=CALIBRATION_FLAGS)
+
+        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints_for_intrinsics,
+                                                   imgpoints_for_intrinsics,
+                                                   cal_data['im_size'][i_cam],
+                                                   init_mtx,
+                                                   None,
+                                                   flags=CALIBRATION_FLAGS)
+        total_frames = np.shape(cam_objpoints)[0]
+        valid_frames = cal_data['valid_frames'][i_cam]
+        for i_frame in range(total_frames):
+            pp = test_reprojection(objpoints_for_intrinsics[i_frame], imgpoints_for_intrinsics[i_frame], mtx, rvecs[i_frame], tvecs[i_frame], dist)
+            cur_frame = [ii for ii, vf in enumerate(valid_frames) if vf == True][frame_numbers[i_frame]]
+            vid_obj[i_cam].set(cv2.CAP_PROP_POS_FRAMES, cur_frame)
+            ret, cur_img = vid_obj[i_cam].read()
+
+            if current_cam == 1:
+                # rotate the image 180 degrees
+                cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
+
+            corners_img = cv2.drawChessboardCorners(cur_img, cal_data['cb_size'], imgpoints_for_intrinsics[i_frame], True)
+            reproj_img = cv2.drawChessboardCorners(corners_img, cal_data['cb_size'], pp, False)
+
+            img_name = '/home/levlab/Public/mouse_SR_videos_to_analyze/mouse_SR_calibration_data/test_frame_cam{:02d}_frame{:03d}.jpg'.format(current_cam, cur_frame)
+            cv2.imwrite(img_name, reproj_img)
+            pass
+
+        cal_data['mtx'].append(mtx)
+        cal_data['dist'].append(dist)
+        cal_data['frame_nums_for_intrinsics'].append(frame_numbers)
+
+        skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
     pass
+
+
+def test_reprojection(objpoints, imgpoints, mtx, rvec, tvec, dist):
+
+    projected_pts, _ = cv2.projectPoints(objpoints, rvec, tvec, mtx, dist)
+    return projected_pts
+
+def select_cboards_for_calibration(objpoints, imgpoints, num_frames_to_extract):
+
+    total_frames = np.shape(objpoints)[0]
+    frame_spacing = int(total_frames/num_frames_to_extract)
+
+    selected_objpoints = objpoints[::frame_spacing]
+    selected_imgpoints = imgpoints[::frame_spacing]
+
+    frame_numbers = range(0, total_frames, frame_spacing)
+
+    return selected_objpoints, selected_imgpoints, frame_numbers
 
 def camera_calibration_from_mirror_vids(calibration_data, calibration_summary_name):
 

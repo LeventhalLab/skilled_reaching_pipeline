@@ -718,7 +718,6 @@ def find_marked_vids_for_3d_reconstruction(marked_vids_parent, dlc_mat_output_pa
     return metadata_list
 
 
-
 def find_Burgess_calibration_folder(calibration_parent, session_datetime):
 
     session_year = session_datetime.strftime('%Y')
@@ -811,12 +810,13 @@ def parse_Burgess_calibration_vid_name(cal_vid_name):
 
     name_parts_list = bare_name.split('_')
 
-    cal_name_parts = {
+    calvid_metadata = {
         'cam_num': int(name_parts_list[3][3:]),
-        'session_datetime': fname_string_to_datetime(name_parts_list[1] + '_' + name_parts_list[2])
+        'session_datetime': fname_string_to_datetime(name_parts_list[1] + '_' + name_parts_list[2]),
+        'calvid_name': cal_vid_name
     }
 
-    return cal_name_parts
+    return calvid_metadata
 
 
 def create_calibration_data_name(cal_data_parent, session_datetime):

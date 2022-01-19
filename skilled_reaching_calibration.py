@@ -523,6 +523,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
 
                     corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid],
                                                             found_valid_chessboard)
+
                 else:
                     corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners,
                                                             found_valid_chessboard)
@@ -538,7 +539,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
                     os.makedirs(test_save_dir)
 
                 test_img_name = os.path.join(test_save_dir,
-                                             'test_cboard_cam{:02d}_frame{:04d}.jpg'.format(calvid_metadata[i_vid]['cam_num'], i_frame))
+                                             'test_cboard_{}_cam{:02d}_frame{:04d}.jpg'.format(session_date_string, calvid_metadata[i_vid]['cam_num'], i_frame))
                 # frame_name = vid_name + '_frame{:03d}'.format(i_frame) + '.png'
 
                 cv2.imwrite(test_img_name, corners_img)
@@ -659,8 +660,8 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
                 cv2.imwrite(img_name, reproj_img)
                 pass
 
-        cal_data['mtx'].append(mtx)
-        cal_data['dist'].append(dist)
+        cal_data['mtx'].append(np.copy(mtx))
+        cal_data['dist'].append(np.copy(dist))
         cal_data['frame_nums_for_intrinsics'].append(frame_numbers)
 
         skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
@@ -708,13 +709,16 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
 
     # check if calibration worked
-    stereo_idx = 0
-    projPoints = []
-    for i_cam in range(num_cams):
-        projPoints.append(cal_data['stereo_imgpoints'][i_cam][stereo_idx])
-        projPoints[i_cam] = np.squeeze(projPoints[i_cam]).T
+    num_valid_stereo_pairs = np.shape(cal_data['stereo_imgpoints'])[1]
+    for stereo_idx in range(num_valid_stereo_pairs):
+        frame_num = cal_data['stereo_frames'][stereo_idx]
+        projPoints = []
+        for i_cam in range(num_cams):
+            projPoints.append(cal_data['stereo_imgpoints'][i_cam][stereo_idx])
+            projPoints[i_cam] = np.squeeze(projPoints[i_cam]).T
 
-    points4D = triangulate_points(cal_data, projPoints)
+        print('frame number {:d}'.format(frame_num))
+        worldpoints = triangulate_points(cal_data, projPoints, frame_num)
 
     pass
 
@@ -758,7 +762,8 @@ def select_cboards_for_stereo_calibration(objpoints, imgpoints, num_frames_to_ex
     return selected_objpoints, selected_imgpoints, frame_numbers
 
 
-def triangulate_points(cal_data, projPoints):
+def triangulate_points(cal_data, projPoints, frame_num):
+    cal_data_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze/mouse_SR_calibration_data'
 
     # first, create projMatr1 and projMatr2 (3 x 4 projection matrices for each camera) for each camera
     mtx = cal_data['mtx']
@@ -767,6 +772,37 @@ def triangulate_points(cal_data, projPoints):
 
     # undistort points, which should give results in normalized coordinates
     ud_pts = [cv2.undistortPoints(projPoints[i_cam], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
+
+    num_pts = np.shape(projPoints)[2]
+    reshaped_pts = [np.zeros((1, num_pts, 2)) for ii in range(2)]
+    projPoints_array = []
+    newpoints = [[], []]
+    for ii in range(2):
+        projPoints_array.append(np.squeeze(np.array([projPoints[ii]]).T))
+        reshaped_pts[ii][0,:,:] = projPoints_array[ii]
+    newpoints[0], newpoints[1] = cv2.correctMatches(cal_data['F'], reshaped_pts[0], reshaped_pts[1])
+
+    new_cornerpoints = [np.squeeze(newpoints[ii]) for ii in range(2)]
+
+    for i_cam in range(2):
+        session_date_string = navigation_utilities.datetime_to_string_for_fname(
+            cal_data['calvid_metadata'][i_cam]['session_datetime'])
+        test_img_dir = os.path.join(cal_data_parent, 'corner_images', session_date_string,
+                                     'cam{:02d}'.format(cal_data['calvid_metadata'][i_cam]['cam_num']))
+
+        test_img_name = os.path.join(test_img_dir,
+                                     'test_cboard_{}_cam{:02d}_frame{:04d}.jpg'.format(session_date_string,
+                                                                                   cal_data['calvid_metadata'][i_cam]['cam_num'],
+                                                                                   frame_num))
+
+        cboard_img = cv2.imread(test_img_name)
+        new_name = os.path.join(test_img_dir, 'refined_pts_{}_cam{:02d}_frame{:04d}.jpg'.format(session_date_string,
+                                                                                   cal_data['calvid_metadata'][i_cam]['cam_num'],
+                                                                                   frame_num))
+        new_img = cv2.drawChessboardCorners(cboard_img, cal_data['cb_size'], np.reshape(new_cornerpoints[ii], (70,1,2)), False)
+        cv2.imwrite(new_name, new_img)
+
+    # nudp1, nudp2 = cv2.correctMatches(cal_data['F'], ud_pts[0], ud_pts[1])
 
     projMatr1 = np.eye(3, 4)
     projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
@@ -777,9 +813,11 @@ def triangulate_points(cal_data, projPoints):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
 
-    ax.scatter(worldpoints[:,0], worldpoints[:,1], worldpoints[:,2])
+    ax.scatter(worldpoints[:, 0], worldpoints[:, 1], worldpoints[:, 2])
     plt.show()
-    pass
+
+    return worldpoints
+
 
 def camera_calibration_from_mirror_vids(calibration_data, calibration_summary_name):
 

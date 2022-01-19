@@ -799,7 +799,7 @@ def triangulate_points(cal_data, projPoints, frame_num):
         new_name = os.path.join(test_img_dir, 'refined_pts_{}_cam{:02d}_frame{:04d}.jpg'.format(session_date_string,
                                                                                    cal_data['calvid_metadata'][i_cam]['cam_num'],
                                                                                    frame_num))
-        new_img = cv2.drawChessboardCorners(cboard_img, cal_data['cb_size'], np.reshape(new_cornerpoints[ii], (70,1,2)), False)
+        new_img = cv2.drawChessboardCorners(cboard_img, cal_data['cb_size'], np.reshape(new_cornerpoints[ii], (70, 1, 2)), False)
         cv2.imwrite(new_name, new_img)
 
     # nudp1, nudp2 = cv2.correctMatches(cal_data['F'], ud_pts[0], ud_pts[1])

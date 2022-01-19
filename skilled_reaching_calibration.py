@@ -426,7 +426,7 @@ def multi_mirror_calibration(calibration_data, calibration_summary_name):
     pass
 
 
-def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(10, 7)):
+def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(7, 10)):
 
 
     paired_cal_vids = navigation_utilities.find_Burgess_calibration_vids(cal_vid_parent)
@@ -445,8 +445,7 @@ def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(10, 7))
         pass
 
 
-
-def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(10, 7)):
+def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
     '''
 
     :param cal_vids:
@@ -484,7 +483,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(10, 7)):
         cbrow = cb_size[0]
         cbcol = cb_size[1]
         objp = np.zeros((cbrow * cbcol, 3), np.float32)
-        objp[:, :2] = np.mgrid[0:cbcol, 0:cbrow].T.reshape(-1, 2)
+        objp[:, :2] = np.mgrid[0:cbrow, 0:cbcol].T.reshape(-1, 2)
 
         cam_objpoints = [[] for ii in vid_pair]
         stereo_objpoints = []
@@ -495,7 +494,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(10, 7)):
     # views eventually
     # valid_frames is a list of length num_cameras of lists that each are of length num_frames
     valid_frames = [[False for frame_num in range(num_frames[0])] for ii in vid_pair]
-
+    stereo_frames = []
     for i_frame in range(num_frames[0]):
         print(i_frame)
 
@@ -522,27 +521,34 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(10, 7)):
                     cam_objpoints[i_vid].append(objp)
                     cam_imgpoints[i_vid].append(corners2[i_vid])
 
-                #     corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid],
-                #                                             found_valid_chessboard)
-                # else:
-                #     corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners,
-                #                                             found_valid_chessboard)
-                # # vid_path, vid_name = os.path.split(calibration_vids[i_vid])
-                # # vid_name, _ = os.path.splitext(vid_name)
-                # # frame_path = os.path.join(vid_path, vid_name)
-                # # if not os.path.isdir(frame_path):
-                # #     os.makedirs(frame_path)
-                #
-                # test_img_name = os.path.join(cal_data_parent,
-                #                              'test_cboard_cam{:02d}_frame{:04d}.jpg'.format(calibration_metadata[i_vid]['cam_num'], i_frame))
+                    corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid],
+                                                            found_valid_chessboard)
+                else:
+                    corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners,
+                                                            found_valid_chessboard)
+                # vid_path, vid_name = os.path.split(calibration_vids[i_vid])
+                # vid_name, _ = os.path.splitext(vid_name)
+                # frame_path = os.path.join(vid_path, vid_name)
+                # if not os.path.isdir(frame_path):
+                #     os.makedirs(frame_path)
+
+                session_date_string = navigation_utilities.datetime_to_string_for_fname(calvid_metadata[i_vid]['session_datetime'])
+                test_save_dir = os.path.join(cal_data_parent, 'corner_images', session_date_string, 'cam{:02d}'.format(calvid_metadata[i_vid]['cam_num']))
+                if not os.path.isdir(test_save_dir):
+                    os.makedirs(test_save_dir)
+
+                test_img_name = os.path.join(test_save_dir,
+                                             'test_cboard_cam{:02d}_frame{:04d}.jpg'.format(calvid_metadata[i_vid]['cam_num'], i_frame))
                 # frame_name = vid_name + '_frame{:03d}'.format(i_frame) + '.png'
-                #
-                # cv2.imwrite(test_img_name, corners_img)
+
+                cv2.imwrite(test_img_name, corners_img)
 
         # collect all checkerboard points visible in pairs of images
         if valid_frames[0][i_frame] and valid_frames[1][i_frame]:
             # checkerboards were identified in matching frames
             stereo_objpoints.append(objp)
+            stereo_frames.append(i_frame)
+
             for i_vid, corner_pts in enumerate(corners2):
                 stereo_imgpoints[i_vid].append(corner_pts)
 
@@ -560,6 +566,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(10, 7)):
         'cam_imgpoints': cam_imgpoints,
         'stereo_objpoints': stereo_objpoints,
         'stereo_imgpoints': stereo_imgpoints,
+        'stereo_frames': stereo_frames,         # frame numbers for which valid checkerboards were found for both cameras
         'valid_frames': valid_frames,
         'im_size': im_size,
         'cb_size': cb_size,
@@ -572,11 +579,14 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(10, 7)):
         vo.release()
 
 
-def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_intrinsics=50):
+def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_intrinsics=50, min_frames_for_intrinsics=10, num_frames_for_stereo=20, min_frames_for_stereo=5):
     '''
 
     :param calibration_data_name:
     :param num_frames_for_intrinsics:
+    :param min_frames_for_intrinsics: minimum number of frames to use for intrinsics calibration (if number of valid frames
+        is less than num_frames_for_intrinsics, it will use all available frames. If min_frames_for_intrinsics is greater
+        than the number of available frames, calibration will be skipped).
     :return:
     '''
 
@@ -586,6 +596,7 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
         vid_obj.append(cv2.VideoCapture(vid_name))
 
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO
+    STEREO_FLAGS = cv2.CALIB_FIX_INTRINSIC + cv2.CALIB_FIX_PRINCIPAL_POINT
     # initialize camera intrinsics to have an aspect ratio of 1 and assume the center of the 1280 x 1024 field is [639.5, 511.5]
     init_mtx = np.array([[2000, 0, 639.5],[0, 2000, 511.5],[0, 0, 1]])
     cal_data = skilled_reaching_io.read_pickle(calibration_data_name)
@@ -599,58 +610,122 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
 
         current_cam = cal_data['calvid_metadata'][i_cam]['cam_num']
 
-        session_date_string = navigation_utilities.datetime_to_string_for_fname(cal_data['calvid_metadata'][i_cam]['session_datetime'])
-        print('working on {}, camera {:02d} intrinsics calibration'.format(session_date_string, i_cam))
+        session_date_string = navigation_utilities.datetime_to_string_for_fname(
+            cal_data['calvid_metadata'][i_cam]['session_datetime'])
+        # if 'mtx' in cal_data.keys():
+        #     # if intrinsics have already been calculated for this camera, skip
+        #     if i_cam >= len(cal_data['mtx']):
+        #         # this camera number is larger than the number of cameras for which intrinsics have been stored
+        #         print('intrinsics already calculated for {}, camera {:02d}'.format(session_date_string, current_cam))
+        #         continue
+
+        print('working on {}, camera {:02d} intrinsics calibration'.format(session_date_string, current_cam))
 
         # select num_frames_for_intrinsics evenly spaced frames
         cam_objpoints = cal_data['cam_objpoints'][i_cam]
         cam_imgpoints = cal_data['cam_imgpoints'][i_cam]
-        objpoints_for_intrinsics, imgpoints_for_intrinsics, frame_numbers = select_cboards_for_calibration(cam_objpoints, cam_imgpoints, num_frames_for_intrinsics)
 
-        # ret, mtx, dist, _, _ = cv2.calibrateCamera(cal_data['cam_objpoints'][i_cam],
-        #                                            cal_data['cam_imgpoints'][i_cam],
-        #                                            cal_data['im_size'][i_cam],
-        #                                            None,
-        #                                            None,
-        #                                            flags=CALIBRATION_FLAGS)
+        total_valid_frames = np.shape(cam_objpoints)[0]
+        num_frames_to_use = min(num_frames_for_intrinsics, total_valid_frames)
+        if num_frames_to_use < min_frames_for_intrinsics:
+            mtx = np.zeros((3, 3))
+            dist = np.zeros((1, 5))
+            frame_numbers = []
+        else:
+            objpoints_for_intrinsics, imgpoints_for_intrinsics, frame_numbers = select_cboards_for_calibration(cam_objpoints, cam_imgpoints, num_frames_to_use)
 
-        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints_for_intrinsics,
-                                                   imgpoints_for_intrinsics,
-                                                   cal_data['im_size'][i_cam],
-                                                   init_mtx,
-                                                   None,
-                                                   flags=CALIBRATION_FLAGS)
-        total_frames = np.shape(cam_objpoints)[0]
-        valid_frames = cal_data['valid_frames'][i_cam]
-        for i_frame in range(total_frames):
-            pp = test_reprojection(objpoints_for_intrinsics[i_frame], imgpoints_for_intrinsics[i_frame], mtx, rvecs[i_frame], tvecs[i_frame], dist)
-            cur_frame = [ii for ii, vf in enumerate(valid_frames) if vf == True][frame_numbers[i_frame]]
-            vid_obj[i_cam].set(cv2.CAP_PROP_POS_FRAMES, cur_frame)
-            ret, cur_img = vid_obj[i_cam].read()
+            ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints_for_intrinsics,
+                                                       imgpoints_for_intrinsics,
+                                                       cal_data['im_size'][i_cam],
+                                                       init_mtx,
+                                                       None,
+                                                       flags=CALIBRATION_FLAGS)
+            intrinsics_frames = np.shape(objpoints_for_intrinsics)[0]
+            valid_frames = cal_data['valid_frames'][i_cam]
+            for i_frame in range(intrinsics_frames):
+                pp = test_reprojection(objpoints_for_intrinsics[i_frame], imgpoints_for_intrinsics[i_frame], mtx, rvecs[i_frame], tvecs[i_frame], dist)
+                cur_frame = [ii for ii, vf in enumerate(valid_frames) if vf == True][frame_numbers[i_frame]]
+                vid_obj[i_cam].set(cv2.CAP_PROP_POS_FRAMES, cur_frame)
+                ret, cur_img = vid_obj[i_cam].read()
 
-            if current_cam == 1:
-                # rotate the image 180 degrees
-                cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
+                if current_cam == 1:
+                    # rotate the image 180 degrees
+                    cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
 
-            corners_img = cv2.drawChessboardCorners(cur_img, cal_data['cb_size'], imgpoints_for_intrinsics[i_frame], True)
-            reproj_img = cv2.drawChessboardCorners(corners_img, cal_data['cb_size'], pp, False)
+                corners_img = cv2.drawChessboardCorners(cur_img, cal_data['cb_size'], imgpoints_for_intrinsics[i_frame], True)
+                reproj_img = cv2.drawChessboardCorners(corners_img, cal_data['cb_size'], pp, False)
 
-            img_name = '/home/levlab/Public/mouse_SR_videos_to_analyze/mouse_SR_calibration_data/test_frame_cam{:02d}_frame{:03d}.jpg'.format(current_cam, cur_frame)
-            cv2.imwrite(img_name, reproj_img)
-            pass
+                img_name = '/home/levlab/Public/mouse_SR_videos_to_analyze/mouse_SR_calibration_data/test_frame_{}_cam{:02d}_frame{:03d}.jpg'.format(session_date_string, current_cam, cur_frame)
+                cv2.imwrite(img_name, reproj_img)
+                pass
 
         cal_data['mtx'].append(mtx)
         cal_data['dist'].append(dist)
         cal_data['frame_nums_for_intrinsics'].append(frame_numbers)
 
         skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
+
+    # now perform stereo calibration
+    # num_frames_for_stereo = 20, min_frames_for_stereo = 5
+    stereo_objpoints = cal_data['stereo_objpoints']
+    stereo_imgpoints = cal_data['stereo_imgpoints']
+    num_stereo_pairs = np.shape(stereo_objpoints)[0]
+    num_frames_to_use = min(num_frames_for_stereo, num_stereo_pairs)
+    objpoints, imgpoints, stereo_frame_idx = select_cboards_for_stereo_calibration(stereo_objpoints, stereo_imgpoints, num_frames_to_use)
+    frames_for_stereo_calibration = [sf_idx for sf_idx in cal_data['stereo_frames']]
+
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+    im_size = cal_data['im_size']
+    # im_size must be the same for both cameras
+    if all([ims == im_size[0] for ims in im_size]) and num_frames_to_use >= min_frames_for_stereo:
+        # all images have the same size
+        print('working on stereo calibration for {}'.format(session_date_string))
+        im_size = im_size[0]
+        ret, mtx1, dist1, mtx2, dist2, R, T, E, F = cv2.stereoCalibrate(objpoints, imgpoints[0], imgpoints[1], mtx[0], dist[0], mtx[1], dist[1], im_size, flags=STEREO_FLAGS)
+    else:
+        ret = False
+        mtx1 = np.zeros((3, 3))
+        mtx2 = np.zeros((3, 3))
+        dist1 = np.zeros((1, 5))
+        dist2 = np.zeros((1, 5))
+        R = np.zeros((3, 3))
+        T = np.zeros((3, 1))
+        E = np.zeros((3, 3))
+        F = np.zeros((3, 3))
+
+    cal_data['R'] = R
+    cal_data['T'] = T
+    cal_data['E'] = E
+    cal_data['F'] = F
+    cal_data['frames_for_stereo_calibration'] = frames_for_stereo_calibration   # frame numbers in original calibration video used for the stereo calibration
+    # if valid_frames[0][i_frame] and valid_frames[1][i_frame]:
+    #     # checkerboards were identified in matching frames
+    #     stereo_objpoints.append(objp)
+    #     for i_vid, corner_pts in enumerate(corners2):
+    #         stereo_imgpoints[i_vid].append(corner_pts)
+
+    skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
+
+    # check if calibration worked
+    stereo_idx = 0
+    projPoints = []
+    for i_cam in range(num_cams):
+        projPoints.append(cal_data['stereo_imgpoints'][i_cam][stereo_idx])
+        projPoints[i_cam] = np.squeeze(projPoints[i_cam]).T
+
+    points4D = triangulate_points(cal_data, projPoints)
+
     pass
+
 
 
 def test_reprojection(objpoints, imgpoints, mtx, rvec, tvec, dist):
 
+    # rvec = np.array([0., 0., 0.])
     projected_pts, _ = cv2.projectPoints(objpoints, rvec, tvec, mtx, dist)
     return projected_pts
+
 
 def select_cboards_for_calibration(objpoints, imgpoints, num_frames_to_extract):
 
@@ -663,6 +738,48 @@ def select_cboards_for_calibration(objpoints, imgpoints, num_frames_to_extract):
     frame_numbers = range(0, total_frames, frame_spacing)
 
     return selected_objpoints, selected_imgpoints, frame_numbers
+
+
+def select_cboards_for_stereo_calibration(objpoints, imgpoints, num_frames_to_extract):
+
+    total_frames = np.shape(objpoints)[0]
+
+    if num_frames_to_extract == 0:
+        frame_numbers = []
+        selected_objpoints = []
+        selected_imgpoints = []
+    else:
+        frame_spacing = int(total_frames/num_frames_to_extract)
+        frame_numbers = range(0, total_frames, frame_spacing)
+
+        selected_objpoints = objpoints[::frame_spacing]
+        selected_imgpoints = [ip[::frame_spacing] for ip in imgpoints]
+
+    return selected_objpoints, selected_imgpoints, frame_numbers
+
+
+def triangulate_points(cal_data, projPoints):
+
+    # first, create projMatr1 and projMatr2 (3 x 4 projection matrices for each camera) for each camera
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+    num_cams = len(mtx)
+
+    # undistort points, which should give results in normalized coordinates
+    ud_pts = [cv2.undistortPoints(projPoints[i_cam], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
+
+    projMatr1 = np.eye(3, 4)
+    projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
+
+    points4D = cv2.triangulatePoints(projMatr1, projMatr2, ud_pts[0], ud_pts[1])
+    worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    ax.scatter(worldpoints[:,0], worldpoints[:,1], worldpoints[:,2])
+    plt.show()
+    pass
 
 def camera_calibration_from_mirror_vids(calibration_data, calibration_summary_name):
 

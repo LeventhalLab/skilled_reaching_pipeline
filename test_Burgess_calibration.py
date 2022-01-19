@@ -16,8 +16,8 @@ if __name__ == '__main__':
 
     session_datetime = datetime.strptime('20210701_15-30-33', '%Y%m%d_%H-%M-%S')
 
-    cb_size = (10, 7)
+    cb_size = (7, 10)
 
-    skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent)
+    skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=cb_size)
     cal_vids = navigation_utilities.find_Burgess_calibration_vids(cal_vid_parent)
     skilled_reaching_calibration.multi_camera_calibration(cal_vids, cal_data_parent, cb_size=cb_size)

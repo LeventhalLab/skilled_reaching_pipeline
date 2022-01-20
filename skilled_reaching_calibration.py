@@ -466,6 +466,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
         # camera calibrations have been performed, now need to do stereo calibration
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+    # CBOARD_FLAGS = cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE
 
     # create video objects for each calibration_video
     vid_obj = []
@@ -504,14 +505,14 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
             vo.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
             ret, cur_img[i_vid] = vo.read()
 
-            if calvid_metadata[i_vid]['cam_num'] == 1:
-                # rotate the image 180 degrees
-                cur_img[i_vid] = cv2.rotate(cur_img[i_vid], cv2.ROTATE_180)
-
             # test_img_name = os.path.join(cal_data_parent, 'test_cam{:02d}.jpg'.format(calibration_metadata[i_vid]['cam_num']))
             # cv2.imwrite(test_img_name, cur_img[i_vid])
 
             if ret:
+                if calvid_metadata[i_vid]['cam_num'] == 1:
+                    # rotate the image 180 degrees
+                    cur_img[i_vid] = cv2.rotate(cur_img[i_vid], cv2.ROTATE_180)
+
                 cur_img_gray = cv2.cvtColor(cur_img[i_vid], cv2.COLOR_BGR2GRAY)
                 found_valid_chessboard, corners = cv2.findChessboardCorners(cur_img_gray, cb_size)
                 valid_frames[i_vid][i_frame] = found_valid_chessboard
@@ -709,16 +710,16 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
 
     # check if calibration worked
-    num_valid_stereo_pairs = np.shape(cal_data['stereo_imgpoints'])[1]
-    for stereo_idx in range(num_valid_stereo_pairs):
-        frame_num = cal_data['stereo_frames'][stereo_idx]
-        projPoints = []
-        for i_cam in range(num_cams):
-            projPoints.append(cal_data['stereo_imgpoints'][i_cam][stereo_idx])
-            projPoints[i_cam] = np.squeeze(projPoints[i_cam]).T
-
-        print('frame number {:d}'.format(frame_num))
-        worldpoints = triangulate_points(cal_data, projPoints, frame_num)
+    # num_valid_stereo_pairs = np.shape(cal_data['stereo_imgpoints'])[1]
+    # for stereo_idx in range(num_valid_stereo_pairs):
+    #     frame_num = cal_data['stereo_frames'][stereo_idx]
+    #     projPoints = []
+    #     for i_cam in range(num_cams):
+    #         projPoints.append(cal_data['stereo_imgpoints'][i_cam][stereo_idx])
+    #         projPoints[i_cam] = np.squeeze(projPoints[i_cam]).T
+    #
+    #     print('frame number {:d}'.format(frame_num))
+        # worldpoints = triangulate_points(cal_data, projPoints, frame_num)
 
     pass
 
@@ -781,26 +782,30 @@ def triangulate_points(cal_data, projPoints, frame_num):
         projPoints_array.append(np.squeeze(np.array([projPoints[ii]]).T))
         reshaped_pts[ii][0,:,:] = projPoints_array[ii]
     newpoints[0], newpoints[1] = cv2.correctMatches(cal_data['F'], reshaped_pts[0], reshaped_pts[1])
+    newpoints = [np_array.astype('float32') for np_array in newpoints]
 
     new_cornerpoints = [np.squeeze(newpoints[ii]) for ii in range(2)]
 
-    for i_cam in range(2):
-        session_date_string = navigation_utilities.datetime_to_string_for_fname(
-            cal_data['calvid_metadata'][i_cam]['session_datetime'])
-        test_img_dir = os.path.join(cal_data_parent, 'corner_images', session_date_string,
-                                     'cam{:02d}'.format(cal_data['calvid_metadata'][i_cam]['cam_num']))
+    # for i_cam in range(2):
+    #     session_date_string = navigation_utilities.datetime_to_string_for_fname(
+    #         cal_data['calvid_metadata'][i_cam]['session_datetime'])
+    #     test_img_dir = os.path.join(cal_data_parent, 'corner_images', session_date_string,
+    #                                  'cam{:02d}'.format(cal_data['calvid_metadata'][i_cam]['cam_num']))
+    #
+    #     test_img_name = os.path.join(test_img_dir,
+    #                                  'test_cboard_{}_cam{:02d}_frame{:04d}.jpg'.format(session_date_string,
+    #                                                                                cal_data['calvid_metadata'][i_cam]['cam_num'],
+    #                                                                                frame_num))
 
-        test_img_name = os.path.join(test_img_dir,
-                                     'test_cboard_{}_cam{:02d}_frame{:04d}.jpg'.format(session_date_string,
-                                                                                   cal_data['calvid_metadata'][i_cam]['cam_num'],
-                                                                                   frame_num))
-
-        cboard_img = cv2.imread(test_img_name)
-        new_name = os.path.join(test_img_dir, 'refined_pts_{}_cam{:02d}_frame{:04d}.jpg'.format(session_date_string,
-                                                                                   cal_data['calvid_metadata'][i_cam]['cam_num'],
-                                                                                   frame_num))
-        new_img = cv2.drawChessboardCorners(cboard_img, cal_data['cb_size'], np.reshape(new_cornerpoints[ii], (70, 1, 2)), False)
-        cv2.imwrite(new_name, new_img)
+        # cboard_img = cv2.imread(test_img_name)
+        # new_name = os.path.join(test_img_dir, 'refined_pts_{}_cam{:02d}_frame{:04d}.jpg'.format(session_date_string,
+        #                                                                            cal_data['calvid_metadata'][i_cam]['cam_num'],
+        #                                                                            frame_num))
+        # new_img = cv2.drawChessboardCorners(cboard_img, cal_data['cb_size'], np.reshape(new_cornerpoints[ii], (70, 1, 2)), False)
+        # try:
+        #     cv2.imwrite(new_name, new_img)
+        # except:
+        #     pass
 
     # nudp1, nudp2 = cv2.correctMatches(cal_data['F'], ud_pts[0], ud_pts[1])
 

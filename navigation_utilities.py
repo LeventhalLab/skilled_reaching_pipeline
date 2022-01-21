@@ -841,6 +841,51 @@ def create_multiview_calibration_data_name(cal_data_parent, session_datetime):
     return cal_data_name
 
 
+def get_Burgess_video_folders_to_crop(video_root_folder):
+    """
+    find all the lowest level directories within video_root_folder, which are presumably the lowest level folders that
+    contain the videos to be cropped
+
+    :param video_root_folder: root directory from which to extract the list of folders that contain videos to crop
+    :return: crop_dirs - list of lowest level directories within video_root_folder
+    """
+
+    crop_dirs = []
+
+    # assume that any directory that does not have a subdirectory contains videos to crop
+    for root, dirs, files in os.walk(video_root_folder):
+        if not dirs:
+            crop_dirs.append(root)
+
+    return crop_dirs
+
+
+def parse_Burgess_vid_name(full_vid_path):
+    vid_metadata = {
+        'mouseID': '',
+        'time': datetime(1, 1, 1),
+        'vid_num': 0,
+        'cam_num': 99,
+    }
+    _, vid_name = os.path.split(full_vid_path)
+    vid_name, _ = os.path.splitext(vid_name)
+
+    vid_name_parts = vid_name.split('_')
+
+    vid_metadata['mouseID'] = vid_name_parts[0]
+
+    datetime_str = vid_name_parts[1] + '_' + vid_name_parts[2]
+    vid_metadata['time'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
+
+    vid_metadata['vid_num'] = int(vid_name_parts[3])
+
+    vid_metadata['cam_num'] = int(vid_name_parts[4][3:])
+
+    return vid_metadata
+
+
+
+
 def create_calibration_data_folder(cal_data_parent, session_datetime):
 
     year_folder = 'calibration_data_' + session_datetime.strftime('%Y')

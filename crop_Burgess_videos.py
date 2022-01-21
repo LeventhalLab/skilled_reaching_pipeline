@@ -59,3 +59,66 @@ def crop_Burgess_video(vid_path_in, vid_path_out, crop_params, filtertype='mjpeg
             f"-c:v h264 -c:a copy {vid_path_out}"
         )
         subprocess.call(command, shell=True)
+
+
+def crop_Burgess_folders(video_folder_list, cropped_vids_parent, crop_params, vidtype='avi'):
+    """
+    :param video_folder_list:
+    :param cropped_vids_parent:
+    :param crop_params: either a dictionary with keys 'direct', 'leftmirror', 'rightmirror', each with a 4-element list [left, right, top, bottom]
+            OR a pandas dataframe with columns 'date', 'box_num', 'direct_left', 'direct_right',...
+    :param vidtype:
+    :return:
+    """
+    #todo: write the function below
+    cropped_video_directories = navigation_utilities.create_Burgess_cropped_video_destination_list(cropped_vids_parent, video_folder_list, view_list)
+    # make sure vidtype starts with a '.'
+    if vidtype[0] != '.':
+        vidtype = '.' + vidtype
+
+    for i_path, vids_path in enumerate(video_folder_list):
+        # find files with extension vidtype
+        vids_list = glob.glob(os.path.join(vids_path, '*' + vidtype))
+        if not bool(vids_list):
+            # vids_list is empty
+            continue
+
+        # if crop_params is a DataFrame object, create a crop_params dictionary based on the current folder
+        if isinstance(crop_params, pd.DataFrame):
+            # pick an .avi file in this folder
+            test_vid = vids_list[0]
+            vid_metadata = navigation_utilities.parse_video_name(test_vid)
+            session_date = vid_metadata['triggertime'].date()
+            crop_params_dict = crop_params_dict_from_df(crop_params, session_date, vid_metadata['boxnum'])
+        elif isinstance(crop_params, dict):
+            crop_params_dict = crop_params
+
+        if not bool(crop_params_dict):
+            # the crop parameters dictionary is empty, skip to the next folder
+            continue
+
+        for i_view, view_name in enumerate(view_list):
+            current_crop_params = crop_params_dict[view_name]
+            dest_folder = cropped_video_directories[i_view][i_path]
+            if not os.path.isdir(dest_folder):
+                os.makedirs(dest_folder)
+
+            for full_vid_path in vids_list:
+                dest_name = cropped_vid_name(full_vid_path, dest_folder, view_name, current_crop_params)
+
+                # if video was already cropped, skip it
+                if os.path.exists(dest_name):
+                    print(dest_name + ' already exists, skipping')
+                    continue
+                else:
+                    crop_video(full_vid_path, dest_name, current_crop_params, view_name, filtertype=filtertype)
+
+    return cropped_video_directories
+
+
+def preprocess_Burgess_videos(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi'):
+
+    cropped_video_directories = crop_Burgess_folders(vid_folder_list, cropped_vids_parent, crop_params, view_list,
+                                                 vidtype='avi')
+
+    return cropped_video_directories

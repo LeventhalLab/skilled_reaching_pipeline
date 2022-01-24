@@ -860,6 +860,38 @@ def get_Burgess_video_folders_to_crop(video_root_folder):
     return crop_dirs
 
 
+def create_Burgess_cropped_video_destination_list(cropped_vids_parent, video_folder_list, cam_list):
+    """
+    create subdirectory trees in which to store the cropped videos. Directory structure is ratID-->sessionID-->
+        [sessionID_direct/leftmirror/rightmirror]
+    :param cropped_vids_parent: parent directory in which to create directory tree
+    :param video_folder_list: list of lowest level directories containing the original videos
+    :param cam_list: list/tuple of camera numbers as integers
+    :return: cropped_video_directories - list of num_cam element lists containing folders for cropped images from each camera for each session
+    """
+
+    num_cams = len(cam_list)
+    cam_names = ['cam{:02d}'.format(i_cam) for i_cam in cam_list]
+    cropped_video_directories = dict.fromkeys(cam_names)
+    for i_cam in cam_list:
+        cam_name = 'cam{:02d}'.format(i_cam)
+        cropped_video_directories[cam_name] = []
+    for i_vidfolder, crop_dir in enumerate(video_folder_list):
+        _, session_dir = os.path.split(crop_dir)
+        mouseID, session_date_str = parse_session_dir_name(session_dir)
+        session_datetime = datetime.strptime(session_date_str, '%Y%m%d')
+        session_month = session_datetime.strftime('%Y%m')
+        month_folder = mouseID + '_' + session_month
+
+        # create folders for cropped video for each camera
+        for i_cam in range(num_cams):
+            cam_name = 'cam{:02d}'.format(cam_list[i_cam])
+            cropped_vid_dir = session_dir + '_cam{:02d}'.format(cam_list[i_cam])
+            cropped_video_directories[cam_name].append(os.path.join(cropped_vids_parent, mouseID, month_folder, cropped_vid_dir))
+
+    return cropped_video_directories
+
+
 def parse_Burgess_vid_name(full_vid_path):
     vid_metadata = {
         'mouseID': '',

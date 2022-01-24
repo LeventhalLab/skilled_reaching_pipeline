@@ -61,7 +61,7 @@ def crop_Burgess_video(vid_path_in, vid_path_out, crop_params, filtertype='mjpeg
         subprocess.call(command, shell=True)
 
 
-def crop_Burgess_folders(video_folder_list, cropped_vids_parent, crop_params, vidtype='avi'):
+def crop_Burgess_folders(video_folder_list, cropped_vids_parent, crop_params, cam_list, vidtype='avi'):
     """
     :param video_folder_list:
     :param cropped_vids_parent:
@@ -70,8 +70,11 @@ def crop_Burgess_folders(video_folder_list, cropped_vids_parent, crop_params, vi
     :param vidtype:
     :return:
     """
-    #todo: write the function below
-    cropped_video_directories = navigation_utilities.create_Burgess_cropped_video_destination_list(cropped_vids_parent, video_folder_list, view_list)
+
+    box_num = 1    # for now, only one mouse skilled reaching box
+    cropped_video_directories = navigation_utilities.create_Burgess_cropped_video_destination_list(cropped_vids_parent, video_folder_list, cam_list)
+    # create_Burgess_cropped_video_destination_list returns a list of num_cam-element lists, where each list contains
+    # folders in which to store cropped videos
     # make sure vidtype starts with a '.'
     if vidtype[0] != '.':
         vidtype = '.' + vidtype
@@ -87,9 +90,11 @@ def crop_Burgess_folders(video_folder_list, cropped_vids_parent, crop_params, vi
         if isinstance(crop_params, pd.DataFrame):
             # pick an .avi file in this folder
             test_vid = vids_list[0]
-            vid_metadata = navigation_utilities.parse_video_name(test_vid)
-            session_date = vid_metadata['triggertime'].date()
-            crop_params_dict = crop_params_dict_from_df(crop_params, session_date, vid_metadata['boxnum'])
+            vid_metadata = navigation_utilities.parse_Burgess_vid_name(test_vid)
+            session_date = vid_metadata['time'].date()
+            crop_params_dict = crop_params_optitrack_dict_from_df(crop_params, session_date, box_num, cam_list)
+
+            cam_names = crop_params_dict.keys()
         elif isinstance(crop_params, dict):
             crop_params_dict = crop_params
 
@@ -97,28 +102,106 @@ def crop_Burgess_folders(video_folder_list, cropped_vids_parent, crop_params, vi
             # the crop parameters dictionary is empty, skip to the next folder
             continue
 
-        for i_view, view_name in enumerate(view_list):
-            current_crop_params = crop_params_dict[view_name]
-            dest_folder = cropped_video_directories[i_view][i_path]
+        for full_vid_path in vids_list:
+            vid_metadata = navigation_utilities.parse_Burgess_vid_name(full_vid_path)
+            cam_num = vid_metadata['cam_num']
+            cam_name = 'cam{:02d}'.format(cam_num)
+            current_crop_params = crop_params_dict[cam_name]
+            dest_folder = cropped_video_directories[cam_name][i_path]
             if not os.path.isdir(dest_folder):
                 os.makedirs(dest_folder)
 
             for full_vid_path in vids_list:
-                dest_name = cropped_vid_name(full_vid_path, dest_folder, view_name, current_crop_params)
+                dest_name = optirack_cropped_vid_name(full_vid_path, dest_folder, current_crop_params)
 
                 # if video was already cropped, skip it
                 if os.path.exists(dest_name):
                     print(dest_name + ' already exists, skipping')
                     continue
                 else:
-                    crop_video(full_vid_path, dest_name, current_crop_params, view_name, filtertype=filtertype)
+                    crop_optitrack_video(full_vid_path, dest_name, current_crop_params, filtertype=filtertype)
 
     return cropped_video_directories
 
 
-def preprocess_Burgess_videos(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi'):
+def crop_params_optitrack_dict_from_df(crop_params_df, session_date, box_num, cam_list):
 
-    cropped_video_directories = crop_Burgess_folders(vid_folder_list, cropped_vids_parent, crop_params, view_list,
+    # find the row with the relevant session data and box number
+    date_box_row = crop_params_df[(crop_params_df['date'] == session_date) & (crop_params_df['box_num'] == box_num)]
+
+    if date_box_row.empty:
+        # crop_params_dict = {
+        #     view_list[0]: [700, 1350, 270, 935],
+        #     view_list[1]: [1, 470, 270, 920],
+        #     view_list[2]: [1570, 2040, 270, 920]
+        # }
+        crop_params_dict = {}
+    elif date_box_row.shape[0] == 1:
+        dict_keys = ['cam{:02d}'.format(i_cam) for i_cam in cam_list]
+        crop_params_dict = dict.fromkeys(dict_keys, None)
+        for camID in dict_keys:
+            left_edge = date_box_row[camID + '_left'].values[0]
+            right_edge = date_box_row[camID + '_right'].values[0]
+            top_edge = date_box_row[camID + '_top'].values[0]
+            bot_edge = date_box_row[camID + '_bottom'].values[0]
+
+            if any([pd.isna(left_edge), pd.isna(right_edge), pd.isna(top_edge),  pd.isna(bot_edge)]):
+                crop_params_dict = {}
+                break
+            else:
+                crop_params_dict[camID] = [left_edge,
+                                          right_edge,
+                                          top_edge,
+                                          bot_edge]
+    else:
+        # there must be more than one valid row in the table, use default
+        # crop_params_dict = {
+        #     view_list[0]: [700, 1350, 270, 935],
+        #     view_list[1]: [1, 470, 270, 920],
+        #     view_list[2]: [1570, 2040, 270, 920]
+        # }
+        crop_params_dict = {}
+
+    return crop_params_dict
+
+
+def optirack_cropped_vid_name(full_vid_path, dest_folder, crop_params):
+    """
+    function to return the name to be used for the cropped video
+    :param full_vid_path:
+    :param dest_folder: path in which to put the new folder with the cropped videos
+    :param crop_params: 4-element list [left, right, top, bottom]
+    :return: full_dest_name - name of output file. Is name of input file with "_cropped_left-top-width-height" appended
+    """
+    vid_root, vid_ext = os.path.splitext(full_vid_path)
+    vid_path, vid_name = os.path.split(vid_root)
+    # _, vid_folder_name = os.path.split(vid_path)
+    crop_params = [int(cp) for cp in crop_params]
+    crop_params_str = '-'.join(map(str, crop_params))
+    # dest_folder_name = vid_folder_name + '_' + view_name
+
+    # vid_folder_name should be of format 'RXXXX_YYYYMMDD...'
+    # vid_name_split = vid_folder_name.split('_')
+    # ratID = vid_name_split[0]
+    # full_dest_path = os.path.join(dest_folder, ratID, vid_folder_name, dest_folder_name)
+
+    if not os.path.isdir(dest_folder):
+        os.makedirs(dest_folder)
+
+    dest_name = vid_name + '_' + crop_params_str + vid_ext
+
+    full_dest_name = os.path.join(dest_folder, dest_name)
+
+    return full_dest_name
+
+
+def crop_optitrack_video(full_vid_path, dest_name, current_crop_params, filtertype=filtertype):
+
+    #todo: write this function - should be able to get from laptop
+
+def preprocess_Burgess_videos(vid_folder_list, cropped_vids_parent, crop_params, cam_list, vidtype='avi'):
+
+    cropped_video_directories = crop_Burgess_folders(vid_folder_list, cropped_vids_parent, crop_params, cam_list,
                                                  vidtype='avi')
 
     return cropped_video_directories

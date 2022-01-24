@@ -8,13 +8,15 @@ from datetime import datetime
 import skilled_reaching_calibration
 import navigation_utilities
 
-def crop_Burgess_video(vid_path_in, vid_path_out, crop_params, filtertype='mjpeg2jpeg'):
+def crop_optitrack_video(vid_path_in, vid_path_out, crop_params, filtertype='mjpeg2jpeg'):
 
     x1, x2, y1, y2 = [int(cp) for cp in crop_params]
     w = x2 - x1 + 1
     h = y2 - y1 + 1
     vid_root, vid_name = os.path.split(vid_path_out)
 
+    vid_metadata = navigation_utilities.parse_Burgess_vid_name(vid_path_in)
+    cam_num = vid_metadata['cam_num']
     if filtertype == 'mjpeg2jpeg':
         jpg_temp_folder = os.path.join(vid_root, 'temp')
 
@@ -53,15 +55,17 @@ def crop_Burgess_video(vid_path_in, vid_path_out, crop_params, filtertype='mjpeg
         shutil.rmtree(jpg_temp_folder)
 
     elif filtertype == '':
+        #todo: need to add contingency for rotating 180 degrees if needed
         command = (
             f"ffmpeg -n -i {vid_path_in} "
             f"-filter:v crop={w}:{h}:{x1}:{y1} "
             f"-c:v h264 -c:a copy {vid_path_out}"
         )
+
         subprocess.call(command, shell=True)
 
 
-def crop_Burgess_folders(video_folder_list, cropped_vids_parent, crop_params, cam_list, vidtype='avi'):
+def crop_Burgess_folders(video_folder_list, cropped_vids_parent, crop_params, cam_list, vidtype='avi', filtertype='mjpeg2jpeg'):
     """
     :param video_folder_list:
     :param cropped_vids_parent:
@@ -111,17 +115,86 @@ def crop_Burgess_folders(video_folder_list, cropped_vids_parent, crop_params, ca
             if not os.path.isdir(dest_folder):
                 os.makedirs(dest_folder)
 
-            for full_vid_path in vids_list:
-                dest_name = optirack_cropped_vid_name(full_vid_path, dest_folder, current_crop_params)
+            dest_name = optirack_cropped_vid_name(full_vid_path, dest_folder, current_crop_params)
 
-                # if video was already cropped, skip it
-                if os.path.exists(dest_name):
-                    print(dest_name + ' already exists, skipping')
-                    continue
-                else:
-                    crop_optitrack_video(full_vid_path, dest_name, current_crop_params, filtertype=filtertype)
+            # if video was already cropped, skip it
+            if os.path.exists(dest_name):
+                print(dest_name + ' already exists, skipping')
+                continue
+            else:
+                crop_optitrack_video(full_vid_path, dest_name, current_crop_params, filtertype=filtertype)
 
     return cropped_video_directories
+
+
+# def crop_optitrack_video(full_vid_path, cropped_vid_dir, crop_params, filtertype='mjpeg2jpeg'):
+#
+#     x1, x2, y1, y2 = [cp for cp in crop_params]
+#
+#     trial_metadata = parse_optitrack_name(full_vid_path)
+#     trial_metadata['crop_params'] = crop_params   # crop_params is [left, right, top, bottom]
+#
+#     vid_root, vid_name = os.path.split(full_vid_path)
+#     vid_root_name, vid_ext = os.path.splitext(vid_name)
+#     cropped_vid_name = vid_root_name + '_cropped' + vid_ext
+#     full_cropped_vid_name = os.path.join(cropped_vid_dir, cropped_vid_name)
+#     if os.path.exists(full_cropped_vid_name):
+#         # this video has already been cropped, don't do it again
+#         return
+#
+#     # make a new directory to store the cropped videos in
+#     # cropped_vid_dir = create_cropped_vid_directory(full_vid_path)
+#     # revised - create the cropped_vid_dir in the calling function so it only has to be called once
+#
+#     # first, let's see if we can extract individual frames using ffmpeg
+#     jpg_temp_folder = os.path.join(cropped_vid_dir, 'temp')
+#
+#     # if path already exists, delete the old temp folder. Either way, make a new one.
+#     if os.path.isdir(jpg_temp_folder):
+#         shutil.rmtree(jpg_temp_folder)
+#     os.mkdir(jpg_temp_folder)
+#
+#     full_jpg_path = os.path.join(jpg_temp_folder, 'frame_%04d.jpg')
+#     # full_jpg_crop_path = os.path.join(jpg_temp_folder, 'frame_crop_%d.jpg')
+#     command = (
+#         f"ffmpeg -i {full_vid_path} "
+#         f"-c:v copy -bsf:v mjpeg2jpeg {full_jpg_path} "
+#     )
+#     subprocess.call(command, shell=True)
+#
+#     # find the list of jpg frames that were just made, crop them, and resave them
+#     jpg_list = glob.glob(os.path.join(jpg_temp_folder, '*.jpg'))
+#     for jpg_name in jpg_list:
+#         img = cv2.imread(jpg_name)
+#         # cropped_img = img[y1 - 1:y2 - 1, x1 - 1:x2 - 1, :]
+#         if trial_metadata['cam_location'] == 'left':
+#             # rotate the image 180 degrees
+#             img = cv2.rotate(img, cv2.ROTATE_180)
+#
+#         cropped_img = img[y1 - 1:y2 - 1, x1 - 1:x2 - 1, :]
+#
+#         # cv2.imshow('testwin', cropped_img)
+#         # cv2.waitKey(0)
+#
+#         cv2.imwrite(jpg_name, cropped_img)
+#
+#     # now resave the cropped frames into a full video
+#     command = (
+#         f"ffmpeg -i {full_jpg_path} "
+#         f"-c:v copy {full_cropped_vid_name}"
+#     )
+#     subprocess.call(command, shell=True)
+#
+#     # destroy the temp jpeg folder
+#     shutil.rmtree(jpg_temp_folder)
+#
+#     elif filtertype == '':
+#         command = (
+#             f"ffmpeg -n -i {vid_path_in} "
+#             f"-filter:v crop={w}:{h}:{x1}:{y1} "
+#             f"-c:v h264 -c:a copy {vid_path_out}"
+#         )
+#         subprocess.call(command, shell=True)
 
 
 def crop_params_optitrack_dict_from_df(crop_params_df, session_date, box_num, cam_list):
@@ -173,34 +246,39 @@ def optirack_cropped_vid_name(full_vid_path, dest_folder, crop_params):
     :param crop_params: 4-element list [left, right, top, bottom]
     :return: full_dest_name - name of output file. Is name of input file with "_cropped_left-top-width-height" appended
     """
+    vid_metadata = navigation_utilities.parse_Burgess_vid_name(full_vid_path)
+
     vid_root, vid_ext = os.path.splitext(full_vid_path)
     vid_path, vid_name = os.path.split(vid_root)
-    # _, vid_folder_name = os.path.split(vid_path)
     crop_params = [int(cp) for cp in crop_params]
     crop_params_str = '-'.join(map(str, crop_params))
-    # dest_folder_name = vid_folder_name + '_' + view_name
 
-    # vid_folder_name should be of format 'RXXXX_YYYYMMDD...'
-    # vid_name_split = vid_folder_name.split('_')
-    # ratID = vid_name_split[0]
-    # full_dest_path = os.path.join(dest_folder, ratID, vid_folder_name, dest_folder_name)
 
     if not os.path.isdir(dest_folder):
         os.makedirs(dest_folder)
 
-    dest_name = vid_name + '_' + crop_params_str + vid_ext
+    if vid_metadata['cam_num'] == 1:
+        # this video will be cropped AND rotated (cropping happens first)
+        dest_name = vid_name + '_' + crop_params_str + '_rotated' + vid_ext
+    else:
+        # this video will just be cropped
+        dest_name = vid_name + '_' + crop_params_str + '_cropped' + vid_ext
 
     full_dest_name = os.path.join(dest_folder, dest_name)
 
     return full_dest_name
 
 
-def crop_optitrack_video(full_vid_path, dest_name, current_crop_params, filtertype=filtertype):
-
-    #todo: write this function - should be able to get from laptop
-
 def preprocess_Burgess_videos(vid_folder_list, cropped_vids_parent, crop_params, cam_list, vidtype='avi'):
+    '''
 
+    :param vid_folder_list:
+    :param cropped_vids_parent:
+    :param crop_params:
+    :param cam_list:
+    :param vidtype:
+    :return: cropped_video_directories:
+    '''
     cropped_video_directories = crop_Burgess_folders(vid_folder_list, cropped_vids_parent, crop_params, cam_list,
                                                  vidtype='avi')
 

@@ -106,28 +106,43 @@ def find_folders_to_analyze(cropped_videos_parent, view_list=None):
 
     return folders_to_analyze
 
-    # for view in view_list:
-    #
-    #     if 'direct' in view:
-    #         view_folder = os.path.join(cropped_videos_parent, 'direct_view')
-    #     elif 'mirror' in view:
-    #         view_folder = os.path.join(cropped_videos_parent, 'mirror_views')
-    #     else:
-    #         print(view + ' does not contain the keyword "direct" or "mirror"')
-    #         continue
-    #
-    #     rat_folder_list = glob.glob(os.path.join(view_folder + '/R*'))
-    #
-    #     for rat_folder in rat_folder_list:
-    #         # make sure it's actually a folder
-    #         if os.path.isdir(rat_folder):
-    #             # assume the rat_folder directory name is the same as ratID (i.e., form of RXXXX)
-    #             _, ratID = os.path.split(rat_folder)
-    #             session_name = ratID + '_*_' + view
-    #             session_dir_list = glob.glob(rat_folder + '/' + session_name)
-    #
-    #             # make sure we only include directories (just in case there are some stray files with the right names)
-    #             session_dir_list = [session_dir for session_dir in session_dir_list if os.path.isdir(session_dir)]
+
+def find_optitrack_folders_to_analyze(cropped_videos_parent, cam_list=(1, 2)):
+    """
+    get the full list of directories containing cropped videos in the videos_to_analyze folder
+    :param cropped_videos_parent: parent directory with subfolders direct_view and mirror_views, which have subfolders
+        RXXXX-->RXXXXyyyymmddz[direct/leftmirror/rightmirror] (assuming default view list)
+    :param view_list:
+    :return: folders_to_analyze: dictionary containing a key for each member of view_list. Each key holds a list of
+        folders to run through deeplabcut
+    """
+
+    cam_name_list = ['cam{:02d}'.format(cam_num) for cam_num in cam_list]
+    folders_to_analyze = dict.fromkeys(cam_name_list)
+    for cam_name in cam_name_list:
+        folders_to_analyze[cam_name] = []
+
+    mouse_folder_list = glob.glob(os.path.join(cropped_videos_parent, '*'))
+    for mouse_folder in mouse_folder_list:
+        if os.path.isdir(mouse_folder):
+            # assume the rat_folder directory name is the same as ratID (i.e., form of RXXXX)
+            _, mouseID = os.path.split(mouse_folder)
+            monthfolder_name = mouseID + '_*'
+            month_dir_list = glob.glob(os.path.join(mouse_folder, monthfolder_name))
+            # make sure we only include directories (just in case there are some stray files with the right names)
+            month_dir_list = [month_dir for month_dir in month_dir_list if os.path.isdir(month_dir)]
+            for month_dir in month_dir_list:
+                _, cur_month_dir_name = os.path.split(month_dir)
+                sessionfolder_name = cur_month_dir_name + '*'
+                session_dir_list = glob.glob(os.path.join(month_dir, sessionfolder_name))
+                for session_dir in session_dir_list:
+                    _, cur_session = os.path.split(session_dir)
+                    for cam_name in cam_name_list:
+                        cam_folder = os.path.join(session_dir, cur_session + '_' + cam_name)
+                        if os.path.isdir(cam_folder):
+                            folders_to_analyze[cam_name].extend([cam_folder])
+
+    return folders_to_analyze
 
 
 def parse_cropped_video_name(cropped_video_name):
@@ -174,6 +189,61 @@ def parse_cropped_video_name(cropped_video_name):
         next_metadata_idx = 2
     else:
         next_metadata_idx = 1
+
+    datetime_str = metadata_list[next_metadata_idx] + '_' + metadata_list[1+next_metadata_idx]
+    cropped_vid_metadata['triggertime'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
+
+    cropped_vid_metadata['video_number'] = int(metadata_list[next_metadata_idx + 2])
+    cropped_vid_metadata['video_type'] = vid_type
+    cropped_vid_metadata['view'] = metadata_list[next_metadata_idx + 3]
+
+    left, right, top, bottom = list(map(int, metadata_list[next_metadata_idx + 4].split('-')))
+    cropped_vid_metadata['crop_window'].extend(left, right, top, bottom)
+
+    return cropped_vid_metadata
+
+
+def parse_cropped_optitrack_video_name(cropped_video_name):
+    """
+    extract metadata information from the video name
+    :param cropped_video_name: video name with expected format mouseID_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
+        where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
+        cropping windows from the original video
+    :return: cropped_vid_metadata: dictionary containing the following keys
+        ratID - rat ID as a string RXXXX
+        boxnum - box number the session was run in. useful for making sure we used the right calibration. If unknown,
+            set to 99
+        triggertime - datetime object with when the trigger event occurred (date and time)
+        video_number - number of the video (ZZZ in the filename). This number is not necessarily unique within a session
+            if it had to be restarted partway through
+        video_type - video type (e.g., '.avi', '.mp4', etc)
+        crop_window - 4-element list [left, right, top, bottom] in pixels
+    """
+
+    cropped_vid_metadata = {
+        'mouseID': '',
+        'boxnum': 99,
+        'time': datetime(1,1,1),
+        'video_number': 0,
+        'cam_num': 0,
+        'video_type': '',
+        'crop_window': [],
+        'cropped_video_name': ''
+    }
+    _, vid_name = os.path.split(cropped_video_name)
+    cropped_vid_metadata['cropped_video_name'] = vid_name
+    vid_name, vid_type = os.path.splitext(vid_name)
+
+    metadata_list = vid_name.split('_')
+
+    cropped_vid_metadata['mouseID'] = metadata_list[0]
+
+    # # if box number is stored in file name, then extract it
+    # if 'box' in metadata_list[1]:
+    #     cropped_vid_metadata['boxnum'] = int(metadata_list[1][3:])
+    #     next_metadata_idx = 2
+    # else:
+    #     next_metadata_idx = 1
 
     datetime_str = metadata_list[next_metadata_idx] + '_' + metadata_list[1+next_metadata_idx]
     cropped_vid_metadata['triggertime'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
@@ -327,6 +397,25 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
 
 
 def create_marked_vids_folder(cropped_vid_folder, cropped_videos_parent, marked_videos_parent):
+    """
+    :param cropped_vid_folder:
+    :param cropped_videos_parent:
+    :param marked_videos_parent:
+    :return:
+    """
+
+    # find the string 'cropped_videos' in cropped_vid_folder; everything after that is the relative path to create the marked_vids_folder
+    cropped_vid_relpath = os.path.relpath(cropped_vid_folder, start=cropped_videos_parent)
+    marked_vid_relpath = cropped_vid_relpath + '_marked'
+    marked_vids_folder = os.path.join(marked_videos_parent, marked_vid_relpath)
+
+    if not os.path.isdir(marked_vids_folder):
+        os.makedirs(marked_vids_folder)
+
+    return marked_vids_folder
+
+
+def create_optitrack_marked_vids_folder(cropped_vid_folder, cropped_videos_parent, marked_videos_parent):
     """
     :param cropped_vid_folder:
     :param cropped_videos_parent:
@@ -887,7 +976,7 @@ def create_Burgess_cropped_video_destination_list(cropped_vids_parent, video_fol
         for i_cam in range(num_cams):
             cam_name = 'cam{:02d}'.format(cam_list[i_cam])
             cropped_vid_dir = session_dir + '_cam{:02d}'.format(cam_list[i_cam])
-            cropped_video_directories[cam_name].append(os.path.join(cropped_vids_parent, mouseID, month_folder, cropped_vid_dir))
+            cropped_video_directories[cam_name].append(os.path.join(cropped_vids_parent, mouseID, month_folder, session_dir, cropped_vid_dir))
 
     return cropped_video_directories
 

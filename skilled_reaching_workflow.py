@@ -208,7 +208,7 @@ if __name__ == '__main__':
     crop_params_csv_path = os.path.join(video_root_folder, 'SR_video_crop_regions.csv')
     crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
 
-    calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=cb_size)
+    # calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=cb_size)
 
     # skilled_reaching_calibration.calibrate_camera_from_video(test_calibration_file, calibration_parent, cb_size=cb_size)
 
@@ -223,8 +223,8 @@ if __name__ == '__main__':
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
 
     #todo: complete the camera calibration algorithms
-    # video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
-    # cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi')
+    video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
+    cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi')
 
     # step 2: run the vids through DLC
     # parameters for running DLC

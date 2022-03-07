@@ -115,7 +115,7 @@ def reconstruct_3d_optitrack(cropped_vid_parent, cal_data_parent):
     for cam01_dir in cam01_folders:
         #todo: check to see if calibration has been performed for this date,then find matching cam02_dir
 
-    pass
+        pass
 
 if __name__ == '__main__':
 
@@ -139,7 +139,7 @@ if __name__ == '__main__':
     cb_size = (7, 10)
 
     # step 1 - run all the calibrations
-    # skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=cb_size)
+    skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=cb_size)
 
     # step 2 - crop all videos of mice reaching
     vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)

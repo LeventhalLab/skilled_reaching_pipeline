@@ -2,6 +2,7 @@ import glob
 import os
 import crop_Burgess_videos
 import skilled_reaching_calibration
+import reconstruct_3d_optitrack
 import navigation_utilities
 import skilled_reaching_io
 import deeplabcut
@@ -98,7 +99,7 @@ def create_labeled_optitrack_videos(folders_to_analyze, marked_vids_parent, conf
                         shutil.move(pickle_file, new_dir)
 
 
-def reconstruct_3d_optitrack(cropped_vid_parent, cal_data_parent):
+def reconstruct_optitrack_3d(cropped_vid_parent, cal_data_parent):
     '''
 
     :param cropped_vid_parent:
@@ -111,11 +112,18 @@ def reconstruct_3d_optitrack(cropped_vid_parent, cal_data_parent):
 
     # start with cam01, find all matching cam02 data
     cam01_folders = folders_to_reconstruct['cam01']
+    cam02_folders = folders_to_reconstruct['cam02']
 
     for cam01_dir in cam01_folders:
         #todo: check to see if calibration has been performed for this date,then find matching cam02_dir
+        cam02_dir = cam01_dir.replace('cam01', 'cam02')
+        if cam02_dir not in cam02_folders:
+            print('no matching cam02 directory for {}'.format(cam01_dir))
+            continue
+        view_directories = (cam01_dir, cam02_dir)
+        reconstruct_3d_optitrack.reconstruct_optitrack_session(view_directories)
 
-        pass
+
 
 if __name__ == '__main__':
 
@@ -139,25 +147,28 @@ if __name__ == '__main__':
     cb_size = (7, 10)
 
     # step 1 - run all the calibrations
-    skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=cb_size)
+    # UNCOMMENT BELOW
+    # skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=cb_size)
 
     # step 2 - crop all videos of mice reaching
     vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
     crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
-    cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, cropped_videos_parent, crop_params_df, cam_list, vidtype='avi')
+    # UNCOMMENT BELOW
+    # cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, cropped_videos_parent, crop_params_df, cam_list, vidtype='avi')
 
     # step 3 - run DLC on each cropped video
     folders_to_analyze = navigation_utilities.find_optitrack_folders_to_analyze(cropped_videos_parent, cam_list=cam_list)
+    # UNCOMMENT BELOW
+    # scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, marked_videos_parent, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
 
-    scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, marked_videos_parent, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
-
-    if label_videos:
-        #todo: working here - create labeled videos
-        create_labeled_optitrack_videos(folders_to_analyze,
-                                  marked_videos_parent,
-                                  Burgess_DLC_config_path,
-                                  scorername,
-                                  cropped_vid_type=cropped_vid_type
-                                  )
+    # UNCOMMENT BELOW
+    # if label_videos:
+    #     #todo: working here - create labeled videos
+    #     create_labeled_optitrack_videos(folders_to_analyze,
+    #                               marked_videos_parent,
+    #                               Burgess_DLC_config_path,
+    #                               scorername,
+    #                               cropped_vid_type=cropped_vid_type
+    #                               )
     # step 4 - reconstruct 3D images
-    reconstruct_3d_optitrack(cropped_videos_parent, cal_data_parent)
+    reconstruct_optitrack_3d(cropped_videos_parent, cal_data_parent)

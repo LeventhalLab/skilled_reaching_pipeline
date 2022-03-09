@@ -6,6 +6,7 @@ import skilled_reaching_io
 import pandas as pd
 import scipy.io as sio
 
+
 def triangulate_video(video_id, videos_parent, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df,
                       view_list=None,
                       min_confidence=0.95):

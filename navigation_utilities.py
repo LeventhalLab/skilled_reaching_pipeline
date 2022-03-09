@@ -396,6 +396,75 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
     return pickle_metadata
 
 
+def parse_dlc_output_pickle_name_optitrack(dlc_output_pickle_name):
+    """
+    extract metadata information from the pickle file name
+    :param dlc_output_pickle_name: video name with expected format mouseID_yyyymmdd_HH-MM-SS_[sess#]_ZZZ_camAA_l-r-t-b_[rotated]DLC_dlcrnetms5_mouse_headfixed_skilledreachingNov5shuffle1_150000_full.pickle
+        where [sess#] may or may not be present (but generally should be)
+    :return: cropped_vid_metadata: dictionary containing the following keys
+        mouseID - mouseID as a string (e.g., 'dLightXX')
+        trialtime - datetime object with when the trigger event occurred (date and time)
+        video_number - number of the video (ZZZ in the filename). This number is not necessarily unique within a session
+            if it had to be restarted partway through
+        video_type - video type (e.g., '.avi', '.mp4', etc)
+        crop_window - 4-element list [left, right, top, bottom] in pixels
+    """
+
+    pickle_metadata = {
+        'mouseID': '',
+        'trialtime': datetime(1,1,1),
+        'session_num': 0,
+        'video_number': 0,
+        'cam_num': 0,
+        'crop_window': [],
+        'isrotated': False,
+        'scorername': '',
+        'pickle_name': ''
+    }
+    _, pickle_name = os.path.split(dlc_output_pickle_name)
+    pickle_metadata['pickle_name'] = pickle_name
+    pickle_name, vid_type = os.path.splitext(pickle_name)
+
+    metadata_list = pickle_name.split('_')
+
+    pickle_metadata['mouseID'] = metadata_list[0]
+    # num_string = ''.join(filter(lambda i: i.isdigit(), pickle_metadata['ratID']))
+    # pickle_metadata['rat_num'] = int(num_string)
+
+    # if box number is stored in file name, then extract it
+    if 'box' in metadata_list[1]:
+        pickle_metadata['boxnum'] = int(metadata_list[1][3:])
+        next_metadata_idx = 2
+    else:
+        next_metadata_idx = 1
+
+    datetime_str = metadata_list[next_metadata_idx] + '_' + metadata_list[1+next_metadata_idx]
+    pickle_metadata['trialtime'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
+
+    pickle_metadata['session_num'] = int(metadata_list[next_metadata_idx + 2])
+    pickle_metadata['video_number'] = int(metadata_list[next_metadata_idx + 3])
+    pickle_metadata['cam_num'] = int(metadata_list[next_metadata_idx + 4][3:])
+
+    # 'DLC' gets appended to the last cropping parameter in the filename by deeplabcut
+    crop_window_strings = metadata_list[next_metadata_idx + 5].split('-')
+    left, right, top, bottom = list(map(int, crop_window_strings))
+
+    # find where 'DLC' starts in the last crop_window_string
+    # dlc_location = crop_window_strings[-1].find('DLC')
+    # bottom = int(crop_window_strings[-1][:dlc_location])
+
+    pickle_metadata['crop_window'].extend((left, right, top, bottom))
+
+    # was this video rotated 180 degrees?
+    if metadata_list[next_metadata_idx + 6][:7] == 'rotated':
+        pickle_metadata['isrotated'] = True
+
+    #todo: write the scorername into the pickle metadata dictionary. It's also in the metadata pickle file
+    pickle_metadata['scorername']
+
+    return pickle_metadata
+
+
 def create_marked_vids_folder(cropped_vid_folder, cropped_videos_parent, marked_videos_parent):
     """
     :param cropped_vid_folder:
@@ -986,6 +1055,7 @@ def parse_Burgess_vid_name(full_vid_path):
         'mouseID': '',
         'time': datetime(1, 1, 1),
         'vid_num': 0,
+        'session_num': 0,
         'cam_num': 99,
     }
     _, vid_name = os.path.split(full_vid_path)
@@ -1000,11 +1070,14 @@ def parse_Burgess_vid_name(full_vid_path):
 
     vid_metadata['vid_num'] = int(vid_name_parts[3])
 
-    vid_metadata['cam_num'] = int(vid_name_parts[4][3:])
+    if len(vid_name_parts) == 6:
+        # name includes session # (numbered from the first session overall or first session of the day?)
+        vid_metadata['session_num'] = int(vid_name_parts[4])
+        vid_metadata['cam_num'] = int(vid_name_parts[5][3:])
+    else:
+        vid_metadata['cam_num'] = int(vid_name_parts[4][3:])
 
     return vid_metadata
-
-
 
 
 def create_calibration_data_folder(cal_data_parent, session_datetime):

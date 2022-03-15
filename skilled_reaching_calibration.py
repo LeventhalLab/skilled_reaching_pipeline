@@ -439,7 +439,7 @@ def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(7, 10))
         if not os.path.isfile(cal_data_name):
             # collect the checkerboard points, write to file
             collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=cb_size)
-        #todo: overlay points and figure out how the .pickle file data are arranged
+
         calibrate_Burgess_session(cal_data_name, vid_pair)
 
         pass

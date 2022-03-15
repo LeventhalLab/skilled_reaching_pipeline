@@ -49,7 +49,7 @@ def reconstruct_optitrack_session(view_directories):
         bodyparts = []
         for dlc_md in dlc_metadata:
             bodyparts.append(dlc_md['data']['DLC-model-config file']['all_joints_names'])
-        rotate_translate_optitrack_points(dlc_output, pickle_metadata)
+        rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata, pickle_metadata)
         pass
     pass
 
@@ -70,12 +70,22 @@ def rotate_pts_180(pts, im_size):
     if not isinstance(im_size, np.array):
         im_size = np.array(im_size)
 
+    for i_pt, pt in enumerate(pts):
+        if len(pt) > 0:
+            try:
+                x, y = pt[0]
+            except:
+                pass
+            x = int(round(x))
+            y = int(round(y))
+            bp_color = color_from_bodypart(bodyparts[i_pt])
+            new_img = cv2.circle(new_img, (x, y), 3, bp_color, -1)
     reflected_pts = im_size - pts
 
     return reflected_pts
 
 
-def rotate_translate_optitrack_points(dlc_output, pickle_metadata):
+def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata, meta_pickles):
 
     # note that current algorithm for camera 1 crops, then rotates. We want a rotated, but uncropped transformation of coordinates
     # camera 2 is easy - just crops
@@ -89,7 +99,7 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata):
         for i_frame, frame in enumerate(frame_list):
             current_coords = cam_output[frame]['coordinates'][0]
             # current_coords is a list of arrays containing data points as (x,y) pairs
-            overlay_pts(pickle_metadata[i_cam], current_coords, i_frame)
+            overlay_pts(pickle_metadata[i_cam], current_coords, dlc_metadata[i_cam], i_frame)
             # if this image was rotated 180 degrees, first reflect back across the midpoint of the current image
             if cam_metadata['isrotated'] == True:
                 # rotate points around the center of the cropped image, then translate into position in the original
@@ -108,10 +118,12 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata):
     pass
 
 
-def overlay_pts(pickle_metadata, current_coords, i_frame):
+def overlay_pts(pickle_metadata, current_coords, dlc_metadata, i_frame):
 
     videos_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze'
     cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
+
+    bodyparts = dlc_metadata['data']['DLC-model-config file']['all_joints_names']
 
     month_dir = pickle_metadata['mouseID'] + '_' + pickle_metadata['trialtime'].strftime('%Y%m')
     day_dir = pickle_metadata['mouseID'] + '_' + pickle_metadata['trialtime'].strftime('%Y%m%d')
@@ -131,14 +143,65 @@ def overlay_pts(pickle_metadata, current_coords, i_frame):
     cropped_vid_name = os.path.join(cropped_vid_folder, cropped_vid_name)
     jpg_name = os.path.join(cropped_vid_folder, jpg_name)
 
-
-
     video_object = cv2.VideoCapture(cropped_vid_name)
 
     video_object.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
     ret, cur_img = video_object.read()
 
     # overlay points
+    new_img = cur_img
+    for i_pt, pt in enumerate(current_coords):
+        if len(pt) > 0:
+            try:
+                x, y = pt[0]
+            except:
+                pass
+            x = int(round(x))
+            y = int(round(y))
+            bp_color = color_from_bodypart(bodyparts[i_pt])
+            new_img = cv2.circle(new_img, (x, y), 3, bp_color, -1)
 
-    cv2.imwrite(jpg_name, cur_img)
+    cv2.imwrite(jpg_name, new_img)
     pass
+
+
+def color_from_bodypart(bodypart):
+
+    if bodypart == 'leftear':
+        bp_color = (127,0,0)
+    elif bodypart == 'rightear':
+        bp_color = (255,0,0)
+    elif bodypart == 'lefteye':
+        bp_color = (150,150,150)
+    elif bodypart == 'righteye':
+        bp_color = (200,200,200)
+    elif bodypart == 'nose':
+        bp_color = (0,0,0)
+    elif bodypart == 'leftpaw':
+        bp_color = (0,50,0)
+    elif bodypart == 'leftdigit1':
+        bp_color = (0, 100, 0)
+    elif bodypart == 'leftdigit2':
+        bp_color = (0,150,0)
+    elif bodypart == 'leftdigit3':
+        bp_color = (0, 200, 0)
+    elif bodypart == 'leftdigit4':
+        bp_color = (0,250,0)
+    elif bodypart == 'rightpaw':
+        bp_color = (0,0,50)
+    elif bodypart == 'rightdigit1':
+        bp_color = (0, 0, 100)
+    elif bodypart == 'rightdigit2':
+        bp_color = (0,0,150)
+    elif bodypart == 'rightdigit3':
+        bp_color = (0, 0, 200)
+    elif bodypart == 'rightdigit4':
+        bp_color = (0,0,250)
+    elif bodypart == 'pellet1':
+        bp_color = (100,0,100)
+    elif bodypart == 'pellet2':
+        bp_color = (200,0,200)
+    else:
+        bp_color = (0,0,255)
+
+    return bp_color

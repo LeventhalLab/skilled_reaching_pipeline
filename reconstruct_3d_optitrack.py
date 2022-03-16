@@ -49,7 +49,7 @@ def reconstruct_optitrack_session(view_directories):
         bodyparts = []
         for dlc_md in dlc_metadata:
             bodyparts.append(dlc_md['data']['DLC-model-config file']['all_joints_names'])
-        rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata, pickle_metadata)
+        rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata)
         pass
     pass
 
@@ -64,13 +64,154 @@ def rotate_pts_180(pts, im_size):
 
     # reflect points around the center
 
-    if not isinstance(pts, np.array):
-        pts = np.array(pts)
+    # if not isinstance(pts, np.array):
+    #     pts = np.array(pts)
+    #
+    # if not isinstance(im_size, np.array):
+    #     im_size = np.array(im_size)
 
-    if not isinstance(im_size, np.array):
-        im_size = np.array(im_size)
-
+    reflected_pts = []
     for i_pt, pt in enumerate(pts):
+        if len(pt) > 0:
+            try:
+                x, y = pt[0]
+            except:
+                pass
+            # possible that im_size is width x height or height x width
+            try:
+                new_x = im_size[0] - x
+                new_y = im_size[1] - y
+            except:
+                pass
+
+            reflected_pts.append([np.array([new_x, new_y])])
+        else:
+            reflected_pts.append(np.array([]))
+
+    return reflected_pts
+
+
+def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata, orig_im_size=(1280, 1024)):
+
+    # note that current algorithm for camera 1 crops, then rotates. We want a rotated, but uncropped transformation of coordinates
+    # camera 2 is easy - just crops
+    pts_wrt_orig_img = []
+    dlc_conf = []
+    for i_cam, cam_output in enumerate(dlc_output):
+        # cam_output is a dictionary where each entry is 'frame0000', 'frame0001', etc.
+        # each frame has keys: 'coordinates', 'confidence', and 'costs'
+        cam_metadata = pickle_metadata[i_cam]
+
+        # loop through the frames
+        frame_list = cam_output.keys()
+        num_frames = cam_output['metadata']['nframes']
+        num_joints = len(cam_output['metadata']['all_joints_names'])
+        pts_wrt_orig_img.append(np.zeros((num_frames, 2, num_joints)))
+        dlc_conf.append(np.zeros((num_frames, num_joints)))
+        #todo: write the new points/confidences into these arrays so they can be returned by this function
+
+        for i_frame, frame in enumerate(frame_list):
+            if frame[:5] != 'frame':
+                continue
+            current_coords = cam_output[frame]['coordinates'][0]
+
+            # current_coords is a list of arrays containing data points as (x,y) pairs
+            # overlay_pts(pickle_metadata[i_cam], current_coords, dlc_metadata[i_cam], i_frame)
+            # if this image was rotated 180 degrees, first reflect back across the midpoint of the current image
+            if cam_metadata['isrotated'] == True:
+                # rotate points around the center of the cropped image, then translate into position in the original
+                # image, then rotate around the center of the original image
+                crop_win = cam_metadata['crop_window']
+
+                crop_win_size = np.array([crop_win[1] - crop_win[0], crop_win[3] - crop_win[2]])
+                reflected_pts = rotate_pts_180(current_coords, crop_win_size)
+
+                # now have the points back in the upside-down version. Now need to rotate the points within the full image
+                # to get into the same reference frame as the calibration image
+                full_im_size = dlc_metadata[i_cam]['data']['frame_dimensions']
+                # full_im_size = (full_im_size[1],full_im_size[0])
+
+                pts_translated_to_orig = translate_back_to_orig_img(pickle_metadata[i_cam], reflected_pts)
+
+                # overlay_pts(pickle_metadata[i_cam], reflected_pts, dlc_metadata[i_cam], i_frame, rotate_img=True)
+                # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_translated_to_orig, dlc_metadata[i_cam], i_frame, rotate_img=False)
+
+                pts_in_calibration_coords = rotate_pts_180(pts_translated_to_orig, orig_im_size)
+                # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
+                #                           rotate_img=True)
+            else:
+                pts_in_calibration_coords = translate_back_to_orig_img(pickle_metadata[i_cam], current_coords)
+                overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
+                                          rotate_img=False)
+                #todo: align all the points for the two camera views/frames and store them in a way that can be neatly
+                # exported to another function for 3D reconstuction. should also write a function to organize pickled data
+                # into a more reasonable format so if/when start using .h5 files, can write another function to organize
+                # those
+
+            pass
+
+    pass
+
+
+def translate_back_to_orig_img(pickle_metadata, pts):
+    crop_win = pickle_metadata['crop_window']
+
+    translated_pts = []
+    for i_pt, pt in enumerate(pts):
+        if len(pt) > 0:
+            try:
+                x, y = pt[0]
+            except:
+                pass
+            # possible that im_size is width x height or height x width
+            new_x = crop_win[0] + x
+            new_y = crop_win[2] + y
+
+            translated_pts.append([np.array([new_x, new_y])])
+        else:
+            translated_pts.append(np.array([]))
+
+    return translated_pts
+
+
+def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_frame, rotate_img=False):
+    videos_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze'
+    cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
+    video_root_folder = os.path.join(videos_parent, 'mouse_SR_videos_tocrop')
+
+    bodyparts = dlc_metadata['data']['DLC-model-config file']['all_joints_names']
+
+    month_dir = pickle_metadata['mouseID'] + '_' + pickle_metadata['trialtime'].strftime('%Y%m')
+    day_dir = pickle_metadata['mouseID'] + '_' + pickle_metadata['trialtime'].strftime('%Y%m%d')
+    orig_vid_folder = os.path.join(video_root_folder, pickle_metadata['mouseID'], month_dir, day_dir)
+
+    cam_dir = day_dir + '_' + 'cam{:02d}'.format(pickle_metadata['cam_num'])
+    cropped_vid_folder = os.path.join(cropped_videos_parent, pickle_metadata['mouseID'], month_dir, day_dir, cam_dir)
+
+    orig_vid_name_base = '_'.join([pickle_metadata['mouseID'],
+                              pickle_metadata['trialtime'].strftime('%Y%m%d_%H-%M-%S'),
+                              '{:d}'.format(pickle_metadata['session_num']),
+                              '{:03d}'.format(pickle_metadata['video_number']),
+                              'cam{:02d}'.format(pickle_metadata['cam_num'])
+                              ])
+    orig_vid_name = os.path.join(orig_vid_folder, orig_vid_name_base + '.avi')
+
+    video_object = cv2.VideoCapture(orig_vid_name)
+
+    video_object.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
+    ret, cur_img = video_object.read()
+
+    video_object.release()
+
+    jpg_name = orig_vid_name_base + '_{:04d}'.format(i_frame)
+    if rotate_img:
+        cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
+        jpg_name = jpg_name + '_rotated'
+    jpg_name = os.path.join(cropped_vid_folder, jpg_name + '.jpg')
+
+    # overlay points
+    new_img = cur_img
+    for i_pt, pt in enumerate(current_coords):
         if len(pt) > 0:
             try:
                 x, y = pt[0]
@@ -80,45 +221,12 @@ def rotate_pts_180(pts, im_size):
             y = int(round(y))
             bp_color = color_from_bodypart(bodyparts[i_pt])
             new_img = cv2.circle(new_img, (x, y), 3, bp_color, -1)
-    reflected_pts = im_size - pts
 
-    return reflected_pts
-
-
-def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata, meta_pickles):
-
-    # note that current algorithm for camera 1 crops, then rotates. We want a rotated, but uncropped transformation of coordinates
-    # camera 2 is easy - just crops
-    for i_cam, cam_output in enumerate(dlc_output):
-        # cam_output is a dictionary where each entry is 'frame0000', 'frame0001', etc.
-        # each frame has keys: 'coordinates', 'confidence', and 'costs'
-        cam_metadata = pickle_metadata[i_cam]
-
-        # loop through the frames
-        frame_list = cam_output.keys()
-        for i_frame, frame in enumerate(frame_list):
-            current_coords = cam_output[frame]['coordinates'][0]
-            # current_coords is a list of arrays containing data points as (x,y) pairs
-            overlay_pts(pickle_metadata[i_cam], current_coords, dlc_metadata[i_cam], i_frame)
-            # if this image was rotated 180 degrees, first reflect back across the midpoint of the current image
-            if cam_metadata['isrotated'] == True:
-                # rotate points around the center of the cropped image, then translate into position in the original
-                # image, then rotate around the center of the original image
-                crop_win = cam_metadata['crop_window']
-                crop_win_size = np.array([crop_win[1] - crop_win[0], crop_win[3] - crop_win[2]])
-
-                # rotated_win_coords = np.array([])
-                # for
-                pass
-            pass
-
-
-
-
+    cv2.imwrite(jpg_name, new_img)
     pass
 
 
-def overlay_pts(pickle_metadata, current_coords, dlc_metadata, i_frame):
+def overlay_pts(pickle_metadata, current_coords, dlc_metadata, i_frame, rotate_img=False):
 
     videos_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze'
     cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
@@ -137,16 +245,27 @@ def overlay_pts(pickle_metadata, current_coords, dlc_metadata, i_frame):
                                 'cam{:02d}'.format(pickle_metadata['cam_num']),
                                 '-'.join(str(x) for x in pickle_metadata['crop_window'])])
     if pickle_metadata['isrotated']:
-        cropped_vid_name = cropped_vid_name + '_rotated'
-    jpg_name = cropped_vid_name + '_{:04d}'.format(i_frame) + '.jpg'
-    cropped_vid_name = cropped_vid_name + '.avi'
+        cropped_vid_name_base = cropped_vid_name + '_rotated'
+    else:
+        cropped_vid_name_base = cropped_vid_name
+
+    cropped_vid_name = cropped_vid_name_base + '.avi'
     cropped_vid_name = os.path.join(cropped_vid_folder, cropped_vid_name)
-    jpg_name = os.path.join(cropped_vid_folder, jpg_name)
 
     video_object = cv2.VideoCapture(cropped_vid_name)
 
     video_object.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
     ret, cur_img = video_object.read()
+
+    video_object.release()
+
+    jpg_name = cropped_vid_name_base + '_{:04d}'.format(i_frame)
+    if rotate_img:
+        cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
+        jpg_name = jpg_name + '_rotatedback.jpg'
+    else:
+        jpg_name = jpg_name + '.jpg'
+    jpg_name = os.path.join(cropped_vid_folder, jpg_name)
 
     # overlay points
     new_img = cur_img
@@ -162,7 +281,6 @@ def overlay_pts(pickle_metadata, current_coords, dlc_metadata, i_frame):
             new_img = cv2.circle(new_img, (x, y), 3, bp_color, -1)
 
     cv2.imwrite(jpg_name, new_img)
-    pass
 
 
 def color_from_bodypart(bodypart):

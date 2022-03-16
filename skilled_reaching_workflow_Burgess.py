@@ -77,8 +77,14 @@ def create_labeled_optitrack_videos(folders_to_analyze, marked_vids_parent, conf
         current_cam_folders = folders_to_analyze[cam_name]
 
         for current_folder in current_cam_folders:
+            _, folder_name = os.path.split(current_folder)
+            if current_folder[:8] == 'dLight36':
+                continue
             cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
-            deeplabcut.create_video_with_all_detections(config_path, cropped_video_list, scorername)
+            try:
+                deeplabcut.create_video_with_all_detections(config_path, cropped_video_list, scorername)
+            except:
+                pass
 
             # current_basename = os.path.basename(current_folder)
             new_dir = navigation_utilities.create_marked_vids_folder(current_folder, cropped_videos_parent,
@@ -132,7 +138,7 @@ if __name__ == '__main__':
     cropped_vid_type = 'avi'
     gputouse = 2
     cam_list = (1, 2)
-    label_videos = False
+    label_videos = True
 
     Burgess_DLC_config_path = '/home/levlab/Public/mouse_headfixed_skilledreaching-DanL-2021-11-05/config.yaml'
 
@@ -156,21 +162,24 @@ if __name__ == '__main__':
     vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
     crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
     # UNCOMMENT BELOW
-    cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, cropped_videos_parent, crop_params_df, cam_list, vidtype='avi')
+    # cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, cropped_videos_parent, crop_params_df, cam_list, vidtype='avi')
 
     # step 3 - run DLC on each cropped video
     folders_to_analyze = navigation_utilities.find_optitrack_folders_to_analyze(cropped_videos_parent, cam_list=cam_list)
     # UNCOMMENT BELOW
-    scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, marked_videos_parent, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
+    # scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, marked_videos_parent, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
 
     # UNCOMMENT BELOW
-    if label_videos:
-        #todo: working here - create labeled videos
-        create_labeled_optitrack_videos(folders_to_analyze,
-                                  marked_videos_parent,
-                                  Burgess_DLC_config_path,
-                                  scorername,
-                                  cropped_vid_type=cropped_vid_type
-                                  )
+    # if label_videos:
+    #     #todo: working here - create labeled videos
+    #     try:
+    #         create_labeled_optitrack_videos(folders_to_analyze,
+    #                                   marked_videos_parent,
+    #                                   Burgess_DLC_config_path,
+    #                                   scorername,
+    #                                   cropped_vid_type=cropped_vid_type
+    #                                   )
+    #     except:
+    #         pass
     # step 4 - reconstruct 3D images
-    # reconstruct_optitrack_3d(cropped_videos_parent, cal_data_parent)
+    reconstruct_optitrack_3d(cropped_videos_parent, cal_data_parent)

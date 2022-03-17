@@ -8,7 +8,7 @@ import pandas as pd
 import scipy.io as sio
 
 
-def reconstruct_optitrack_session(view_directories):
+def reconstruct_optitrack_session(view_directories, calibration_parent):
 
     # find all the files containing labeled points in view_directories
     full_pickles = []
@@ -20,6 +20,11 @@ def reconstruct_optitrack_session(view_directories):
     for cam01_file in full_pickles[0]:
         pickle_metadata = []
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file))
+
+        calibration_file = navigation_utilities.create_multiview_calibration_data_name(calibration_parent, pickle_metadata[0]['trialtime'])
+        if not os.path.exists(calibration_file):
+            # if there is no calibration file for this session, skip
+            continue
 
         # find corresponding pickle file for camera 2
         _, cam01_pickle_name = os.path.split(cam01_file)
@@ -49,10 +54,48 @@ def reconstruct_optitrack_session(view_directories):
         bodyparts = []
         for dlc_md in dlc_metadata:
             bodyparts.append(dlc_md['data']['DLC-model-config file']['all_joints_names'])
-        rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata)
-        pass
+        pts_wrt_orig_img, dlc_conf = rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata)
+
+        # now have all the identified points moved back into the original coordinate systems that the checkerboards were
+        # identified in, and confidence levels. pts_wrt_orig_img is an array (num_frames x num_joints x 2) and dlc_conf
+        # is an array (num_frames x num_joints). Zeros are stored where dlc was uncertain (no result for that joint on
+        # that frame)
+
+        reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf)
     pass
 
+
+def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf):
+
+    # read in the calibration file, make sure we have stereo and camera calibrations
+    cal_data = skilled_reaching_io.read_pickle(calibration_file)
+    '''
+    cal_data is a dictionary containing:
+        cam_objpoints
+        cam_imgpoints
+        stereo_objpoints
+        stereo_imgpoints
+        stereo_frames
+        valid_frames
+        im_size
+        cb_size
+        calvid_metadata
+        mtx - 2 x 3 x 3 array with camera intrinsic matrices - mtx[0,:,:] is for camera 1, mtx[1,:,:] is for camera 2
+        dist - distortion coefficients; 2 x 5 array, first row is for camera 1, 2nd row for camera 2
+        frame_nums_for_intrinsics
+        R
+        T 
+        E  - essential matrix
+        F - fundamental matrix
+        frames_for_stereo_calibration
+    '''
+    num_frames = np.shape(pts_wrt_orig_img[0])[0]
+    pass
+
+
+def triangulate_single_point(cal_data, cam01_pt, cam02_pt):
+
+    pass
 
 def rotate_pts_180(pts, im_size):
     '''
@@ -106,7 +149,7 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
         frame_list = cam_output.keys()
         num_frames = cam_output['metadata']['nframes']
         num_joints = len(cam_output['metadata']['all_joints_names'])
-        pts_wrt_orig_img.append(np.zeros((num_frames, 2, num_joints)))
+        pts_wrt_orig_img.append(np.zeros((num_frames, num_joints, 2)))
         dlc_conf.append(np.zeros((num_frames, num_joints)))
         #todo: write the new points/confidences into these arrays so they can be returned by this function
 
@@ -147,11 +190,42 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
                 # exported to another function for 3D reconstuction. should also write a function to organize pickled data
                 # into a more reasonable format so if/when start using .h5 files, can write another function to organize
                 # those
+            array_pts = convert_pts_to_array(pts_in_calibration_coords)
+            pts_wrt_orig_img[i_cam][i_frame] = array_pts
 
-            pass
+            #todo: store and return the confidence array
+            conf = dlc_output[i_cam][frame]['confidence']
+            array_conf = convert_pickle_conf_to_array(conf)
 
-    pass
+            dlc_conf[i_cam][i_frame, :] = array_conf
 
+    return pts_wrt_orig_img, dlc_conf
+
+
+def convert_pts_to_array(pickle_format_pts):
+
+    num_joints = len(pickle_format_pts)
+    array_pts = np.zeros([num_joints, 2])
+    for i_pt, cur_pt in enumerate(pickle_format_pts):
+        if len(cur_pt) == 0:
+            continue
+        else:
+            array_pts[i_pt, :] = cur_pt[0]
+
+    return array_pts
+
+
+def convert_pickle_conf_to_array(pickle_confidence):
+
+    num_joints = len(pickle_confidence)
+    array_conf = np.zeros(num_joints)
+    for i_conf, cur_conf in enumerate(pickle_confidence):
+        if len(cur_conf) == 0:
+            continue
+        else:
+            array_conf[i_conf] = cur_conf[0]
+
+    return array_conf
 
 def translate_back_to_orig_img(pickle_metadata, pts):
     crop_win = pickle_metadata['crop_window']

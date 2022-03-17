@@ -129,7 +129,7 @@ def reconstruct_optitrack_3d(cropped_vid_parent, cal_data_parent):
             print('no matching cam02 directory for {}'.format(cam01_dir))
             continue
         view_directories = (cam01_dir, cam02_dir)
-        reconstruct_3d_optitrack.reconstruct_optitrack_session(view_directories)
+        reconstruct_3d_optitrack.reconstruct_optitrack_session(view_directories, cal_data_parent)
 
 
 

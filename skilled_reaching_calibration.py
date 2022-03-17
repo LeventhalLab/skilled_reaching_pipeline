@@ -427,15 +427,20 @@ def multi_mirror_calibration(calibration_data, calibration_summary_name):
 
 
 def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(7, 10)):
+    '''
 
+    :param cal_vid_parent:
+    :param cal_data_parent:
+    :param cb_size:
+    :return:
+    '''
 
     paired_cal_vids = navigation_utilities.find_Burgess_calibration_vids(cal_vid_parent)
 
     for vid_pair in paired_cal_vids:
         calvid_metadata = [navigation_utilities.parse_Burgess_calibration_vid_name(vid) for vid in vid_pair]
         cal_data_name = navigation_utilities.create_multiview_calibration_data_name(cal_data_parent,
-                                                                                    calvid_metadata[0][
-                                                                                        'session_datetime'])
+                                                                                    calvid_metadata[0]['session_datetime'])
         if not os.path.isfile(cal_data_name):
             # collect the checkerboard points, write to file
             collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=cb_size)

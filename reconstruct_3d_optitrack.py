@@ -61,12 +61,18 @@ def reconstruct_optitrack_session(view_directories, calibration_parent):
         # is an array (num_frames x num_joints). Zeros are stored where dlc was uncertain (no result for that joint on
         # that frame)
 
-        reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf)
+        reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf, cam01_file, cam02_file, dlc_metadata)
     pass
 
 
-def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf):
+def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf, cam01_file, cam02_file, dlc_metadata):
+    '''
 
+    :param calibration_file:
+    :param pts_wrt_orig_img: 2 - element list containing arrays num_frames x num_joints x 2
+    :param dlc_conf:  2-element list containing num_frames x num_joints array with dlc confidence values
+    :return:
+    '''
     # read in the calibration file, make sure we have stereo and camera calibrations
     cal_data = skilled_reaching_io.read_pickle(calibration_file)
     '''
@@ -89,11 +95,47 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
         F - fundamental matrix
         frames_for_stereo_calibration
     '''
+    num_cams = len(pts_wrt_orig_img)
     num_frames = np.shape(pts_wrt_orig_img[0])[0]
+
+    for i_frame in range(num_frames):
+        frame_pts = []
+        frame_conf = []
+        for i_cam in range(num_cams):
+            frame_pts.append(pts_wrt_orig_img[i_cam][i_frame, :, :])
+            frame_conf.append(dlc_conf[i_cam][i_frame, :])
+
+        reconstruct_one_frame(frame_pts, frame_conf, cal_data, cam01_file, cam02_file, i_frame, dlc_metadata)
+
+        pass
+
     pass
 
 
-def triangulate_single_point(cal_data, cam01_pt, cam02_pt):
+def reconstruct_one_frame(frame_pts, frame_conf, cal_data, cam01_file, cam02_file, i_frame, dlc_metadata):
+
+    # first, check that images match
+    pickle_meta01 = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file)
+    pickle_meta02 = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam02_file)
+
+    #verified that coordinates are mapped correctly into full image
+    # overlay_pts_in_orig_image(pickle_meta01, frame_pts[0], dlc_metadata[0], i_frame,
+    #                           rotate_img=True)
+    # overlay_pts_in_orig_image(pickle_meta02, frame_pts[1], dlc_metadata[1], i_frame,
+    #                           rotate_img=False)
+
+    num_joints = np.shape(frame_pts)[1]
+    num_cams = len(frame_pts)
+
+    for i_joint in range(num_joints):
+        matched_pts = np.zeros((num_cams, 2))
+        for i_cam, cam_pts in enumerate(frame_pts):
+
+            matched_pts[i_cam, :] = cam_pts[i_joint, :]
+            # matched_pts should be a num_cams x 2 array containing (x,y) pairs for a single "joint" (DLC bodypart) for each camera
+        pass
+
+def triangulate_single_point(cal_data, cam_pts):
 
     pass
 
@@ -184,8 +226,8 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
                 #                           rotate_img=True)
             else:
                 pts_in_calibration_coords = translate_back_to_orig_img(pickle_metadata[i_cam], current_coords)
-                overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
-                                          rotate_img=False)
+                # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
+                #                           rotate_img=False)
                 #todo: align all the points for the two camera views/frames and store them in a way that can be neatly
                 # exported to another function for 3D reconstuction. should also write a function to organize pickled data
                 # into a more reasonable format so if/when start using .h5 files, can write another function to organize
@@ -290,7 +332,7 @@ def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_f
             try:
                 x, y = pt[0]
             except:
-                pass
+                x, y = pt
             x = int(round(x))
             y = int(round(y))
             bp_color = color_from_bodypart(bodyparts[i_pt])

@@ -124,19 +124,71 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, cam01_file, cam02_fil
     # overlay_pts_in_orig_image(pickle_meta02, frame_pts[1], dlc_metadata[1], i_frame,
     #                           rotate_img=False)
 
-    num_joints = np.shape(frame_pts)[1]
+    num_cams = len(frame_pts)
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+
+    projPoints = [cv2.undistortPoints(frame_pts[i_cam], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
+    projMatr1 = np.eye(3, 4)
+    projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
+
+    points4D = cv2.triangulatePoints(projMatr1, projMatr2, projPoints[0], projPoints[1])
+    worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
+
+    #todo: check that there was good reconstruction of individual points (i.e., the matched points were truly well-matched?
+    check_3d_reprojection(worldpoints, frame_pts, cal_data)
+    return worldpoints
+
+def check_3d_reprojection(worldpoints, frame_pts, cal_data):
+
     num_cams = len(frame_pts)
 
-    for i_joint in range(num_joints):
-        matched_pts = np.zeros((num_cams, 2))
-        for i_cam, cam_pts in enumerate(frame_pts):
+    for i_cam in range(num_cams):
+        mtx = cal_data['mtx'][i_cam]
+        dist = cal_data['dist'][i_cam]
+        if i_cam == 0:
+            rvec = np.zeros((3, 1))
+            tvec = np.zeros((3, 1))
+        else:
+            rvec = cv2.Rodrigues(cal_data['R'])
+            tvec = cal_data['T']
 
-            matched_pts[i_cam, :] = cam_pts[i_joint, :]
-            # matched_pts should be a num_cams x 2 array containing (x,y) pairs for a single "joint" (DLC bodypart) for each camera
+        #todo: sort out why projected_pts isn't an array of 2-D points
+        projected_pts = cv2.projectPoints(worldpoints, rvec, tvec, mtx, dist)
+        cam_errors = reprojection_errors(projected_pts, frame_pts[i_cam])
         pass
 
-def triangulate_single_point(cal_data, cam_pts):
 
+def reprojection_errors(reprojected_pts, measured_pts):
+
+    xy_errors = reprojected_pts - measured_pts
+    euclidean_error = np.sqrt(np.sum(np.square(xy_errors), 1))
+
+    pass
+
+def triangulate_single_point(cal_data, matched_pts):
+
+    cal_data_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze/mouse_SR_calibration_data'
+
+    # first, create projMatr1 and projMatr2 (3 x 4 projection matrices for each camera) for each camera
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+    num_cams = len(mtx)
+
+    # undistort points, which should give results in normalized coordinates
+    ud_pts = [cv2.undistortPoints(matched_pts[i_cam], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
+
+    num_pts = np.shape(projPoints)[2]
+    reshaped_pts = [np.zeros((1, num_pts, 2)) for ii in range(2)]
+    projPoints_array = []
+    newpoints = [[], []]
+    for ii in range(2):
+        projPoints_array.append(np.squeeze(np.array([projPoints[ii]]).T))
+        reshaped_pts[ii][0,:,:] = projPoints_array[ii]
+    newpoints[0], newpoints[1] = cv2.correctMatches(cal_data['F'], reshaped_pts[0], reshaped_pts[1])
+    newpoints = [np_array.astype('float32') for np_array in newpoints]
+
+    new_cornerpoints = [np.squeeze(newpoints[ii]) for ii in range(2)]
     pass
 
 def rotate_pts_180(pts, im_size):

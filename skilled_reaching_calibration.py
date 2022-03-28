@@ -447,8 +447,6 @@ def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(7, 10))
 
         calibrate_Burgess_session(cal_data_name, vid_pair)
 
-        pass
-
 
 def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
     '''
@@ -664,7 +662,6 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
 
                 img_name = '/home/levlab/Public/mouse_SR_videos_to_analyze/mouse_SR_calibration_data/test_frame_{}_cam{:02d}_frame{:03d}.jpg'.format(session_date_string, current_cam, cur_frame)
                 cv2.imwrite(img_name, reproj_img)
-                pass
 
         cal_data['mtx'].append(np.copy(mtx))
         cal_data['dist'].append(np.copy(dist))
@@ -715,16 +712,16 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
 
     # check if calibration worked
-    # num_valid_stereo_pairs = np.shape(cal_data['stereo_imgpoints'])[1]
-    # for stereo_idx in range(num_valid_stereo_pairs):
-    #     frame_num = cal_data['stereo_frames'][stereo_idx]
-    #     projPoints = []
-    #     for i_cam in range(num_cams):
-    #         projPoints.append(cal_data['stereo_imgpoints'][i_cam][stereo_idx])
-    #         projPoints[i_cam] = np.squeeze(projPoints[i_cam]).T
-    #
-    #     print('frame number {:d}'.format(frame_num))
-        # worldpoints = triangulate_points(cal_data, projPoints, frame_num)
+    num_valid_stereo_pairs = np.shape(cal_data['stereo_imgpoints'])[1]
+    for stereo_idx in range(num_valid_stereo_pairs):
+        frame_num = cal_data['stereo_frames'][stereo_idx]
+        projPoints = []
+        for i_cam in range(num_cams):
+            projPoints.append(cal_data['stereo_imgpoints'][i_cam][stereo_idx])
+            projPoints[i_cam] = np.squeeze(projPoints[i_cam]).T
+
+        print('frame number {:d}'.format(frame_num))
+        worldpoints = triangulate_points(cal_data, projPoints, frame_num)
 
     pass
 
@@ -821,9 +818,13 @@ def triangulate_points(cal_data, projPoints, frame_num):
     worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
 
     fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
+    ax0 = fig.add_subplot(3, 1, 1)
+    ax1 = fig.add_subplot(3, 1, 2)
+    ax3d = fig.add_subplot(3, 1, 3, projection='3d')
 
-    ax.scatter(worldpoints[:, 0], worldpoints[:, 1], worldpoints[:, 2])
+    ax0.scatter(projPoints_array[0][:,0], projPoints_array[0][:,1])
+    ax1.scatter(projPoints_array[1][:, 0], projPoints_array[0][:, 1])
+    ax3d.scatter(worldpoints[:, 0], worldpoints[:, 1], worldpoints[:, 2])
     plt.show()
 
     return worldpoints

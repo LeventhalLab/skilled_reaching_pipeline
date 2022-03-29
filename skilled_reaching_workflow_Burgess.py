@@ -107,7 +107,7 @@ def create_labeled_optitrack_videos(folders_to_analyze, marked_vids_parent, conf
                         shutil.move(pickle_file, new_dir)
 
 
-def reconstruct_optitrack_3d(cropped_vid_parent, cal_data_parent):
+def reconstruct_optitrack_3d(cropped_vid_parent, cal_data_parent, videos_parent):
     '''
 
     :param cropped_vid_parent:
@@ -129,7 +129,7 @@ def reconstruct_optitrack_3d(cropped_vid_parent, cal_data_parent):
             print('no matching cam02 directory for {}'.format(cam01_dir))
             continue
         view_directories = (cam01_dir, cam02_dir)
-        reconstruct_3d_optitrack.reconstruct_optitrack_session(view_directories, cal_data_parent)
+        reconstruct_3d_optitrack.reconstruct_optitrack_session(view_directories, cal_data_parent, videos_parent)
 
 
 
@@ -182,4 +182,4 @@ if __name__ == '__main__':
     #     except:
     #         pass
     # step 4 - reconstruct 3D images
-    reconstruct_optitrack_3d(cropped_videos_parent, cal_data_parent)
+    reconstruct_optitrack_3d(cropped_videos_parent, cal_data_parent, videos_parent)

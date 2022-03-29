@@ -25,6 +25,27 @@ def get_video_folders_to_crop(video_root_folder):
     return crop_dirs
 
 
+def find_original_optitrack_video(video_root_folder, metadata):
+
+    mouseID = metadata['mouseID']
+    trialtime =  metadata['trialtime']
+    month_dir = mouseID + '_' + trialtime.strftime('%Y%m')
+    date_dir = mouseID + '_' + trialtime.strftime('%Y%m%d')
+
+    vid_name = '_'.join([mouseID,
+                         trialtime.strftime('%Y%m%d_%H-%M-%S'),
+                         str(metadata['session_num']),
+                         '{:03d}'.format(metadata['video_number']),
+                         'cam{:02d}.avi'.format(metadata['cam_num'])])
+
+    full_vid_name = os.path.join(video_root_folder, mouseID, month_dir, date_dir, vid_name)
+
+    if not os.path.exists(full_vid_name):
+        full_vid_name = None
+
+    return full_vid_name
+
+
 def create_cropped_video_destination_list(cropped_vids_parent, video_folder_list, view_list):
     """
     create subdirectory trees in which to store the cropped videos. Directory structure is ratID-->sessionID-->

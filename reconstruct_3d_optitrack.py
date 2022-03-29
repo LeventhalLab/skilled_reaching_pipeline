@@ -4,11 +4,12 @@ import os
 import glob
 import navigation_utilities
 import skilled_reaching_io
+import matplotlib.pyplot as plt
 import pandas as pd
 import scipy.io as sio
 
 
-def reconstruct_optitrack_session(view_directories, calibration_parent):
+def reconstruct_optitrack_session(view_directories, calibration_parent, videos_parent):
 
     # find all the files containing labeled points in view_directories
     full_pickles = []
@@ -17,14 +18,15 @@ def reconstruct_optitrack_session(view_directories, calibration_parent):
         full_pickles.append(glob.glob(os.path.join(view_dir, '*full.pickle')))
         # meta_pickles.append(glob.glob(os.path.join(view_dir, '*meta.pickle')))
 
+    pickle_files = []
     for cam01_file in full_pickles[0]:
         pickle_metadata = []
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file))
-
         calibration_file = navigation_utilities.create_multiview_calibration_data_name(calibration_parent, pickle_metadata[0]['trialtime'])
         if not os.path.exists(calibration_file):
             # if there is no calibration file for this session, skip
             continue
+        pickle_files.append(cam01_file)   # pickle_files[0] is the full pickle file for camera 1
 
         # find corresponding pickle file for camera 2
         _, cam01_pickle_name = os.path.split(cam01_file)
@@ -34,22 +36,24 @@ def reconstruct_optitrack_session(view_directories, calibration_parent):
         cam02_file_list = glob.glob(os.path.join(view_directories[1], cam02_pickle_stem + '*full.pickle'))
         if len(cam02_file_list) == 1:
             cam02_file = cam02_file_list[0]
+            pickle_files.append(cam02_file)
         else:
             print('no matching camera 2 file for {}'.format(cam01_file))
             continue
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam02_file))
 
         # read in the points
-        dlc_output = []
-        dlc_metadata = []
-        dlc_output.append(skilled_reaching_io.read_pickle(cam01_file))
-        dlc_output.append(skilled_reaching_io.read_pickle(cam02_file))
+        dlc_output = [skilled_reaching_io.read_pickle(pickle_file) for pickle_file in pickle_files]
 
-        cam01_meta = cam01_file.replace('full.pickle', 'meta.pickle')
-        cam02_meta = cam02_file.replace('full.pickle', 'meta.pickle')
+        # dlc_output.append(skilled_reaching_io.read_pickle(cam01_file))
+        # dlc_output.append(skilled_reaching_io.read_pickle(cam02_file))
 
-        dlc_metadata.append(skilled_reaching_io.read_pickle(cam01_meta))
-        dlc_metadata.append(skilled_reaching_io.read_pickle(cam02_meta))
+        # cam01_meta = cam01_file.replace('full.pickle', 'meta.pickle')
+        # cam02_meta = cam02_file.replace('full.pickle', 'meta.pickle')
+        cam_meta_files = [pickle_file.replace('full.pickle', 'meta.pickle') for pickle_file in pickle_files]
+        dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in cam_meta_files]
+        # dlc_metadata.append(skilled_reaching_io.read_pickle(cam01_meta))
+        # dlc_metadata.append(skilled_reaching_io.read_pickle(cam02_meta))
 
         bodyparts = []
         for dlc_md in dlc_metadata:
@@ -61,11 +65,11 @@ def reconstruct_optitrack_session(view_directories, calibration_parent):
         # is an array (num_frames x num_joints). Zeros are stored where dlc was uncertain (no result for that joint on
         # that frame)
 
-        reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf, cam01_file, cam02_file, dlc_metadata)
+        reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf, pickle_files, dlc_metadata, videos_parent)
     pass
 
 
-def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf, cam01_file, cam02_file, dlc_metadata):
+def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf, pickle_files, dlc_metadata, videos_parent):
     '''
 
     :param calibration_file:
@@ -95,8 +99,16 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
         F - fundamental matrix
         frames_for_stereo_calibration
     '''
+    video_root_folder = os.path.join(videos_parent, 'mouse_SR_videos_tocrop')
+
     num_cams = len(pts_wrt_orig_img)
     num_frames = np.shape(pts_wrt_orig_img[0])[0]
+
+    pickle_metadata = []
+    orig_vid_names = []
+    for i_cam in range(num_cams):
+        pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(pickle_files[i_cam]))
+        orig_vid_names.append(navigation_utilities.find_original_optitrack_video(video_root_folder, pickle_metadata[i_cam]))
 
     for i_frame in range(num_frames):
         frame_pts = []
@@ -105,23 +117,22 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
             frame_pts.append(pts_wrt_orig_img[i_cam][i_frame, :, :])
             frame_conf.append(dlc_conf[i_cam][i_frame, :])
 
-        reconstruct_one_frame(frame_pts, frame_conf, cal_data, cam01_file, cam02_file, i_frame, dlc_metadata)
+        reconstruct_one_frame(frame_pts, frame_conf, cal_data, pickle_files, i_frame, dlc_metadata, videos_parent)
 
         pass
 
     pass
 
 
-def reconstruct_one_frame(frame_pts, frame_conf, cal_data, cam01_file, cam02_file, i_frame, dlc_metadata):
+def reconstruct_one_frame(frame_pts, frame_conf, cal_data, pickle_files, i_frame, dlc_metadata, videos_parent):
 
     # first, check that images match
-    pickle_meta01 = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file)
-    pickle_meta02 = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam02_file)
+    pickle_metadata = [navigation_utilities.parse_dlc_output_pickle_name_optitrack(pickle_file) for pickle_file in pickle_files]
 
     #verified that coordinates are mapped correctly into full image
-    # overlay_pts_in_orig_image(pickle_meta01, frame_pts[0], dlc_metadata[0], i_frame,
+    # overlay_pts_in_orig_image(pickle_meta[0], frame_pts[0], dlc_metadata[0], i_frame,
     #                           rotate_img=True)
-    # overlay_pts_in_orig_image(pickle_meta02, frame_pts[1], dlc_metadata[1], i_frame,
+    # overlay_pts_in_orig_image(pickle_meta[1], frame_pts[1], dlc_metadata[1], i_frame,
     #                           rotate_img=False)
 
     num_cams = len(frame_pts)
@@ -136,12 +147,48 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, cam01_file, cam02_fil
     worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
 
     #todo: check that there was good reconstruction of individual points (i.e., the matched points were truly well-matched?
-    check_3d_reprojection(worldpoints, frame_pts, cal_data)
+    check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_metadata, dlc_metadata, i_frame, videos_parent)
+
     return worldpoints
 
-def check_3d_reprojection(worldpoints, frame_pts, cal_data):
+
+def plot_worldpoints(worldpoints, dlc_metadata):
+
+    bodyparts = dlc_metadata['data']['DLC-model-config file']['all_joints_names']
+
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+
+    dotsize = 6
+
+    for i_pt, pt in enumerate(worldpoints):
+
+        if len(pt) > 0:
+            try:
+                x, y, z = pt[0]
+            except:
+                x, y, z = pt
+            # x = int(round(x))
+            # y = int(round(y))
+            bp_color = color_from_bodypart(bodyparts[i_pt])
+
+            ax.scatter(x, y, z, marker='o', s=dotsize, color=bp_color)
+
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+
+    plt.show()
+
+    pass
+
+def check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_metadata, dlc_metadata, frame_num, videos_parent):
 
     num_cams = len(frame_pts)
+
+    #3d plot of worldpoints
+    #todo: plot worldpoints in 3d. Is the problem with the triangulation or reprojection?
+    plot_worldpoints(worldpoints, dlc_metadata[0])
 
     for i_cam in range(num_cams):
         mtx = cal_data['mtx'][i_cam]
@@ -150,19 +197,29 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data):
             rvec = np.zeros((3, 1))
             tvec = np.zeros((3, 1))
         else:
-            rvec = cv2.Rodrigues(cal_data['R'])
+            rvec, _ = cv2.Rodrigues(cal_data['R'])
             tvec = cal_data['T']
 
-        #todo: sort out why projected_pts isn't an array of 2-D points
-        projected_pts = cv2.projectPoints(worldpoints, rvec, tvec, mtx, dist)
+        projected_pts, _ = cv2.projectPoints(worldpoints, rvec, tvec, mtx, dist)
         cam_errors = reprojection_errors(projected_pts, frame_pts[i_cam])
-        pass
+
+        overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, reprojected_pts=projected_pts,
+                                  rotate_img=pickle_metadata[i_cam]['isrotated'], videos_parent=videos_parent)
+
+    pass
 
 
 def reprojection_errors(reprojected_pts, measured_pts):
 
+    # the output of cv2.projectPoints may be n x 1 x 2
+    reprojected_pts = np.squeeze(reprojected_pts)
     xy_errors = reprojected_pts - measured_pts
     euclidean_error = np.sqrt(np.sum(np.square(xy_errors), 1))
+
+    return euclidean_error
+
+
+def overlay_measured_reproj_pts(reprojected_pts, measured_pts, vid_filename, frame_num):
 
     pass
 
@@ -342,8 +399,8 @@ def translate_back_to_orig_img(pickle_metadata, pts):
     return translated_pts
 
 
-def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_frame, rotate_img=False):
-    videos_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze'
+def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_frame, reprojected_pts=None, rotate_img=False, videos_parent='/home/levlab/Public/mouse_SR_videos_to_analyze'):
+
     cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
     video_root_folder = os.path.join(videos_parent, 'mouse_SR_videos_tocrop')
 
@@ -378,20 +435,73 @@ def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_f
     jpg_name = os.path.join(cropped_vid_folder, jpg_name + '.jpg')
 
     # overlay points
-    new_img = cur_img
-    for i_pt, pt in enumerate(current_coords):
+    fig, img_ax = overlay_pts_on_image(cur_img, current_coords, reprojected_pts, bodyparts, ['o', '+'], jpg_name)
+
+    # new_img = cur_img
+    # for i_pt, pt in enumerate(current_coords):
+    #     if len(pt) > 0:
+    #         try:
+    #             x, y = pt[0]
+    #         except:
+    #             x, y = pt
+    #         x = int(round(x))
+    #         y = int(round(y))
+    #         bp_color = color_from_bodypart(bodyparts[i_pt])
+    #         new_img = cv2.circle(new_img, (x, y), 3, bp_color, -1)
+    #
+    # cv2.imwrite(jpg_name, new_img)
+
+
+def prepare_img_axes(width, height, scale=1.0, dpi=100):
+    fig = plt.figure(
+        frameon=False, figsize=(width * scale / dpi, height * scale / dpi), dpi=dpi
+    )
+    ax = fig.add_subplot(111)
+    ax.axis("off")
+    ax.set_xlim(0, width)
+    ax.set_ylim(0, height)
+    ax.invert_yaxis()
+    return fig, ax
+
+
+def overlay_pts_on_image(img, pts, reprojected_pts, bodyparts, markertype, jpg_name):
+
+    dotsize = 6
+
+    h, w, _ = np.shape(img)
+    fig, ax = prepare_img_axes(w, h)
+
+    ax.imshow(img)
+
+    for i_pt, pt in enumerate(pts):
+
         if len(pt) > 0:
             try:
                 x, y = pt[0]
             except:
                 x, y = pt
-            x = int(round(x))
-            y = int(round(y))
+            # x = int(round(x))
+            # y = int(round(y))
             bp_color = color_from_bodypart(bodyparts[i_pt])
-            new_img = cv2.circle(new_img, (x, y), 3, bp_color, -1)
 
-    cv2.imwrite(jpg_name, new_img)
-    pass
+            ax.plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
+
+    for i_rpt, rpt in enumerate(reprojected_pts):
+        if len(rpt) > 0:
+            try:
+                x, y = rpt[0]
+            except:
+                x, y = rpt
+            # x = int(round(x))
+            # y = int(round(y))
+            bp_color = color_from_bodypart(bodyparts[i_rpt])
+
+            ax.plot(x, y, marker=markertype[1], ms=dotsize, color=bp_color)
+
+    # plt.show()
+    fig.savefig(jpg_name)
+
+    return fig, ax
 
 
 def overlay_pts(pickle_metadata, current_coords, dlc_metadata, i_frame, rotate_img=False):
@@ -489,5 +599,7 @@ def color_from_bodypart(bodypart):
         bp_color = (200,0,200)
     else:
         bp_color = (0,0,255)
+
+    bp_color = [float(bpc)/255. for bpc in bp_color]
 
     return bp_color

@@ -269,6 +269,8 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_m
         projected_pts, _ = cv2.projectPoints(worldpoints, rvec, tvec, mtx, dist)
         cam_errors = reprojection_errors(projected_pts, frame_pts[i_cam])
 
+        draw_epipolar_lines(cal_data, frame_pts, dlc_metadata, pickle_metadata, frame_num, videos_parent)
+
         overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, reprojected_pts=projected_pts,
                                   rotate_img=pickle_metadata[i_cam]['isrotated'], videos_parent=videos_parent)
 
@@ -578,10 +580,30 @@ def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, marker
     return fig, ax
 
 
-def draw_epipolar_lines(cal_data, img_points, dlc_metadata):
+def draw_epipolar_lines(cal_data, img_points, dlc_metadata, pickle_metadata, i_frame, videos_parent):
 
     cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
     video_root_folder = os.path.join(videos_parent, 'mouse_SR_videos_tocrop')
+
+    bodyparts = dlc_metadata[0]['data']['DLC-model-config file']['all_joints_names']
+    mouseID = pickle_metadata[0]['mouseID']
+    month_dir = mouseID + '_' + pickle_metadata[0]['trialtime'].strftime('%Y%m')
+    day_dir = mouseID + '_' + pickle_metadata[0]['trialtime'].strftime('%Y%m%d')
+    orig_vid_folder = os.path.join(video_root_folder, mouseID, month_dir, day_dir)
+
+    cam_dirs = [day_dir + '_' + 'cam{:02d}'.format(pickle_metadata[i_cam]['cam_num']) for i_cam in range(2)]
+
+    cropped_vid_folders = [os.path.join(cropped_videos_parent, mouseID, month_dir, day_dir, cam_dir) for cam_dir in cam_dirs]
+
+    orig_vid_names_base = ['_'.join([mouseID,
+                              pickle_metadata[0]['trialtime'].strftime('%Y%m%d_%H-%M-%S'),
+                              '{:d}'.format(pickle_metadata[0]['session_num']),
+                              '{:03d}'.format(pickle_metadata[0]['video_number']),
+                              'cam{:02d}'.format(pickle_metadata[i_cam]['cam_num'])
+                              ]) for i_cam in range(2)]
+    orig_vid_names = [os.path.join(orig_vid_folder, orig_vid_name_base + '.avi') for orig_vid_name_base in orig_vid_names_base]
+
+    #todo: read in images from both camera views
 
     h, w, _ = np.shape(img)
     fig, ax = prepare_img_axes(w, h)

@@ -141,9 +141,16 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, pickle_files, i_frame
 
     projPoints = [cv2.undistortPoints(frame_pts[i_cam], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
     projMatr1 = np.eye(3, 4)
-    projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
+    # projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
+    projMatr2 = np.hstack((cal_data['R'].T, -cal_data['R'].T.dot(cal_data['T'])))
+
+    # plot_projpoints(projPoints, dlc_metadata[0])
+
+    # projMatr1 = np.matmul(mtx[0], projMatr1)
+    # projMatr2 = np.matmul(mtx[1], projMatr2)
 
     points4D = cv2.triangulatePoints(projMatr1, projMatr2, projPoints[0], projPoints[1])
+    # points4D = cv2.triangulatePoints(projMatr1, projMatr2, frame_pts[0], frame_pts[1])
     worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
 
     #todo: check that there was good reconstruction of individual points (i.e., the matched points were truly well-matched?
@@ -152,7 +159,35 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, pickle_files, i_frame
     return worldpoints
 
 
-def plot_worldpoints(worldpoints, dlc_metadata):
+def plot_projpoints(projPoints, dlc_metadata):
+
+    bodyparts = dlc_metadata['data']['DLC-model-config file']['all_joints_names']
+    fig, axs = plt.subplots(1, 2)
+
+    dotsize = 3
+
+    for i_cam in range(2):
+        for i_pt, pt in enumerate(projPoints[i_cam]):
+            if len(pt) > 0:
+                try:
+                    x, y = pt[0]
+                except:
+                    x, y = pt
+                # x = int(round(x))
+                # y = int(round(y))
+                bp_color = color_from_bodypart(bodyparts[i_pt])
+
+                axs[i_cam].scatter(x, y, marker='o', s=dotsize, color=bp_color)
+
+                axs[i_cam].set_ylim(-1, 1)
+                axs[i_cam].invert_yaxis()
+                axs[i_cam].set_xlim(-1, 1)
+
+    # plt.show()
+
+    pass
+
+def plot_worldpoints(worldpoints, dlc_metadata, pickle_metadata, i_frame, videos_parent='/home/levlab/Public/mouse_SR_videos_to_analyze'):
 
     bodyparts = dlc_metadata['data']['DLC-model-config file']['all_joints_names']
 
@@ -160,6 +195,24 @@ def plot_worldpoints(worldpoints, dlc_metadata):
     ax = fig.add_subplot(projection='3d')
 
     dotsize = 6
+
+    video_root_folder = os.path.join(videos_parent, 'mouse_SR_videos_tocrop')
+    cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
+
+    month_dir = pickle_metadata['mouseID'] + '_' + pickle_metadata['trialtime'].strftime('%Y%m')
+    day_dir = pickle_metadata['mouseID'] + '_' + pickle_metadata['trialtime'].strftime('%Y%m%d')
+    orig_vid_folder = os.path.join(video_root_folder, pickle_metadata['mouseID'], month_dir, day_dir)
+
+    cam_dir = day_dir + '_' + 'cam{:02d}'.format(pickle_metadata['cam_num'])
+    cropped_vid_folder = os.path.join(cropped_videos_parent, pickle_metadata['mouseID'], month_dir, day_dir)
+
+    orig_vid_name_base = '_'.join([pickle_metadata['mouseID'],
+                              pickle_metadata['trialtime'].strftime('%Y%m%d_%H-%M-%S'),
+                              '{:d}'.format(pickle_metadata['session_num']),
+                              '{:03d}'.format(pickle_metadata['video_number']),
+                              'cam{:02d}'.format(pickle_metadata['cam_num'])
+                              ])
+    orig_vid_name = os.path.join(orig_vid_folder, orig_vid_name_base + '.avi')
 
     for i_pt, pt in enumerate(worldpoints):
 
@@ -177,10 +230,23 @@ def plot_worldpoints(worldpoints, dlc_metadata):
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     ax.set_zlabel('z')
+    # ax.invert_yaxis()
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 5)
 
-    plt.show()
+    jpg_name = orig_vid_name_base + '_{:04d}'.format(i_frame)
+    jpg_name = os.path.join(cropped_vid_folder, jpg_name + '.jpg')
+
+    plt.savefig(jpg_name)
+    # plt.show()
 
     pass
+
+
+def triangulate_points(img_points, cal_data):
+
+    pass
+
 
 def check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_metadata, dlc_metadata, frame_num, videos_parent):
 
@@ -188,7 +254,7 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_m
 
     #3d plot of worldpoints
     #todo: plot worldpoints in 3d. Is the problem with the triangulation or reprojection?
-    plot_worldpoints(worldpoints, dlc_metadata[0])
+    plot_worldpoints(worldpoints, dlc_metadata[0], pickle_metadata[0], frame_num, videos_parent=videos_parent)
 
     for i_cam in range(num_cams):
         mtx = cal_data['mtx'][i_cam]
@@ -197,13 +263,13 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_m
             rvec = np.zeros((3, 1))
             tvec = np.zeros((3, 1))
         else:
-            rvec, _ = cv2.Rodrigues(cal_data['R'])
-            tvec = cal_data['T']
+            rvec, _ = cv2.Rodrigues(cal_data['R'].T)
+            tvec = -cal_data['T']
 
         projected_pts, _ = cv2.projectPoints(worldpoints, rvec, tvec, mtx, dist)
         cam_errors = reprojection_errors(projected_pts, frame_pts[i_cam])
 
-        overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, reprojected_pts=projected_pts,
+        overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, reprojected_pts=projected_pts,
                                   rotate_img=pickle_metadata[i_cam]['isrotated'], videos_parent=videos_parent)
 
     pass
@@ -399,7 +465,7 @@ def translate_back_to_orig_img(pickle_metadata, pts):
     return translated_pts
 
 
-def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_frame, reprojected_pts=None, rotate_img=False, videos_parent='/home/levlab/Public/mouse_SR_videos_to_analyze'):
+def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_frame, mtx, dist, reprojected_pts=None, rotate_img=False, videos_parent='/home/levlab/Public/mouse_SR_videos_to_analyze'):
 
     cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
     video_root_folder = os.path.join(videos_parent, 'mouse_SR_videos_tocrop')
@@ -435,7 +501,9 @@ def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_f
     jpg_name = os.path.join(cropped_vid_folder, jpg_name + '.jpg')
 
     # overlay points
-    fig, img_ax = overlay_pts_on_image(cur_img, current_coords, reprojected_pts, bodyparts, ['o', '+'], jpg_name)
+    fig, img_ax = overlay_pts_on_image(cur_img, mtx, dist, current_coords, reprojected_pts, bodyparts, ['o', '+'], jpg_name)
+
+    pass
 
     # new_img = cur_img
     # for i_pt, pt in enumerate(current_coords):
@@ -464,14 +532,16 @@ def prepare_img_axes(width, height, scale=1.0, dpi=100):
     return fig, ax
 
 
-def overlay_pts_on_image(img, pts, reprojected_pts, bodyparts, markertype, jpg_name):
+def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, markertype, jpg_name):
 
     dotsize = 6
 
     h, w, _ = np.shape(img)
     fig, ax = prepare_img_axes(w, h)
 
-    ax.imshow(img)
+    img_ud = cv2.undistort(img, mtx, dist)
+
+    ax.imshow(img_ud)
 
     for i_pt, pt in enumerate(pts):
 
@@ -482,9 +552,13 @@ def overlay_pts_on_image(img, pts, reprojected_pts, bodyparts, markertype, jpg_n
                 x, y = pt
             # x = int(round(x))
             # y = int(round(y))
+
+            pt_ud_norm = np.squeeze(cv2.undistortPoints(np.array([x, y]), mtx, dist))
+            pt_ud = unnormalize_points(pt_ud_norm, mtx)
             bp_color = color_from_bodypart(bodyparts[i_pt])
 
-            ax.plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
+            ax.plot(pt_ud[0], pt_ud[1], marker=markertype[0], ms=dotsize, color=bp_color)
+            # ax.plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
 
     for i_rpt, rpt in enumerate(reprojected_pts):
         if len(rpt) > 0:
@@ -503,6 +577,29 @@ def overlay_pts_on_image(img, pts, reprojected_pts, bodyparts, markertype, jpg_n
 
     return fig, ax
 
+
+def draw_epipolar_lines(cal_data, img_points, dlc_metadata):
+
+    cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
+    video_root_folder = os.path.join(videos_parent, 'mouse_SR_videos_tocrop')
+
+    h, w, _ = np.shape(img)
+    fig, ax = prepare_img_axes(w, h)
+
+    ax.imshow(img2)
+
+    for i_pt, pt in enumerate(points_in_img):
+
+        if len(pt) > 0:
+            try:
+                x, y = pt[0]
+            except:
+                x, y = pt
+            # x = int(round(x))
+            # y = int(round(y))
+            bp_color = color_from_bodypart(bodyparts[i_pt])
+
+            ax.plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
 
 def overlay_pts(pickle_metadata, current_coords, dlc_metadata, i_frame, rotate_img=False):
 
@@ -603,3 +700,27 @@ def color_from_bodypart(bodypart):
     bp_color = [float(bpc)/255. for bpc in bp_color]
 
     return bp_color
+
+def unnormalize_points(points2d_norm, mtx):
+    '''
+
+    :param points2d: N x 2 array of normalized points
+    :param mtx:
+    :return:
+    '''
+
+    if points2d_norm.ndim == 1:
+        num_pts = 1
+        homogeneous_pts = np.append(points2d_norm, 1.)
+    else:
+        num_pts = max(np.shape(points2d_norm))
+        homogeneous_pts = np.hstack((points2d_norm, np.ones((num_pts, 1))))
+
+    unnorm_pts = np.dot(mtx, homogeneous_pts)
+
+    if num_pts == 1:
+        unnorm_pts = unnorm_pts[:2] / unnorm_pts[-1]
+    else:
+        unnorm_pts = unnorm_pts[:,:2] / unnorm_pts[:, [-1]]
+
+    return unnorm_pts

@@ -822,7 +822,7 @@ def triangulate_points(cal_data, projPoints, frame_num):
     ax1 = fig.add_subplot(3, 1, 2)
     ax3d = fig.add_subplot(3, 1, 3, projection='3d')
 
-    ax0.scatter(projPoints_array[0][:,0], projPoints_array[0][:,1])
+    ax0.scatter(projPoints_array[0][:, 0], projPoints_array[0][:, 1])
     ax1.scatter(projPoints_array[1][:, 0], projPoints_array[0][:, 1])
     ax3d.scatter(worldpoints[:, 0], worldpoints[:, 1], worldpoints[:, 2])
     plt.show()

@@ -5,6 +5,7 @@ import glob
 import navigation_utilities
 import skilled_reaching_io
 import matplotlib.pyplot as plt
+import computer_vision_basics as cvb
 import pandas as pd
 import scipy.io as sio
 
@@ -141,8 +142,8 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, pickle_files, i_frame
 
     projPoints = [cv2.undistortPoints(frame_pts[i_cam], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
     projMatr1 = np.eye(3, 4)
-    # projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
-    projMatr2 = np.hstack((cal_data['R'].T, -cal_data['R'].T.dot(cal_data['T'])))
+    projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
+    # projMatr2 = np.hstack((cal_data['R'].T, -cal_data['R'].T.dot(cal_data['T'])))
 
     # plot_projpoints(projPoints, dlc_metadata[0])
 
@@ -263,17 +264,18 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_m
             rvec = np.zeros((3, 1))
             tvec = np.zeros((3, 1))
         else:
-            rvec, _ = cv2.Rodrigues(cal_data['R'].T)
-            tvec = -cal_data['T']
+            rvec, _ = cv2.Rodrigues(cal_data['R'])
+            tvec = cal_data['T']
 
         projected_pts, _ = cv2.projectPoints(worldpoints, rvec, tvec, mtx, dist)
         cam_errors = reprojection_errors(projected_pts, frame_pts[i_cam])
 
-        draw_epipolar_lines(cal_data, frame_pts, dlc_metadata, pickle_metadata, frame_num, videos_parent)
+        draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, videos_parent)
 
         overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, reprojected_pts=projected_pts,
                                   rotate_img=pickle_metadata[i_cam]['isrotated'], videos_parent=videos_parent)
 
+    plt.show()
     pass
 
 
@@ -505,6 +507,7 @@ def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_f
     # overlay points
     fig, img_ax = overlay_pts_on_image(cur_img, mtx, dist, current_coords, reprojected_pts, bodyparts, ['o', '+'], jpg_name)
 
+
     pass
 
     # new_img = cur_img
@@ -522,16 +525,28 @@ def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_f
     # cv2.imwrite(jpg_name, new_img)
 
 
-def prepare_img_axes(width, height, scale=1.0, dpi=100):
+def prepare_img_axes(width, height, scale=1.0, dpi=100, nrows=1, ncols=1):
+    fig_width = (width * scale / dpi) * ncols
+    fig_height = (width * scale / dpi) * nrows
     fig = plt.figure(
-        frameon=False, figsize=(width * scale / dpi, height * scale / dpi), dpi=dpi
+        frameon=False, figsize=(fig_width, fig_height), dpi=dpi
     )
-    ax = fig.add_subplot(111)
-    ax.axis("off")
-    ax.set_xlim(0, width)
-    ax.set_ylim(0, height)
-    ax.invert_yaxis()
-    return fig, ax
+
+    axs = []
+    for i_row in range(nrows):
+        ax_row = []
+        for i_col in range(ncols):
+            idx = (i_row * ncols) + i_col + 1
+            ax_row.append(fig.add_subplot(nrows, ncols, idx))
+            ax_row[i_col].axis("off")
+            ax_row[i_col].set_xlim(0, width)
+            ax_row[i_col].set_ylim(0, height)
+            ax_row[i_col].invert_yaxis()
+        axs.append(ax_row)
+
+    # plt.subplots_adjust(0., 0., 0., 0., 0.)
+
+    return fig, axs
 
 
 def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, markertype, jpg_name):
@@ -543,7 +558,7 @@ def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, marker
 
     img_ud = cv2.undistort(img, mtx, dist)
 
-    ax.imshow(img_ud)
+    ax[0][0].imshow(img_ud)
 
     for i_pt, pt in enumerate(pts):
 
@@ -556,10 +571,10 @@ def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, marker
             # y = int(round(y))
 
             pt_ud_norm = np.squeeze(cv2.undistortPoints(np.array([x, y]), mtx, dist))
-            pt_ud = unnormalize_points(pt_ud_norm, mtx)
+            pt_ud = cvb.unnormalize_points(pt_ud_norm, mtx)
             bp_color = color_from_bodypart(bodyparts[i_pt])
 
-            ax.plot(pt_ud[0], pt_ud[1], marker=markertype[0], ms=dotsize, color=bp_color)
+            ax[0][0].plot(pt_ud[0], pt_ud[1], marker=markertype[0], ms=dotsize, color=bp_color)
             # ax.plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
 
     for i_rpt, rpt in enumerate(reprojected_pts):
@@ -572,7 +587,7 @@ def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, marker
             # y = int(round(y))
             bp_color = color_from_bodypart(bodyparts[i_rpt])
 
-            ax.plot(x, y, marker=markertype[1], ms=dotsize, color=bp_color)
+            ax[0][0].plot(x, y, marker=markertype[1], ms=dotsize, color=bp_color)
 
     # plt.show()
     fig.savefig(jpg_name)
@@ -580,7 +595,10 @@ def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, marker
     return fig, ax
 
 
-def draw_epipolar_lines(cal_data, img_points, dlc_metadata, pickle_metadata, i_frame, videos_parent):
+def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_metadata, i_frame, videos_parent, markertype=['o', '+']):
+
+    dotsize = 4
+    reproj_pts = np.squeeze(reproj_pts)
 
     cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
     video_root_folder = os.path.join(videos_parent, 'mouse_SR_videos_tocrop')
@@ -603,25 +621,115 @@ def draw_epipolar_lines(cal_data, img_points, dlc_metadata, pickle_metadata, i_f
                               ]) for i_cam in range(2)]
     orig_vid_names = [os.path.join(orig_vid_folder, orig_vid_name_base + '.avi') for orig_vid_name_base in orig_vid_names_base]
 
-    #todo: read in images from both camera views
+    #read in images from both camera views
+    img = []
+    for i_cam, orig_vid_name in enumerate(orig_vid_names):
+        video_object = cv2.VideoCapture(orig_vid_name)
 
-    h, w, _ = np.shape(img)
-    fig, ax = prepare_img_axes(w, h)
+        video_object.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
+        ret, cur_img = video_object.read()
 
-    ax.imshow(img2)
+        if i_cam == 0:
+            cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
+        img.append(cv2.undistort(cur_img, cal_data['mtx'][i_cam], cal_data['dist'][i_cam]))
 
-    for i_pt, pt in enumerate(points_in_img):
+        video_object.release()
 
-        if len(pt) > 0:
-            try:
-                x, y = pt[0]
-            except:
-                x, y = pt
-            # x = int(round(x))
-            # y = int(round(y))
-            bp_color = color_from_bodypart(bodyparts[i_pt])
+    h, w, _ = np.shape(img[0])
+    im_size = (w, h)
+    fig, axs = prepare_img_axes(w, h, scale=1.0, dpi=100, nrows=1, ncols=2)
+    # fig, ax = prepare_img_axes(w, h)
 
-            ax.plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
+    for i_cam in range(2):
+        axs[0][i_cam].imshow(img[i_cam])
+
+    for i_cam in range(2):
+        mtx = cal_data['mtx'][i_cam]
+        dist = cal_data['dist'][i_cam]
+        points_in_img = frame_pts[i_cam]
+        # undistort points
+        pt_ud_norm = np.squeeze(cv2.undistortPoints(points_in_img, mtx, dist))
+        pt_ud = cvb.unnormalize_points(pt_ud_norm, mtx)
+        for i_pt, pt in enumerate(pt_ud):
+
+            if len(pt) > 0:
+                try:
+                    x, y = pt[0]
+                except:
+                    x, y = pt
+                # x = int(round(x))
+                # y = int(round(y))
+                bp_color = color_from_bodypart(bodyparts[i_pt])
+
+                axs[0][i_cam].plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
+                x2 = points_in_img[i_pt,0]
+                y2 = points_in_img[i_pt,1]
+                axs[0][i_cam].plot(x2, y2, marker='+', ms=dotsize, color=bp_color)
+
+                x3 = reproj_pts[i_pt, 0]
+                y3 = reproj_pts[i_pt, 1]
+                axs[0][i_cam].plot(x3, y3, marker='*', ms=dotsize, color=bp_color)
+
+        draw_epipolar_lines_on_img(pt_ud, i_cam+1, cal_data['F'].T, im_size, bodyparts, axs[0][1-i_cam])
+
+    plt.show()
+    pass
+
+
+def draw_epipolar_lines_on_img(img_pts, whichImage, F, im_size, bodyparts, ax):
+
+    epilines = cv2.computeCorrespondEpilines(img_pts, whichImage, F)
+
+    for i_line, epiline in enumerate(epilines):
+        bp_color = color_from_bodypart(bodyparts[i_line])
+        epiline = np.squeeze(epiline)
+        edge_pts = find_line_edge_coordinates(epiline, im_size)
+
+        if not np.all(edge_pts==0):
+            ax.plot(edge_pts[:, 0], edge_pts[:, 1], color=bp_color, ls='-', marker='.')
+
+
+def find_line_edge_coordinates(line, im_size):
+
+    a, b, c = line
+    edge_pts = np.zeros((2, 2))
+
+    x_edge = np.array([0, im_size[0] - 1])
+    y_edge = np.array([0, im_size[1] - 1])
+
+    i_pt = 0
+    # check the intersection with the left and right image borders unless the line is vertical
+    if abs(a) > 0:
+        test_y = (-c - a * x_edge[0]) / b
+        if y_edge[0] <= test_y <= y_edge[1]:
+            # check intersection with left image border
+            edge_pts[i_pt, :] = [x_edge[0], test_y]
+            i_pt += 1
+
+        test_y = (-c - a * x_edge[1]) / b
+        if y_edge[0] <= test_y <= y_edge[1]:
+            # check intersection with left image border
+            edge_pts[i_pt, :] = [x_edge[1], test_y]
+            i_pt += 1
+
+    # check the intersection with the left and right image borders unless the line is horizontal
+    if abs(b) > 0:
+        if i_pt < 2:
+            test_x = (-c - b * y_edge[0]) / a
+            if x_edge[0] <= test_x <= x_edge[1]:
+                # check intersection with left image border
+                edge_pts[i_pt, :] = [test_x, y_edge[0]]
+                i_pt += 1
+
+        if i_pt < 2:
+            test_x = (-c - b * y_edge[1]) / a
+            if x_edge[0] <= test_x <= x_edge[1]:
+                # check intersection with left image border
+                edge_pts[i_pt, :] = [test_x, y_edge[1]]
+                i_pt += 1
+
+    return edge_pts
+
 
 def overlay_pts(pickle_metadata, current_coords, dlc_metadata, i_frame, rotate_img=False):
 
@@ -722,27 +830,3 @@ def color_from_bodypart(bodypart):
     bp_color = [float(bpc)/255. for bpc in bp_color]
 
     return bp_color
-
-def unnormalize_points(points2d_norm, mtx):
-    '''
-
-    :param points2d: N x 2 array of normalized points
-    :param mtx:
-    :return:
-    '''
-
-    if points2d_norm.ndim == 1:
-        num_pts = 1
-        homogeneous_pts = np.append(points2d_norm, 1.)
-    else:
-        num_pts = max(np.shape(points2d_norm))
-        homogeneous_pts = np.hstack((points2d_norm, np.ones((num_pts, 1))))
-
-    unnorm_pts = np.dot(mtx, homogeneous_pts)
-
-    if num_pts == 1:
-        unnorm_pts = unnorm_pts[:2] / unnorm_pts[-1]
-    else:
-        unnorm_pts = unnorm_pts[:,:2] / unnorm_pts[:, [-1]]
-
-    return unnorm_pts

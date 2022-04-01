@@ -9,6 +9,7 @@ import csv
 import numpy as np
 import cv2
 import glob
+import computer_vision_basics as cvb
 from random import randint
 
 
@@ -815,17 +816,58 @@ def triangulate_points(cal_data, projPoints, frame_num):
     projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
 
     points4D = cv2.triangulatePoints(projMatr1, projMatr2, ud_pts[0], ud_pts[1])
+    # fig=plt.figure()
+    # ax0 = fig.add_subplot(1,2,1)
+    # ax1 = fig.add_subplot(1,2,2)
+    # ud_plot = [np.squeeze(ud_pts[i_cam]) for i_cam in range(2)]
+    # ax0.scatter(ud_plot[0][:,0], ud_plot[0][:,1])
+    # ax1.scatter(ud_plot[1][:, 0], ud_plot[1][:, 1])
+    #
+    # ax0.invert_yaxis()
+    # ax1.invert_yaxis()
+    #
+    # plt.show()
+
     worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
 
-    fig = plt.figure()
-    ax0 = fig.add_subplot(3, 1, 1)
-    ax1 = fig.add_subplot(3, 1, 2)
-    ax3d = fig.add_subplot(3, 1, 3, projection='3d')
+    #project worldpoints back to original images
+    # projected_pts = []
+    # unnorm_pts = []
+    # for i_cam in range(2):
+    #     # mtx = cal_data['mtx'][i_cam]
+    #     # dist = cal_data['dist'][i_cam]
+    #     if i_cam == 0:
+    #         rvec = np.zeros((3, 1))
+    #         tvec = np.zeros((3, 1))
+    #     else:
+    #         rvec, _ = cv2.Rodrigues(cal_data['R'])
+    #         # tvec = -np.dot(cal_data['R'].T, cal_data['T'])
+    #         tvec = cal_data['T']
+    #
+    #     proj_pts, _ = cv2.projectPoints(worldpoints, rvec, tvec, mtx[i_cam], dist[i_cam])
+    #     projected_pts.append(np.squeeze(proj_pts))
+    #
+    #     ud_pts_array = np.squeeze(ud_pts[i_cam])
+    #     unnorm_pts.append(cvb.unnormalize_points(ud_pts_array, mtx[i_cam]))
 
-    ax0.scatter(projPoints_array[0][:, 0], projPoints_array[0][:, 1])
-    ax1.scatter(projPoints_array[1][:, 0], projPoints_array[0][:, 1])
-    ax3d.scatter(worldpoints[:, 0], worldpoints[:, 1], worldpoints[:, 2])
-    plt.show()
+    # fig = plt.figure()
+    # ax0 = fig.add_subplot(1, 3, 1)
+    # ax1 = fig.add_subplot(1, 3, 2)
+    # ax3d = fig.add_subplot(1, 3, 3, projection='3d')
+
+    # ax0.scatter(projPoints_array[0][:, 0], projPoints_array[0][:, 1])
+    # ax0.scatter(projected_pts[0][:,0], projected_pts[0][:,1],color='r',marker='+')
+    # ax0.scatter(unnorm_pts[0][:,0], unnorm_pts[0][:,1],color='g',marker='*')
+    # ax0.invert_yaxis()
+    # ax1.scatter(projPoints_array[1][:, 0], projPoints_array[1][:, 1])
+    # ax1.scatter(projected_pts[1][:, 0], projected_pts[1][:, 1], color='r',marker='+')
+    # ax1.scatter(unnorm_pts[1][:, 0], unnorm_pts[1][:, 1], color='g', marker='*')
+    # ax1.invert_yaxis()
+    # ax3d.scatter(worldpoints[:, 0], worldpoints[:, 1], worldpoints[:, 2])
+    # ax3d.set_xlabel('x')
+    # ax3d.set_ylabel('y')
+    # ax3d.set_zlabel('z')
+    # plt.show()
 
     return worldpoints
 

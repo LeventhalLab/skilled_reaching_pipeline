@@ -281,7 +281,7 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_m
     #3d plot of worldpoints
     #todo: plot worldpoints in 3d. Is the problem with the triangulation or reprojection?
     plot_worldpoints(worldpoints, dlc_metadata[0], pickle_metadata[0], frame_num, videos_parent=videos_parent)
-
+    projected_pts = []
     for i_cam in range(num_cams):
         mtx = cal_data['mtx'][i_cam]
         dist = cal_data['dist'][i_cam]
@@ -292,14 +292,14 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_m
             rvec, _ = cv2.Rodrigues(cal_data['R'])
             tvec = cal_data['T']
 
-        projected_pts, _ = cv2.projectPoints(worldpoints, rvec, tvec, mtx, dist)
-        projected_pts = np.squeeze(projected_pts)
+        ppts, _ = cv2.projectPoints(worldpoints, rvec, tvec, mtx, dist)
+        ppts = np.squeeze(ppts)
+        projected_pts.append(ppts)
         cam_errors = reprojection_errors(projected_pts, frame_pts[i_cam])
-
-        draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, videos_parent)
 
         # overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, reprojected_pts=projected_pts,
         #                           rotate_img=pickle_metadata[i_cam]['isrotated'], videos_parent=videos_parent)
+    draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, videos_parent)
 
     plt.show()
     pass
@@ -691,8 +691,8 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
                 y2 = points_in_img[i_pt,1]
                 axs[0][i_cam].plot(x2, y2, marker='+', ms=dotsize, color=bp_color)   # point from DLC with original image disortion
 
-                x3 = reproj_pts[i_pt, 0]
-                y3 = reproj_pts[i_pt, 1]
+                x3 = reproj_pts[i_cam][i_pt, 0]
+                y3 = reproj_pts[i_cam][i_pt, 1]
                 axs[0][i_cam].plot(x3, y3, marker='*', ms=dotsize, color=bp_color)    # reprojected point
 
         draw_epipolar_lines_on_img(pt_ud, i_cam+1, cal_data['F'], im_size, bodyparts, axs[0][1-i_cam])

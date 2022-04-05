@@ -585,6 +585,15 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
         vo.release()
 
 
+def compare_calibration_files(calib_folder):
+
+    calib_files = glob.glob(os.path.join(calib_folder, '*.pickle'))
+    all_cal_data = []
+    for calib_file in calib_files:
+        all_cal_data.append(skilled_reaching_io.read_pickle(calib_file))
+    pass
+
+
 def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_intrinsics=50, min_frames_for_intrinsics=10, num_frames_for_stereo=20, min_frames_for_stereo=5):
     '''
 
@@ -812,6 +821,7 @@ def triangulate_points(cal_data, projPoints, frame_num):
     # nudp1, nudp2 = cv2.correctMatches(cal_data['F'], ud_pts[0], ud_pts[1])
 
     projMatr1 = np.eye(3, 4)
+    # projMatr2 = np.hstack((cal_data['R'], -np.dot(cal_data['R'].T, cal_data['T'])))
     projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
 
     points4D = cv2.triangulatePoints(projMatr1, projMatr2, ud_pts[0], ud_pts[1])
@@ -857,12 +867,19 @@ def triangulate_points(cal_data, projPoints, frame_num):
     ax0.scatter(projPoints_array[0][:, 0], projPoints_array[0][:, 1])
     ax0.scatter(projected_pts[0][:,0], projected_pts[0][:,1],color='r',marker='+')
     ax0.scatter(unnorm_pts[0][:,0], unnorm_pts[0][:,1],color='g',marker='*')
+    ax0.scatter(projPoints_array[0][:2, 0], projPoints_array[0][:2, 1],color='m')
+    ax0.set_xlim((0, 1280))
+    ax0.set_ylim((0, 1024))
     ax0.invert_yaxis()
     ax1.scatter(projPoints_array[1][:, 0], projPoints_array[1][:, 1])
     ax1.scatter(projected_pts[1][:, 0], projected_pts[1][:, 1], color='r',marker='+')
     ax1.scatter(unnorm_pts[1][:, 0], unnorm_pts[1][:, 1], color='g', marker='*')
+    ax1.scatter(projPoints_array[1][:2, 0], projPoints_array[1][:2, 1], color='m')
+    ax1.set_xlim((0, 1280))
+    ax1.set_ylim((0, 1024))
     ax1.invert_yaxis()
     ax3d.scatter(worldpoints[:, 0], worldpoints[:, 1], worldpoints[:, 2])
+    ax3d.scatter(worldpoints[:2, 0], worldpoints[:2, 1], worldpoints[:2, 2], color='m')
     ax3d.set_xlabel('x')
     ax3d.set_ylabel('y')
     ax3d.set_zlabel('z')

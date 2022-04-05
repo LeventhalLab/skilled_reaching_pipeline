@@ -142,7 +142,8 @@ if __name__ == '__main__':
 
     Burgess_DLC_config_path = '/home/levlab/Public/mouse_headfixed_skilledreaching-DanL-2021-11-05/config.yaml'
 
-    videos_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze'
+    # videos_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze'   # on lambda machine
+    videos_parent = '/Volumes/Untitled/mouse_3D_troubleshooting'
     video_root_folder = os.path.join(videos_parent, 'mouse_SR_videos_tocrop')
     cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
     marked_videos_parent = os.path.join(videos_parent, 'marked_mouse_SR_videos')
@@ -156,11 +157,14 @@ if __name__ == '__main__':
 
     # step 1 - run all the calibrations
     # UNCOMMENT BELOW
-    skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=cb_size)
+    calib_folder = os.path.join(cal_data_parent, 'calibration_data_2022', 'calibration_data_202202')
+    skilled_reaching_calibration.compare_calibration_files(calib_folder)
+
+    # skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=cb_size)
 
     # step 2 - crop all videos of mice reaching
-    vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
-    crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
+    # vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
+    # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
     # UNCOMMENT BELOW
     # cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, cropped_videos_parent, crop_params_df, cam_list, vidtype='avi')
 

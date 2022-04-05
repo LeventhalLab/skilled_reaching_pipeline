@@ -141,6 +141,7 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, pickle_files, i_frame
     dist = cal_data['dist']
 
     projPoints = [cv2.undistortPoints(frame_pts[i_cam], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
+    # projPoints = [np.squeeze(ppts) for ppts in projPoints]
     projMatr1 = np.eye(3, 4)
     projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
     # projMatr2 = np.hstack((cal_data['R'].T, -cal_data['R'].T.dot(cal_data['T'])))
@@ -151,13 +152,37 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, pickle_files, i_frame
     # projMatr2 = np.matmul(mtx[1], projMatr2)
 
     points4D = cv2.triangulatePoints(projMatr1, projMatr2, projPoints[0], projPoints[1])
+    # points4D_new, _ = cvb.linear_LS_triangulation(projPoints[0], projMatr1, projPoints[1], projMatr2)
     # points4D = cv2.triangulatePoints(projMatr1, projMatr2, frame_pts[0], frame_pts[1])
+    # worldpoints = points4D_new
     worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
 
     #todo: check that there was good reconstruction of individual points (i.e., the matched points were truly well-matched?
     check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_metadata, dlc_metadata, i_frame, videos_parent)
 
     return worldpoints
+
+
+def triangulate_DL(identified_pts, R, T, mtx, dist):
+    '''
+
+    :param identified_pts: list with num_cams elements; each element is an n x 2 array of points identified by deeplabcut
+    :param R: rotation matrix for camera 2 with respect to camera 1 (from stereocalibrate, usually). R assumed to be identity for camera 1
+    :param T: translation matrix for camera 2 with respect to camera 1 (from stereocalibrate, usually). T assumed to be identity for camera 1
+    :param mtx: list with num_cams elements; each element is a 3 x 3 intrinsic camera parameters matrix K such that K * [r|t] = P (projection matrix)
+    :param dist: list with num_cams elements; each element is a 1 x 5 distortion coefficients array
+    :return:
+    '''
+
+    # undistort points in each camera view
+    pts_ud = []
+    for i_cam, pt_array in enumerate(identified_pts):
+        pts_ud.append(cv2.undistortPoints(pt_array, mtx[i_cam], dist[i_cam]))
+
+    num_cams = len(identified_pts)
+    A = np.zeros()
+
+
 
 
 def plot_projpoints(projPoints, dlc_metadata):
@@ -268,12 +293,13 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_m
             tvec = cal_data['T']
 
         projected_pts, _ = cv2.projectPoints(worldpoints, rvec, tvec, mtx, dist)
+        projected_pts = np.squeeze(projected_pts)
         cam_errors = reprojection_errors(projected_pts, frame_pts[i_cam])
 
         draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, videos_parent)
 
-        overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, reprojected_pts=projected_pts,
-                                  rotate_img=pickle_metadata[i_cam]['isrotated'], videos_parent=videos_parent)
+        # overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, reprojected_pts=projected_pts,
+        #                           rotate_img=pickle_metadata[i_cam]['isrotated'], videos_parent=videos_parent)
 
     plt.show()
     pass
@@ -651,7 +677,6 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
         pt_ud_norm = np.squeeze(cv2.undistortPoints(points_in_img, mtx, dist))
         pt_ud = cvb.unnormalize_points(pt_ud_norm, mtx)
         for i_pt, pt in enumerate(pt_ud):
-
             if len(pt) > 0:
                 try:
                     x, y = pt[0]
@@ -659,18 +684,18 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
                     x, y = pt
                 # x = int(round(x))
                 # y = int(round(y))
-                bp_color = color_from_bodypart(bodyparts[i_pt])
+                bp_color = color_from_bodypart(bodyparts[i_pt])   # undistorted point identified by DLC
 
                 axs[0][i_cam].plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
                 x2 = points_in_img[i_pt,0]
                 y2 = points_in_img[i_pt,1]
-                axs[0][i_cam].plot(x2, y2, marker='+', ms=dotsize, color=bp_color)
+                axs[0][i_cam].plot(x2, y2, marker='+', ms=dotsize, color=bp_color)   # point from DLC with original image disortion
 
                 x3 = reproj_pts[i_pt, 0]
                 y3 = reproj_pts[i_pt, 1]
-                axs[0][i_cam].plot(x3, y3, marker='*', ms=dotsize, color=bp_color)
+                axs[0][i_cam].plot(x3, y3, marker='*', ms=dotsize, color=bp_color)    # reprojected point
 
-        draw_epipolar_lines_on_img(pt_ud, i_cam+1, cal_data['F'].T, im_size, bodyparts, axs[0][1-i_cam])
+        draw_epipolar_lines_on_img(pt_ud, i_cam+1, cal_data['F'], im_size, bodyparts, axs[0][1-i_cam])
 
     plt.show()
     pass
@@ -681,6 +706,7 @@ def draw_epipolar_lines_on_img(img_pts, whichImage, F, im_size, bodyparts, ax):
     epilines = cv2.computeCorrespondEpilines(img_pts, whichImage, F)
 
     for i_line, epiline in enumerate(epilines):
+
         bp_color = color_from_bodypart(bodyparts[i_line])
         epiline = np.squeeze(epiline)
         edge_pts = find_line_edge_coordinates(epiline, im_size)

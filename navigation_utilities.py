@@ -1031,15 +1031,47 @@ def create_calibration_data_name(cal_data_parent, session_datetime):
     return cal_data_name
 
 
-def create_multiview_calibration_data_name(cal_data_parent, session_datetime):
+def create_multiview_calibration_data_name(cal_data_parent, session_datetime, basename='calibrationdata'):
+    '''
 
-    basename = 'calibrationdata'
+    :param cal_data_parent: parent directory for folders containing pickle files with calibration results. Has structure:
+        cal_data_parent-->calibration_data_YYYY-->calibration_data_YYYYmm
+    :param session_datetime:
+    :return:
+    '''
+
     cal_data_name = basename + '_' + datetime_to_string_for_fname(session_datetime) + '.pickle'
 
     cal_data_folder = create_calibration_data_folder(cal_data_parent, session_datetime)
     cal_data_name = os.path.join(cal_data_folder, cal_data_name)
 
     return cal_data_name
+
+
+def find_multiview_calibration_data_name(cal_data_parent, session_datetime, basename='calibrationdata'):
+
+
+    cal_data_folder = create_calibration_data_folder(cal_data_parent, session_datetime)
+
+    # search in cal_data_folder for calibration files from this date
+    test_name = basename + '_' + date_to_string_for_fname(session_datetime) + '_*.pickle'
+
+    cal_data_files = glob.glob(os.path.join(cal_data_folder, test_name))
+    cal_data_datetimes = []
+    for cal_data_file in cal_data_files:
+        _, cal_data_root = os.path.split(cal_data_file)
+        cal_data_root, _ = os.path.splitext(cal_data_root)
+        fparts = cal_data_root.split('_')
+        cal_data_datestring = '_'.join(fparts[1:3])
+
+        cal_data_datetimes.append(fname_string_to_datetime(cal_data_datestring))
+
+    # find datetime of calibration data file closest to session_datetime
+    nearest_datetime = min(cal_data_datetimes, key=lambda x: abs(x - session_datetime))
+
+    closest_calibration_file = create_multiview_calibration_data_name(cal_data_parent, nearest_datetime, basename=basename)
+
+    return closest_calibration_file
 
 
 def get_Burgess_video_folders_to_crop(video_root_folder):
@@ -1136,11 +1168,20 @@ def create_calibration_data_folder(cal_data_parent, session_datetime):
     return cal_data_folder
 
 
-def datetime_to_string_for_fname(date_to_convert):
+def date_to_string_for_fname(date_to_covert):
+
+    format_string = '%Y%m%d'
+
+    date_string = date_to_covert.strftime(format_string)
+
+    return date_string
+
+
+def datetime_to_string_for_fname(datetime_to_convert):
 
     format_string = '%Y%m%d_%H-%M-%S'
 
-    datetime_string = date_to_convert.strftime('%Y%m%d_%H-%M-%S')
+    datetime_string = datetime_to_convert.strftime(format_string)
 
     return datetime_string
 

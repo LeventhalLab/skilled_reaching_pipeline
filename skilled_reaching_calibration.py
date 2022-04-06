@@ -468,7 +468,8 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
     '''
 
     :param vid_pair:
-    :param cal_data_parent:
+    :param cal_data_parent: parent directory for folders containing pickle files with calibration results. Has structure:
+        cal_data_parent-->calibration_data_YYYY-->calibration_data_YYYYmm
     :param cb_size:
     :return:
     '''

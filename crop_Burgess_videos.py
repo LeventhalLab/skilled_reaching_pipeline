@@ -65,18 +65,25 @@ def crop_optitrack_video(vid_path_in, vid_path_out, crop_params, filtertype='mjp
         subprocess.call(command, shell=True)
 
 
-def crop_Burgess_folders(video_folder_list, cropped_vids_parent, crop_params, cam_list, vidtype='avi', filtertype='mjpeg2jpeg'):
+def crop_Burgess_folders(video_folder_list, cropped_vid_parent, crop_params, cam_list, vidtype='avi', filtertype='mjpeg2jpeg'):
     """
-    :param video_folder_list:
-    :param cropped_vids_parent:
+    given the list of folders containing raw videos, loop through each of them, and crop all videos based on crop_params
+    store the cropped videos in the cropped_vid_parent directory with appropriate file directory structure. Currently,
+    assumes camera 1 is rotated 180 degrees. It performs cropping, then rotates 180 degrees
+
+    :param video_folder_list: list of folders in which uncropped (raw) videos can be found
+    :param cropped_vid_parent: parent directory for cropped videos. Has structure:
+        cropped_vids_parent-->mouseID-->mouseID_YYYYmm-->mouseID_YYYYmmdd-->mouseID_YYYYmmdd_camXX (XX = 01 or 02)
     :param crop_params: either a dictionary with keys 'direct', 'leftmirror', 'rightmirror', each with a 4-element list [left, right, top, bottom]
             OR a pandas dataframe with columns 'date', 'box_num', 'direct_left', 'direct_right',...
-    :param vidtype:
+    :param cam_list: tuple/list of integers containing camera numbers
+    :param vidtype: string containing video name extension - 'avi', 'mpg', 'mp4', etc
+    :param filtertype:
     :return:
     """
 
     box_num = 1    # for now, only one mouse skilled reaching box
-    cropped_video_directories = navigation_utilities.create_Burgess_cropped_video_destination_list(cropped_vids_parent, video_folder_list, cam_list)
+    cropped_video_directories = navigation_utilities.create_Burgess_cropped_video_destination_list(cropped_vid_parent, video_folder_list, cam_list)
     # create_Burgess_cropped_video_destination_list returns a list of num_cam-element lists, where each list contains
     # folders in which to store cropped videos
     # make sure vidtype starts with a '.'
@@ -275,7 +282,7 @@ def preprocess_Burgess_videos(vid_folder_list, cropped_vids_parent, crop_params,
     :param vid_folder_list:
     :param cropped_vids_parent:
     :param crop_params:
-    :param cam_list:
+    :param cam_list: tuple/list of integers containing camera numbers
     :param vidtype:
     :return: cropped_video_directories:
     '''

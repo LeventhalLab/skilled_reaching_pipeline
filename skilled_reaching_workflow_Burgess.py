@@ -109,9 +109,12 @@ def create_labeled_optitrack_videos(folders_to_analyze, marked_vids_parent, conf
 
 def reconstruct_optitrack_3d(cropped_vid_parent, cal_data_parent, videos_parent):
     '''
-
-    :param cropped_vid_parent:
-    :param cal_data_parent:
+    perform 3d reconstruction of all videos for which at least two cropped video views are present and those views have
+    been calibrated
+    :param cropped_vid_parent: parent directory for cropped videos. Has structure:
+        cropped_vids_parent-->mouseID-->mouseID_YYYYmm-->mouseID_YYYYmmdd-->mouseID_YYYYmmdd_camXX (XX = 01 or 02)
+    :param cal_data_parent: parent directory for folders containing pickle files with calibration results. Has structure:
+        cal_data_parent-->calibration_data_YYYY-->calibration_data_YYYYmm
     :return:
     '''
 
@@ -123,7 +126,7 @@ def reconstruct_optitrack_3d(cropped_vid_parent, cal_data_parent, videos_parent)
     cam02_folders = folders_to_reconstruct['cam02']
 
     for cam01_dir in cam01_folders:
-        #todo: check to see if calibration has been performed for this date,then find matching cam02_dir
+        # check to see if calibration has been performed for this date,then find matching cam02_dir
         cam02_dir = cam01_dir.replace('cam01', 'cam02')
         if cam02_dir not in cam02_folders:
             print('no matching cam02 directory for {}'.format(cam01_dir))
@@ -142,8 +145,8 @@ if __name__ == '__main__':
 
     Burgess_DLC_config_path = '/home/levlab/Public/mouse_headfixed_skilledreaching-DanL-2021-11-05/config.yaml'
 
-    videos_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze'   # on lambda machine
-    # videos_parent = '/Volumes/Untitled/mouse_3D_troubleshooting'
+    # videos_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze'   # on lambda machine
+    videos_parent = '/Volumes/Untitled/mouse_3D_troubleshooting'
     video_root_folder = os.path.join(videos_parent, 'mouse_SR_videos_tocrop')
     cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
     marked_videos_parent = os.path.join(videos_parent, 'marked_mouse_SR_videos')
@@ -160,13 +163,13 @@ if __name__ == '__main__':
     calib_folder = os.path.join(cal_data_parent, 'calibration_data_2022', 'calibration_data_202202')
     skilled_reaching_calibration.compare_calibration_files(calib_folder)
 
-    skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=cb_size)
+    # skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=cb_size)
 
     # step 2 - crop all videos of mice reaching
     # vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
     # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
     # UNCOMMENT BELOW
-    cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, cropped_videos_parent, crop_params_df, cam_list, vidtype='avi')
+    # cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, cropped_videos_parent, crop_params_df, cam_list, vidtype='avi')
 
     # step 3 - run DLC on each cropped video
     # folders_to_analyze = navigation_utilities.find_optitrack_folders_to_analyze(cropped_videos_parent, cam_list=cam_list)

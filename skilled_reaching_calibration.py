@@ -310,16 +310,16 @@ def collect_cb_corners(calibration_vids, cb_size):
                         cam_objpoints[i_vid].append(objp)
                         cam_imgpoints[i_vid].append(corners2[i_vid])
 
-                    corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners,
-                                                            found_valid_chessboard)
-                    vid_path, vid_name = os.path.split(calibration_vids[i_vid])
-                    vid_name, _ = os.path.splitext(vid_name)
-                    frame_path = os.path.join(vid_path, vid_name)
-                    if not os.path.isdir(frame_path):
-                        os.makedirs(frame_path)
-                    frame_name = vid_name + '_frame{:03d}'.format(i_frame) + '.png'
-                    full_frame_name = os.path.join(frame_path, frame_name)
-                    cv2.imwrite(full_frame_name, corners_img)
+                    # corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners,
+                    #                                         found_valid_chessboard)
+                    # vid_path, vid_name = os.path.split(calibration_vids[i_vid])
+                    # vid_name, _ = os.path.splitext(vid_name)
+                    # frame_path = os.path.join(vid_path, vid_name)
+                    # if not os.path.isdir(frame_path):
+                    #     os.makedirs(frame_path)
+                    # frame_name = vid_name + '_frame{:03d}'.format(i_frame) + '.png'
+                    # full_frame_name = os.path.join(frame_path, frame_name)
+                    # cv2.imwrite(full_frame_name, corners_img)
 
             # collect all checkerboard points visible in pairs of images
             if valid_frames[0][i_frame] and valid_frames[1][i_frame]:

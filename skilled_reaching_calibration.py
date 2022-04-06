@@ -519,7 +519,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
     valid_frames = [[False for frame_num in range(num_frames[0])] for ii in vid_pair]
     stereo_frames = []
     for i_frame in range(num_frames[0]):
-        print('frame number: {:04d} for {} and {}'.format(i_frame), vid_root_names[0], vid_root_names[1])
+        print('frame number: {:04d} for {} and {}'.format(i_frame, vid_root_names[0], vid_root_names[1]))
 
         corners2 = [[] for ii in vid_pair]
         cur_img = [[] for ii in vid_pair]

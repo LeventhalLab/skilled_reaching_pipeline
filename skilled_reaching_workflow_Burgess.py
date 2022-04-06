@@ -160,7 +160,7 @@ if __name__ == '__main__':
     calib_folder = os.path.join(cal_data_parent, 'calibration_data_2022', 'calibration_data_202202')
     skilled_reaching_calibration.compare_calibration_files(calib_folder)
 
-    # skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=cb_size)
+    skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=cb_size)
 
     # step 2 - crop all videos of mice reaching
     # vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)

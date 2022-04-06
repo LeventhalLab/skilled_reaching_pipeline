@@ -524,6 +524,28 @@ def create_optitrack_marked_vids_folder(cropped_vid_folder, cropped_videos_paren
     return marked_vids_folder
 
 
+def sort_optitrack_calibration_vid_names_by_camera_number(calibration_vid_list):
+    '''
+    calibration videos should be collected for each camera. Make sure that corresponding videos collected by multiple
+    cameras are sorted by camera number. This way, rotation and translation matrices are consistently calculated for
+    camera 2 with respect to camera 1 (not the other way around)
+    :param calibration_vid_list: list of videos containing calibration checkerboard images. Should be of the form:
+        mouseID_YYmmdd-HH-MM-SS_sessionnum_vidnum_camXX.avi
+        sessionnum is the number of the session recorded on that day for that mouse, vidnum is a 3-digit zero-padded number
+            with the video number for that session, and XX is the zero-padded camera number (01 or 02)
+    :return: sorted_calibration_vid_list - calibration_vid_list sorted by camera number
+    '''
+    cam_nums = []
+    for cal_name in calibration_vid_list:
+        cal_metadata = parse_Burgess_calibration_vid_name(cal_name)
+        cam_nums.append(cal_metadata['cam_num'])
+
+    # zip calibration_vid_list with camera numbers for each video, sort by camera number, and extract the sorted calibration video name list
+    sorted_calibration_vid_list = [cal_vid_name for cal_vid_name, _ in sorted(zip(calibration_vid_list, cam_nums), key=lambda pair: pair[1])]
+
+    return sorted_calibration_vid_list
+
+
 def create_calibration_file_tree(calibration_parent, vid_metadata):
     """
 

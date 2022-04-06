@@ -429,30 +429,45 @@ def multi_mirror_calibration(calibration_data, calibration_summary_name):
 
 def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(7, 10)):
     '''
-
-    :param cal_vid_parent:
-    :param cal_data_parent:
+    perform calibration for all checkerboard videos stored in appropriate directory structure under cal_vid_parent.
+    Write results into directory structure under cal_vid_data
+    :param cal_vid_parent: parent directory for calibration videos. Directory structure should be:
+        cal_vid_parent-->
+    :param cal_data_parent: parent directory for calibration data extracted from calibration videos. Directory structure should be:
+        cal_data_parent
     :param cb_size:
     :return:
     '''
 
     paired_cal_vids = navigation_utilities.find_Burgess_calibration_vids(cal_vid_parent)
+    '''
+    note that find_Burgess_calibration_vids relies on glob, which may not return file names in alphabetical order. This 
+    is important because the calibration videos for different cameras may show up in different orders (i.e., calibration
+    video for camera 2 may appear in the list before camera 1. This needs to be fixed so that the camera matrices,
+    including extrinsics for multi-views are in the right order. That is, R and T should always be rotation and
+    translation of camera 2 with respect to camera 1, not the other way around in some instances
+    '''
+
 
     for vid_pair in paired_cal_vids:
-        calvid_metadata = [navigation_utilities.parse_Burgess_calibration_vid_name(vid) for vid in vid_pair]
+
+        sorted_vid_pair = navigation_utilities.sort_optitrack_calibration_vid_names_by_camera_number(vid_pair)
+        calvid_metadata = [navigation_utilities.parse_Burgess_calibration_vid_name(vid) for vid in sorted_vid_pair]
+        # sort vid_pair so that file names are in order of camera number
+
         cal_data_name = navigation_utilities.create_multiview_calibration_data_name(cal_data_parent,
                                                                                     calvid_metadata[0]['session_datetime'])
         if not os.path.isfile(cal_data_name):
             # collect the checkerboard points, write to file
-            collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=cb_size)
+            collect_cbpoints_Burgess(sorted_vid_pair, cal_data_parent, cb_size=cb_size)
 
-        calibrate_Burgess_session(cal_data_name, vid_pair)
+        calibrate_Burgess_session(cal_data_name, sorted_vid_pair)
 
 
 def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
     '''
 
-    :param cal_vids:
+    :param vid_pair:
     :param cal_data_parent:
     :param cb_size:
     :return:

@@ -40,8 +40,8 @@ def crop_optitrack_video(vid_path_in, vid_path_out, crop_params, filtertype='mjp
             img = cv2.imread(jpg_name)
             cropped_img = img[y1-1:y2-1, x1-1:x2-1, :]
             if cam_num == 1:
-                # flip the image left to right so it can be run through a single "side mirror" DLC network
-                cropped_img = cv2.rotate(cropped_img, cv2.ROTATE_180)   # 2nd argument flipCode > 0 indicates flip horizontally
+                # rotate the image 180 degrees because camera is rotated in real life
+                cropped_img = cv2.rotate(cropped_img, cv2.ROTATE_180)
             cv2.imwrite(jpg_name, cropped_img)
 
         # turn the cropped jpegs into a new movie

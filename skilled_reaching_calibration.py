@@ -491,6 +491,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
     vid_obj = []
     num_frames = []
     im_size = []
+    vn = []
     for i_vid, vid_name in enumerate(vid_pair):
         vid_obj.append(cv2.VideoCapture(vid_name))
         num_frames.append(int(vid_obj[i_vid].get(cv2.CAP_PROP_FRAME_COUNT)))
@@ -516,7 +517,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
     valid_frames = [[False for frame_num in range(num_frames[0])] for ii in vid_pair]
     stereo_frames = []
     for i_frame in range(num_frames[0]):
-        print(i_frame)
+        print('frame number: {:04d}'.format(i_frame))
 
         corners2 = [[] for ii in vid_pair]
         cur_img = [[] for ii in vid_pair]
@@ -682,11 +683,11 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
                     # rotate the image 180 degrees
                     cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
 
-                corners_img = cv2.drawChessboardCorners(cur_img, cal_data['cb_size'], imgpoints_for_intrinsics[i_frame], True)
-                reproj_img = cv2.drawChessboardCorners(corners_img, cal_data['cb_size'], pp, False)
-
-                img_name = '/home/levlab/Public/mouse_SR_videos_to_analyze/mouse_SR_calibration_data/test_frame_{}_cam{:02d}_frame{:03d}.jpg'.format(session_date_string, current_cam, cur_frame)
-                cv2.imwrite(img_name, reproj_img)
+                # corners_img = cv2.drawChessboardCorners(cur_img, cal_data['cb_size'], imgpoints_for_intrinsics[i_frame], True)
+                # reproj_img = cv2.drawChessboardCorners(corners_img, cal_data['cb_size'], pp, False)
+                #
+                # img_name = '/home/levlab/Public/mouse_SR_videos_to_analyze/mouse_SR_calibration_data/test_frame_{}_cam{:02d}_frame{:03d}.jpg'.format(session_date_string, current_cam, cur_frame)
+                # cv2.imwrite(img_name, reproj_img)
 
         cal_data['mtx'].append(np.copy(mtx))
         cal_data['dist'].append(np.copy(dist))
@@ -874,31 +875,31 @@ def triangulate_points(cal_data, projPoints, frame_num):
         ud_pts_array = np.squeeze(ud_pts[i_cam])
         unnorm_pts.append(cvb.unnormalize_points(ud_pts_array, mtx[i_cam]))
 
-    fig = plt.figure()
-    ax0 = fig.add_subplot(1, 3, 1)
-    ax1 = fig.add_subplot(1, 3, 2)
-    ax3d = fig.add_subplot(1, 3, 3, projection='3d')
-
-    ax0.scatter(projPoints_array[0][:, 0], projPoints_array[0][:, 1])
-    ax0.scatter(projected_pts[0][:,0], projected_pts[0][:,1],color='r',marker='+')
-    ax0.scatter(unnorm_pts[0][:,0], unnorm_pts[0][:,1],color='g',marker='*')
-    ax0.scatter(projPoints_array[0][:2, 0], projPoints_array[0][:2, 1],color='m')
-    ax0.set_xlim((0, 1280))
-    ax0.set_ylim((0, 1024))
-    ax0.invert_yaxis()
-    ax1.scatter(projPoints_array[1][:, 0], projPoints_array[1][:, 1])
-    ax1.scatter(projected_pts[1][:, 0], projected_pts[1][:, 1], color='r',marker='+')
-    ax1.scatter(unnorm_pts[1][:, 0], unnorm_pts[1][:, 1], color='g', marker='*')
-    ax1.scatter(projPoints_array[1][:2, 0], projPoints_array[1][:2, 1], color='m')
-    ax1.set_xlim((0, 1280))
-    ax1.set_ylim((0, 1024))
-    ax1.invert_yaxis()
-    ax3d.scatter(worldpoints[:, 0], worldpoints[:, 1], worldpoints[:, 2])
-    ax3d.scatter(worldpoints[:2, 0], worldpoints[:2, 1], worldpoints[:2, 2], color='m')
-    ax3d.set_xlabel('x')
-    ax3d.set_ylabel('y')
-    ax3d.set_zlabel('z')
-    plt.show()
+    # fig = plt.figure()
+    # ax0 = fig.add_subplot(1, 3, 1)
+    # ax1 = fig.add_subplot(1, 3, 2)
+    # ax3d = fig.add_subplot(1, 3, 3, projection='3d')
+    #
+    # ax0.scatter(projPoints_array[0][:, 0], projPoints_array[0][:, 1])
+    # ax0.scatter(projected_pts[0][:,0], projected_pts[0][:,1],color='r',marker='+')
+    # ax0.scatter(unnorm_pts[0][:,0], unnorm_pts[0][:,1],color='g',marker='*')
+    # ax0.scatter(projPoints_array[0][:2, 0], projPoints_array[0][:2, 1],color='m')
+    # ax0.set_xlim((0, 1280))
+    # ax0.set_ylim((0, 1024))
+    # ax0.invert_yaxis()
+    # ax1.scatter(projPoints_array[1][:, 0], projPoints_array[1][:, 1])
+    # ax1.scatter(projected_pts[1][:, 0], projected_pts[1][:, 1], color='r',marker='+')
+    # ax1.scatter(unnorm_pts[1][:, 0], unnorm_pts[1][:, 1], color='g', marker='*')
+    # ax1.scatter(projPoints_array[1][:2, 0], projPoints_array[1][:2, 1], color='m')
+    # ax1.set_xlim((0, 1280))
+    # ax1.set_ylim((0, 1024))
+    # ax1.invert_yaxis()
+    # ax3d.scatter(worldpoints[:, 0], worldpoints[:, 1], worldpoints[:, 2])
+    # ax3d.scatter(worldpoints[:2, 0], worldpoints[:2, 1], worldpoints[:2, 2], color='m')
+    # ax3d.set_xlabel('x')
+    # ax3d.set_ylabel('y')
+    # ax3d.set_zlabel('z')
+    # plt.show()
 
     return worldpoints
 

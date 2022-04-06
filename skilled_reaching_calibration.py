@@ -491,8 +491,10 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
     vid_obj = []
     num_frames = []
     im_size = []
-    vn = []
+    vid_root_names = []
     for i_vid, vid_name in enumerate(vid_pair):
+        _, cur_root_name = os.path.split(vid_name)
+        vid_root_names.append(cur_root_name)
         vid_obj.append(cv2.VideoCapture(vid_name))
         num_frames.append(int(vid_obj[i_vid].get(cv2.CAP_PROP_FRAME_COUNT)))
         im_size.append((int(vid_obj[i_vid].get(cv2.CAP_PROP_FRAME_WIDTH)), int(vid_obj[i_vid].get(cv2.CAP_PROP_FRAME_HEIGHT))))
@@ -517,7 +519,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
     valid_frames = [[False for frame_num in range(num_frames[0])] for ii in vid_pair]
     stereo_frames = []
     for i_frame in range(num_frames[0]):
-        print('frame number: {:04d}'.format(i_frame))
+        print('frame number: {:04d} for {} and {}'.format(i_frame), vid_root_names[0], vid_root_names[1])
 
         corners2 = [[] for ii in vid_pair]
         cur_img = [[] for ii in vid_pair]

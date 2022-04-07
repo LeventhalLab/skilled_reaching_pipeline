@@ -158,12 +158,34 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, pickle_files, i_frame
     worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
 
     #check that there was good reconstruction of individual points (i.e., the matched points were truly well-matched?)
-    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_metadata, dlc_metadata, i_frame, videos_parent)
+    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts, cal_data)
 
     #todo: check reprojected points and reproj_errors, look for mislabeled points
     #also, consider looking across frames for jumps, and checking the dlc confidence values. Finally, need to check if
     #pellet labels swapped between frames
     return worldpoints
+
+
+def validate_frame_points(reproj_errors, dlc_conf, max_reproj_error=20, min_conf=0.9):
+    '''
+    function to check for valid points in a frame. Valid points are points that:
+        1) reproject close to the original points found in each camera view
+        2) have high confidence in DLC
+    :param reproj_errors: 2-element list of num_point element numpy vectors containing the reprojection error in pixels
+        of each triangulated world point back to the original video frames
+    :param dlc_conf: 2-element list of num_point element numpy vectors containing the deeplabcut confidence in point
+        identification
+    :return:
+    '''
+    # consider changing max reproj error and minimum dlc confidence to be specific for each body part
+
+    num_pts = len(reproj_errors[0])
+    num_cams = len(reproj_errors)
+    valid_frame_points = np.ones((num_pts, num_cams), dtype=bool)
+
+    for i_pt in range(num_pts):
+
+        pass
 
 
 def plot_projpoints(projPoints, dlc_metadata):
@@ -250,20 +272,28 @@ def plot_worldpoints(worldpoints, dlc_metadata, pickle_metadata, i_frame, videos
     pass
 
 
-def triangulate_points(img_points, cal_data):
+def check_3d_reprojection(worldpoints, frame_pts, cal_data):
+    '''
+    calculate reprojection of worldpoints back into original images, and return the location of those projected points
+    (projected onto the distorted image), as well as the euclidean distance in pixels from the originally identified
+    points in DLC to the reprojected points (in the distorted image)
+    :param worldpoints: num_points x 3 array containing (x,y,z) triangulated points in world coordinates with the
+        origin at the camera 1 lens. ADD X,Y,Z POSITIVE DIRECTIONS HERE
+    :param frame_pts: list with num_cams elements. Each element is a num_points x 2 array containing (x,y) pairs of
+        deeplabcut output rotated/translated into the original video frame so that the images are upright (i.e., if
+        camera 1 is rotated 180 degrees, the image/coordinates for camera 1 are rotated)
+    :param cal_data:
 
-    pass
-
-
-def check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_metadata, dlc_metadata, frame_num, videos_parent):
-
+    :return projected_pts:
+    :return reproj_errors:
+    '''
     num_cams = len(frame_pts)
 
-    #3d plot of worldpoints
-    #todo: plot worldpoints in 3d. Is the problem with the triangulation or reprojection?
-    plot_worldpoints(worldpoints, dlc_metadata[0], pickle_metadata[0], frame_num, videos_parent=videos_parent)
+    #3d plot of worldpoints if needed to check triangulation
+    # plot_worldpoints(worldpoints, dlc_metadata[0], pickle_metadata[0], frame_num, videos_parent=videos_parent)
     projected_pts = []
-    reproj_errors = []
+    num_pts = np.shape(frame_pts[0])[0]
+    reproj_errors = np.zeros((num_pts, num_cams))
     for i_cam in range(num_cams):
         mtx = cal_data['mtx'][i_cam]
         dist = cal_data['dist'][i_cam]
@@ -277,7 +307,7 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, frame_conf, pickle_m
         ppts, _ = cv2.projectPoints(worldpoints, rvec, tvec, mtx, dist)
         ppts = np.squeeze(ppts)
         projected_pts.append(ppts)
-        reproj_errors.append(calculate_reprojection_errors(ppts, frame_pts[i_cam]))
+        reproj_errors[:, i_cam] = calculate_reprojection_errors(ppts, frame_pts[i_cam])
 
         # overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, reprojected_pts=projected_pts,
         #                           rotate_img=pickle_metadata[i_cam]['isrotated'], videos_parent=videos_parent)
@@ -297,10 +327,6 @@ def calculate_reprojection_errors(reprojected_pts, measured_pts):
 
     return euclidean_error
 
-
-def overlay_measured_reproj_pts(reprojected_pts, measured_pts, vid_filename, frame_num):
-
-    pass
 
 def triangulate_single_point(cal_data, matched_pts):
 

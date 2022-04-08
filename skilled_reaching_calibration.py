@@ -427,7 +427,7 @@ def multi_mirror_calibration(calibration_data, calibration_summary_name):
     pass
 
 
-def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(7, 10)):
+def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(7, 10), checkerboard_square_size=7):
     '''
     perform calibration for all checkerboard videos stored in appropriate directory structure under cal_vid_parent.
     Write results into directory structure under cal_vid_data
@@ -436,6 +436,7 @@ def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(7, 10))
     :param cal_data_parent: parent directory for calibration data extracted from calibration videos. Directory structure should be:
         cal_data_parent
     :param cb_size:
+    :param checkerboard_square_size:
     :return:
     '''
 
@@ -459,18 +460,19 @@ def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(7, 10))
                                                                                     calvid_metadata[0]['session_datetime'])
         if not os.path.isfile(cal_data_name):
             # collect the checkerboard points, write to file
-            collect_cbpoints_Burgess(sorted_vid_pair, cal_data_parent, cb_size=cb_size)
+            collect_cbpoints_Burgess(sorted_vid_pair, cal_data_parent, cb_size=cb_size, checkerboard_square_size=checkerboard_square_size)
 
         calibrate_Burgess_session(cal_data_name, sorted_vid_pair)
 
 
-def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
+def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10), checkerboard_square_size=7):
     '''
 
     :param vid_pair:
     :param cal_data_parent: parent directory for folders containing pickle files with calibration results. Has structure:
         cal_data_parent-->calibration_data_YYYY-->calibration_data_YYYYmm
     :param cb_size:
+    :param checkerboard_square_size:
     :return:
     '''
 
@@ -595,6 +597,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10)):
         'valid_frames': valid_frames,
         'im_size': im_size,
         'cb_size': cb_size,
+        'checkerboard_square_size': checkerboard_square_size,
         'calvid_metadata': calvid_metadata
     }
 

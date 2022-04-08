@@ -42,7 +42,7 @@ def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, marked_vid
             # deeplabcut.convert_detections2tracklets(config_path, cropped_video_list, videotype='mp4', shuffle=1, trainingsetindex=0)
             # deeplabcut.stitch_tracklets(config_path, cropped_video_list, videotype='mp4', shuffle=1, trainingsetindex=0)
 
-            new_dir = navigation_utilities.create_optitrack_marked_vids_folder(current_folder, cropped_videos_parent,
+            new_dir = navigation_utilities.create_optitrack_marked_vids_folder(current_folder, cropped_vids_parent,
                                                                                marked_vids_parent)
             pickle_list = glob.glob(os.path.join(current_folder, '*.pickle'))
             for pickle_file in pickle_list:
@@ -87,7 +87,7 @@ def create_labeled_optitrack_videos(folders_to_analyze, marked_vids_parent, conf
                 pass
 
             # current_basename = os.path.basename(current_folder)
-            new_dir = navigation_utilities.create_marked_vids_folder(current_folder, cropped_videos_parent,
+            new_dir = navigation_utilities.create_marked_vids_folder(current_folder, cropped_vids_parent,
                                                                      marked_vids_parent)
             #    os.path.join(marked_vids_parent, current_basename + '_marked')
 
@@ -107,7 +107,7 @@ def create_labeled_optitrack_videos(folders_to_analyze, marked_vids_parent, conf
                         shutil.move(pickle_file, new_dir)
 
 
-def reconstruct_optitrack_3d(cropped_vid_parent, cal_data_parent, videos_parent):
+def reconstruct_optitrack_3d(parent_directories):
     '''
     perform 3d reconstruction of all videos for which at least two cropped video views are present and those views have
     been calibrated
@@ -118,7 +118,10 @@ def reconstruct_optitrack_3d(cropped_vid_parent, cal_data_parent, videos_parent)
     :return:
     '''
 
-    folders_to_reconstruct = navigation_utilities.find_optitrack_folders_to_analyze(cropped_vid_parent, cam_list=(1, 2))
+    cropped_vids_parent = parent_directories['cropped_vids_parent']
+    cal_data_parent = parent_directories['cal_data_parent']
+
+    folders_to_reconstruct = navigation_utilities.find_optitrack_folders_to_analyze(cropped_vids_parent, cam_list=(1, 2))
     cam_names = folders_to_reconstruct.keys()
 
     # start with cam01, find all matching cam02 data
@@ -132,8 +135,7 @@ def reconstruct_optitrack_3d(cropped_vid_parent, cal_data_parent, videos_parent)
             print('no matching cam02 directory for {}'.format(cam01_dir))
             continue
         view_directories = (cam01_dir, cam02_dir)
-        reconstruct_3d_optitrack.reconstruct_optitrack_session(view_directories, cal_data_parent, videos_parent)
-
+        reconstruct_3d_optitrack.reconstruct_optitrack_session(view_directories, parent_directories)
 
 
 if __name__ == '__main__':
@@ -146,14 +148,24 @@ if __name__ == '__main__':
 
     Burgess_DLC_config_path = '/home/levlab/Public/mouse_headfixed_skilledreaching-DanL-2021-11-05/config.yaml'
 
-    # videos_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze'   # on lambda machine
-    videos_parent = '/Volumes/Untitled/mouse_3D_troubleshooting'
-    video_root_folder = os.path.join(videos_parent, 'mouse_SR_videos_tocrop')
-    cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
-    marked_videos_parent = os.path.join(videos_parent, 'marked_mouse_SR_videos')
+    # mouse_reaching_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze'   # on lambda machine
+    mouse_reaching_parent = '/Volumes/Untitled/mouse_3D_troubleshooting'
+    video_root_folder = os.path.join(mouse_reaching_parent, 'mouse_SR_videos_tocrop')
+    cropped_vids_parent = os.path.join(mouse_reaching_parent, 'cropped_mouse_SR_videos')
+    marked_vids_parent = os.path.join(mouse_reaching_parent, 'marked_mouse_SR_videos')
+    cal_vids_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_calibration_videos')
+    cal_data_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_calibration_data')
+    reconstruct_3d_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_3dreconstructions')
 
-    cal_vid_parent = os.path.join(videos_parent, 'mouse_SR_calibration_videos')
-    cal_data_parent = os.path.join(videos_parent, 'mouse_SR_calibration_data')
+    parent_directories = {
+        'mouse_reaching_parent': mouse_reaching_parent,
+        'video_root_folder': video_root_folder,
+        'cropped_vids_parent': cropped_vids_parent,
+        'marked_vids_parent': marked_vids_parent,
+        'cal_vids_parent': cal_vids_parent,
+        'cal_data_parent': cal_data_parent,
+        'reconstruct3d_parent': reconstruct_3d_parent
+    }
 
     crop_params_csv_path = os.path.join(video_root_folder, 'optitrack_SR_video_crop_regions.csv')
 
@@ -161,10 +173,10 @@ if __name__ == '__main__':
 
     # step 1 - run all the calibrations
     # UNCOMMENT BELOW
-    calib_folder = os.path.join(cal_data_parent, 'calibration_data_2022', 'calibration_data_202202')
-    skilled_reaching_calibration.compare_calibration_files(calib_folder)
+    # calib_folder = os.path.join(cal_data_parent, 'calibration_data_2022', 'calibration_data_202202')
+    # skilled_reaching_calibration.compare_calibration_files(calib_folder)
 
-    skilled_reaching_calibration.calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=cb_size, checkerboard_square_size=checkerboard_square_size)
+    # skilled_reaching_calibration.calibrate_all_Burgess_vids(parent_directories, cb_size=cb_size, checkerboard_square_size=checkerboard_square_size)
 
     # step 2 - crop all videos of mice reaching
     # vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
@@ -190,4 +202,6 @@ if __name__ == '__main__':
     #     except:
     #         pass
     # step 4 - reconstruct 3D images
-    reconstruct_optitrack_3d(cropped_videos_parent, cal_data_parent, videos_parent)
+    # reconstruct_optitrack_3d(parent_directories)
+
+    reconstruct_3d_optitrack.refine_trajectories(parent_directories)

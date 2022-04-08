@@ -427,7 +427,7 @@ def multi_mirror_calibration(calibration_data, calibration_summary_name):
     pass
 
 
-def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(7, 10), checkerboard_square_size=7):
+def calibrate_all_Burgess_vids(parent_directories, cb_size=(7, 10), checkerboard_square_size=7):
     '''
     perform calibration for all checkerboard videos stored in appropriate directory structure under cal_vid_parent.
     Write results into directory structure under cal_vid_data
@@ -440,7 +440,10 @@ def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(7, 10),
     :return:
     '''
 
-    paired_cal_vids = navigation_utilities.find_Burgess_calibration_vids(cal_vid_parent)
+    cal_vids_parent = parent_directories['cal_vids_parent']
+    cal_data_parent = parent_directories['cal_data_parent']
+
+    paired_cal_vids = navigation_utilities.find_Burgess_calibration_vids(cal_vids_parent)
     '''
     note that find_Burgess_calibration_vids relies on glob, which may not return file names in alphabetical order. This 
     is important because the calibration videos for different cameras may show up in different orders (i.e., calibration
@@ -448,8 +451,6 @@ def calibrate_all_Burgess_vids(cal_vid_parent, cal_data_parent, cb_size=(7, 10),
     including extrinsics for multi-views are in the right order. That is, R and T should always be rotation and
     translation of camera 2 with respect to camera 1, not the other way around in some instances
     '''
-
-
     for vid_pair in paired_cal_vids:
 
         sorted_vid_pair = navigation_utilities.sort_optitrack_calibration_vid_names_by_camera_number(vid_pair)
@@ -744,18 +745,16 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
 
     # check if calibration worked
-    num_valid_stereo_pairs = np.shape(cal_data['stereo_imgpoints'])[1]
-    for stereo_idx in range(num_valid_stereo_pairs):
-        frame_num = cal_data['stereo_frames'][stereo_idx]
-        projPoints = []
-        for i_cam in range(num_cams):
-            projPoints.append(cal_data['stereo_imgpoints'][i_cam][stereo_idx])
-            projPoints[i_cam] = np.squeeze(projPoints[i_cam]).T
-
-        print('frame number {:d}'.format(frame_num))
-        worldpoints = triangulate_points(cal_data, projPoints, frame_num)
-
-    pass
+    # num_valid_stereo_pairs = np.shape(cal_data['stereo_imgpoints'])[1]
+    # for stereo_idx in range(num_valid_stereo_pairs):
+    #     frame_num = cal_data['stereo_frames'][stereo_idx]
+    #     projPoints = []
+    #     for i_cam in range(num_cams):
+    #         projPoints.append(cal_data['stereo_imgpoints'][i_cam][stereo_idx])
+    #         projPoints[i_cam] = np.squeeze(projPoints[i_cam]).T
+    #
+    #     print('frame number {:d}'.format(frame_num))
+    #     worldpoints = triangulate_points(cal_data, projPoints, frame_num)
 
 
 def test_reprojection(objpoints, imgpoints, mtx, rvec, tvec, dist):

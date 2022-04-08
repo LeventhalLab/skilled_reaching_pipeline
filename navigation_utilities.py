@@ -1074,6 +1074,73 @@ def find_multiview_calibration_data_name(cal_data_parent, session_datetime, base
     return closest_calibration_file
 
 
+def create_3dreconstruction_folder(metadata, reconstruction3d_parent):
+    trialtime = metadata['trialtime']
+    trial_datetime_string = datetime_to_string_for_fname(trialtime)
+    mouseID = metadata['mouseID']
+    reconstruction3d_name = '_'.join(
+        [mouseID,
+        trial_datetime_string,
+        '{:d}'.format(metadata['session_num']),
+        '{:03d}'.format(metadata['video_number']),
+        '3dreconstruction.pickle']
+        )
+
+    month_string = trialtime.strftime('%Y%m')
+    date_string = date_to_string_for_fname(trialtime)
+    month_folder_name = mouseID + '_' + month_string
+    date_folder_name = mouseID + '_' + date_string
+    full_path = os.path.join(reconstruction3d_parent, mouseID, month_folder_name, date_folder_name)
+
+    return full_path
+
+
+def find_3dreconstruction_folders(reconstruction3d_parent):
+
+    mouse_folders = glob.glob(os.path.join(reconstruction3d_parent, '*'))
+    reconstruction3d_folders = []
+    for mouse_f in mouse_folders:
+        if os.path.isdir(mouse_f):
+            _, mouseID = os.path.split(mouse_f)    # assume the folder name is the mouse ID
+
+            # search for folders with that mouse ID
+            month_folders = glob.glob(os.path.join(mouse_f, mouseID + '_*'))
+
+            for month_f in month_folders:
+                if os.path.isdir(month_f):
+
+                    _, mouse_month = os.path.split(month_f)
+
+                    date_folders = glob.glob(os.path.join(month_f, mouse_month + '*'))
+
+                    reconstruction3d_folders.extend([df for df in date_folders if os.path.isdir(df)])
+
+    return reconstruction3d_folders
+
+
+def create_3d_reconstruction_pickle_name(metadata, reconstruction3d_parent):
+
+    trialtime = metadata['trialtime']
+    trial_datetime_string = datetime_to_string_for_fname(trialtime)
+    mouseID = metadata['mouseID']
+    reconstruction3d_name = '_'.join(
+        [mouseID,
+        trial_datetime_string,
+        '{:d}'.format(metadata['session_num']),
+        '{:03d}'.format(metadata['video_number']),
+        '3dreconstruction.pickle']
+        )
+
+    full_path = create_3dreconstruction_folder(metadata, reconstruction3d_parent)
+
+    if not os.path.exists(full_path):
+        os.makedirs(full_path)
+
+    full_path_name = os.path.join(full_path, reconstruction3d_name)
+
+    return full_path_name
+
+
 def get_Burgess_video_folders_to_crop(video_root_folder):
     """
     find all the lowest level directories within video_root_folder, which are presumably the lowest level folders that

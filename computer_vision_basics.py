@@ -309,3 +309,45 @@ def set_triangl_output_dtype(output_dtype_):
     """
     global output_dtype
     output_dtype = output_dtype_
+
+
+def find_line_edge_coordinates(line, im_size):
+
+    a, b, c = line
+    edge_pts = np.zeros((2, 2))
+
+    x_edge = np.array([0, im_size[0] - 1])
+    y_edge = np.array([0, im_size[1] - 1])
+
+    i_pt = 0
+    # check the intersection with the left and right image borders unless the line is vertical
+    if abs(a) > 0:
+        test_y = (-c - a * x_edge[0]) / b
+        if y_edge[0] <= test_y <= y_edge[1]:
+            # check intersection with left image border
+            edge_pts[i_pt, :] = [x_edge[0], test_y]
+            i_pt += 1
+
+        test_y = (-c - a * x_edge[1]) / b
+        if y_edge[0] <= test_y <= y_edge[1]:
+            # check intersection with left image border
+            edge_pts[i_pt, :] = [x_edge[1], test_y]
+            i_pt += 1
+
+    # check the intersection with the left and right image borders unless the line is horizontal
+    if abs(b) > 0:
+        if i_pt < 2:
+            test_x = (-c - b * y_edge[0]) / a
+            if x_edge[0] <= test_x <= x_edge[1]:
+                # check intersection with left image border
+                edge_pts[i_pt, :] = [test_x, y_edge[0]]
+                i_pt += 1
+
+        if i_pt < 2:
+            test_x = (-c - b * y_edge[1]) / a
+            if x_edge[0] <= test_x <= x_edge[1]:
+                # check intersection with left image border
+                edge_pts[i_pt, :] = [test_x, y_edge[1]]
+                i_pt += 1
+
+    return edge_pts

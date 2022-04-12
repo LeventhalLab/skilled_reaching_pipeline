@@ -157,6 +157,7 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
         reconstructed_data['reprojected_points'][i_frame, :, :, :] = frame_reprojected_pts
         reconstructed_data['reprojection_errors'][i_frame, :, :] = frame_reproj_errors.T
         reconstructed_data['frame_confidence'][i_frame, :, :] = frame_conf
+        reconstructed_data['bodyparts'] = dlc_metadata[0]['data']['DLC-model-config file']['all_joints_names']
 
     skilled_reaching_io.write_pickle(reconstruction3d_fname, reconstructed_data)
 
@@ -437,17 +438,15 @@ def rotate_pts_180(pts, im_size):
 
 def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata, orig_im_size=(1280, 1024)):
 
-    # note that current algorithm for camera 1 crops, then rotates. We want a rotated, but uncropped transformation of coordinates
-    # camera 2 is easy - just crops
+    # note that current algorithm for camera 1 crops, then rotates. We want a rotated, but uncropped transformation of
+    # coordinates camera 2 is easy - just crops
     pts_wrt_orig_img = []
     dlc_conf = []
     for i_cam, cam_output in enumerate(dlc_output):
         # cam_output is a dictionary where each entry is 'frame0000', 'frame0001', etc.
         # each frame has keys: 'coordinates', 'confidence', and 'costs'
-        try:
-            cam_metadata = pickle_metadata[i_cam]
-        except:
-            pass
+
+        cam_metadata = pickle_metadata[i_cam]
 
         # loop through the frames
         frame_list = cam_output.keys()
@@ -497,7 +496,7 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
             array_pts = convert_pts_to_array(pts_in_calibration_coords)
             pts_wrt_orig_img[i_cam][i_frame] = array_pts
 
-            #todo: store and return the confidence array
+            # store and return the confidence array
             conf = dlc_output[i_cam][frame]['confidence']
             array_conf = convert_pickle_conf_to_array(conf)
 
@@ -507,7 +506,11 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
 
 
 def convert_pts_to_array(pickle_format_pts):
-
+    '''
+    helper function to take points from a deeplabcut _full.pickle file and convert to a numpy array.
+    :param pickle_format_pts:
+    :return:
+    '''
     num_joints = len(pickle_format_pts)
     array_pts = np.zeros([num_joints, 2])
     for i_pt, cur_pt in enumerate(pickle_format_pts):
@@ -531,17 +534,21 @@ def convert_pickle_conf_to_array(pickle_confidence):
 
     return array_conf
 
+
 def translate_back_to_orig_img(pickle_metadata, pts):
+    '''
+    move identified points from deeplabcut from the cropped video back to the original video frame coordinates
+    :param pickle_metadata:
+    :param pts:
+    :return:
+    '''
     crop_win = pickle_metadata['crop_window']
 
     translated_pts = []
     for i_pt, pt in enumerate(pts):
         if len(pt) > 0:
-            try:
-                x, y = pt[0]
-            except:
-                pass
-            # possible that im_size is width x height or height x width
+
+            x, y = pt[0]
             new_x = crop_win[0] + x
             new_y = crop_win[2] + y
 
@@ -764,52 +771,10 @@ def draw_epipolar_lines_on_img(img_pts, whichImage, F, im_size, bodyparts, ax):
 
         bp_color = color_from_bodypart(bodyparts[i_line])
         epiline = np.squeeze(epiline)
-        edge_pts = find_line_edge_coordinates(epiline, im_size)
+        edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
 
         if not np.all(edge_pts==0):
             ax.plot(edge_pts[:, 0], edge_pts[:, 1], color=bp_color, ls='-', marker='.')
-
-
-def find_line_edge_coordinates(line, im_size):
-
-    a, b, c = line
-    edge_pts = np.zeros((2, 2))
-
-    x_edge = np.array([0, im_size[0] - 1])
-    y_edge = np.array([0, im_size[1] - 1])
-
-    i_pt = 0
-    # check the intersection with the left and right image borders unless the line is vertical
-    if abs(a) > 0:
-        test_y = (-c - a * x_edge[0]) / b
-        if y_edge[0] <= test_y <= y_edge[1]:
-            # check intersection with left image border
-            edge_pts[i_pt, :] = [x_edge[0], test_y]
-            i_pt += 1
-
-        test_y = (-c - a * x_edge[1]) / b
-        if y_edge[0] <= test_y <= y_edge[1]:
-            # check intersection with left image border
-            edge_pts[i_pt, :] = [x_edge[1], test_y]
-            i_pt += 1
-
-    # check the intersection with the left and right image borders unless the line is horizontal
-    if abs(b) > 0:
-        if i_pt < 2:
-            test_x = (-c - b * y_edge[0]) / a
-            if x_edge[0] <= test_x <= x_edge[1]:
-                # check intersection with left image border
-                edge_pts[i_pt, :] = [test_x, y_edge[0]]
-                i_pt += 1
-
-        if i_pt < 2:
-            test_x = (-c - b * y_edge[1]) / a
-            if x_edge[0] <= test_x <= x_edge[1]:
-                # check intersection with left image border
-                edge_pts[i_pt, :] = [test_x, y_edge[1]]
-                i_pt += 1
-
-    return edge_pts
 
 
 def overlay_pts(pickle_metadata, current_coords, dlc_metadata, i_frame, rotate_img=False):
@@ -927,15 +892,68 @@ def refine_trajectories(parent_directories):
 
             r3d_data = skilled_reaching_io.read_pickle(r3d_file)
 
+            frame_valid_pts = identify_valid_points_in_frames(r3d_data)
+
+            identify_invalid_point_jumps(r3d_data, frame_valid_pts)
+
             #todo:
-            # 1) find valid frames on a per-frame basis
+            # 1) find valid points on a per-frame basis
             # 2) look for jumps between valid points in adjacent frames
             # 3) look for points that aren't where they should be (for example, if index finger on right paw is too far from middle finger on right paw)
 
-            num_frames = np.shape(worldpoints)[0]
 
-            for i_frame in range(num_frames):
 
-            pass
 
+def identify_invalid_point_jumps(r3d_data, frame_valid_pts, max_point_jump=100):
+
+
+    frame_points = r3d_data['frame_points']
+
+    num_frames = np.shape(frame_points)[0]
+    num_cams = np.shape(frame_points[0])
+
+    for i_frame in range(num_frames-1):
+
+        for i_cam in range(num_cams):
     pass
+
+def identify_valid_points_in_frames(r3d_data, max_reproj_error=20, min_conf=0.9):
+    '''
+
+    :param r3d_data: 3d reconstruction data. dictionary with the following keys:
+        frame_points - num_frames x num_cams x num_points x 2 array containing points identified by dlc in each frame
+            translated/rotated into the original video frames (but rotated so all frames are upright)
+    :param max_reproj_error: maximum allowable projection from world points back into each camera view
+    :param min_conf:
+    :return: frame_valid_points: num_frames x num_cams x num_points boolean array containing True for each frame-
+        camera-view-point that is valid based on reprojection error and dlc confidence
+    '''
+    reproj_errors = r3d_data['reprojection_errors']
+    dlc_conf = r3d_data['frame_confidence']
+
+    num_frames = np.shape(reproj_errors)[0]
+    num_cams = np.shape(reproj_errors)[1]
+    pts_per_frame = np.shape(reproj_errors)[2]
+
+    frame_valid_points = np.ones((num_frames, num_cams, pts_per_frame), dtype=bool)
+
+    for i_frame in range(num_frames):
+
+        # identify frames/camera views in which reprojection error is too large
+        frame_reproj_errors = np.squeeze(reproj_errors[i_frame, :, :])
+        invalid_reprojection = frame_reproj_errors > max_reproj_error
+        # if reprojection error is too large into either camera view, invalidate point in both frames
+        valid_reprojections = np.logical_not(np.any(invalid_reprojection, 0))
+
+        reprojection_valid = np.tile(valid_reprojections, (num_cams, 1))
+
+        # identify valid points based on dlc confidence
+        frame_conf = np.squeeze(dlc_conf[i_frame, :, :])
+        conf_valid = frame_conf > min_conf
+
+        frame_valid_points[i_frame, : , :] = np.logical_and(reprojection_valid, conf_valid)
+
+        # may have to work separately on the pellets, since pellet1/2 could switch between which pellet was labeled in
+        # each frame
+
+    return frame_valid_points

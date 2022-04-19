@@ -878,6 +878,9 @@ def color_from_bodypart(bodypart):
     return bp_color
 
 
+def smooth_3d_trajectory(r3d_data, frame_valid_pts, pt_euc_diffs):
+
+    worldpoints = r3d_data['worldpoints']
 
 def refine_trajectories(parent_directories):
 
@@ -894,18 +897,30 @@ def refine_trajectories(parent_directories):
 
             frame_valid_pts = identify_valid_points_in_frames(r3d_data)
 
-            identify_invalid_point_jumps(r3d_data, frame_valid_pts)
+            pt_euc_diffs = calculate_interframe_point_jumps(r3d_data)
+
+            correct_pellet_locations(r3d_data, frame_valid_pts, pt_euc_diffs)
+
+            smooth_3d_trajectory(r3d_data, frame_valid_pts, pt_euc_diffs)
+            pass
 
             #todo:
-            # 1) find valid points on a per-frame basis
+            # 1) find valid points on a per-frame basis (DONE?)
             # 2) look for jumps between valid points in adjacent frames
             # 3) look for points that aren't where they should be (for example, if index finger on right paw is too far from middle finger on right paw)
+            # 4) correct pellet locations (maybe do all the pellet locations separately from the other bodyparts?)
 
 
+def correct_pellet_locations(r3d_data, frame_valid_pts, pt_euc_diffs):
 
+    pellet_idx = ['pellet' in str for str in r3d_dadta['bodyparts']]
 
-def identify_invalid_point_jumps(r3d_data, frame_valid_pts, max_point_jump=100):
-
+def calculate_interframe_point_jumps(r3d_data):
+    '''
+    calculate the euclidean distance in points for each bodypart in adjacent frames
+    :param r3d_data:
+    :return:
+    '''
 
     frame_points = r3d_data['frame_points']
 
@@ -913,17 +928,16 @@ def identify_invalid_point_jumps(r3d_data, frame_valid_pts, max_point_jump=100):
     num_cams = np.shape(frame_points)[1]
     pts_per_frame = np.shape(frame_points)[2]
 
-    for i_frame in range(num_frames-1):
+    pt_euc_diffs = np.zeros((num_cams, num_frames-1, pts_per_frame))
+    for i_cam in range(num_cams):
+        # calculate difference across frames in (x, y) point locations
+        pt_diffs = np.diff(frame_points[:, i_cam, :, :], n=1, axis=0)
 
-        for i_cam in range(num_cams):
-            cur_frame_points = np.squeeze(frame_points[i_frame, :, :])
-            next_frame_points = np.squeeze(frame_points[i_frame + 1, :, :])
-            inter_frame_difference = next_frame_points - cur_frame_points
+        # calculate euclidean distance between points in adjacent frames
+        pt_euc_diffs[i_cam, :, :] = np.sqrt(np.sum(np.square(pt_diffs), axis=2))
 
-            pass
-            #todo: calculate point jumps between frames (for valid points in consecutive frames)
-            #better to loop through frames and calculate differences (I think so), or better to calculate all the differences for one point across all frames (loop through points)?
-    pass
+    return pt_euc_diffs
+
 
 def identify_valid_points_in_frames(r3d_data, max_reproj_error=20, min_conf=0.9):
     '''

@@ -910,14 +910,17 @@ def identify_invalid_point_jumps(r3d_data, frame_valid_pts, max_point_jump=100):
     frame_points = r3d_data['frame_points']
 
     num_frames = np.shape(frame_points)[0]
-    num_cams = np.shape(frame_points[1])
-    pts_per_frame = np.shape(frame_points[2])
+    num_cams = np.shape(frame_points)[1]
+    pts_per_frame = np.shape(frame_points)[2]
 
     for i_frame in range(num_frames-1):
 
         for i_cam in range(num_cams):
+            cur_frame_points = np.squeeze(frame_points[i_frame, :, :])
+            next_frame_points = np.squeeze(frame_points[i_frame + 1, :, :])
+            inter_frame_difference = next_frame_points - cur_frame_points
 
-
+            pass
             #todo: calculate point jumps between frames (for valid points in consecutive frames)
             #better to loop through frames and calculate differences (I think so), or better to calculate all the differences for one point across all frames (loop through points)?
     pass

@@ -1141,6 +1141,94 @@ def create_3d_reconstruction_pickle_name(metadata, reconstruction3d_parent):
     return full_path_name
 
 
+def parse_3d_reconstruction_pickle_name(r3d_fullpath):
+
+    _, r3d_fname = os.path.split(r3d_fullpath)
+    r3d_fname, _ = os.path.splitext(r3d_fname)
+
+    r3d_name_parts = r3d_fname.split('_')
+
+    trial_datetimestring = r3d_name_parts[1] + '_' + r3d_name_parts[2]
+    trial_datetime = fname_string_to_datetime(trial_datetimestring)
+
+    session_num = int(r3d_name_parts[3])
+
+    vid_num = int(r3d_name_parts[4])
+
+    r3d_metadata = {
+        'mouseID': r3d_name_parts[0],
+        'time': trial_datetime,
+        'vid_num': vid_num,
+        'session_num': session_num,
+    }
+
+    return r3d_metadata
+
+
+
+def find_dlc_pickles_from_r3d_filename(r3d_file, parent_directories):
+
+    cropped_vids_parent = parent_directories['cropped_vids_parent']
+
+    r3d_metadata = parse_3d_reconstruction_pickle_name(r3d_file)
+
+    mouse_folder = os.path.join(cropped_vids_parent, r3d_metadata['mouseID'])
+    month_dirname = r3d_metadata['mouseID'] + '_' + r3d_metadata['time'].strftime('%Y%m')
+    day_dirname = r3d_metadata['mouseID'] + '_' + r3d_metadata['time'].strftime('%Y%m%d')
+
+    full_pickles = []
+    meta_pickles = []
+    for i_cam in range(2):
+        cam_dirname = '_'.join([r3d_metadata['mouseID'],
+                                date_to_string_for_fname(r3d_metadata['time']),
+                                'cam{:02d}'.format(i_cam + 1)
+                                ])
+        cam_dir = os.path.join(mouse_folder, month_dirname, day_dirname, cam_dirname)
+        test_name = '_'.join([r3d_metadata['mouseID'],
+                              datetime_to_string_for_fname(r3d_metadata['time']),
+                              '{:d}'.format(r3d_metadata['session_num']),
+                              '{:03d}'.format(r3d_metadata['vid_num']),
+                              'cam{:02d}'.format(i_cam + 1),
+                              '*',
+                              'full.pickle'])
+        full_testname = os.path.join(cam_dir, test_name)
+        full_pickle = glob.glob(full_testname)
+
+        if len(full_pickle) == 1:
+            full_pickles.append(full_pickle[0])
+        elif len(full_pickle) > 1:
+            print('more than one camera {:02d} full pickle file found for {}'.format(i_cam + 1, r3d_file))
+        else:
+            print('no camera {:02d} full pickle files found for {}'.format(i_cam + 1, r3d_file))
+
+        test_name = '_'.join([r3d_metadata['mouseID'],
+                              datetime_to_string_for_fname(r3d_metadata['time']),
+                              '{:d}'.format(r3d_metadata['session_num']),
+                              '{:03d}'.format(r3d_metadata['vid_num']),
+                              'cam{:02d}'.format(i_cam + 1),
+                              '*',
+                              'meta.pickle'])
+        meta_testname = os.path.join(cam_dir, test_name)
+        meta_pickle = glob.glob(meta_testname)
+
+        if len(meta_pickle) == 1:
+            meta_pickles.append(meta_pickle[0])
+        elif len(meta_pickle) > 1:
+            print('more than one camera {:02d} full pickle file found for {}'.format(i_cam + 1, r3d_file))
+        else:
+            print('no camera {:02d} full pickle files found for {}'.format(i_cam + 1, r3d_file))
+
+    return full_pickles, meta_pickles
+
+
+
+
+def find_orig_movies_from_r3d_filename(r3d_file, parent_directories):
+
+    video_root_folder = parent_directories['video_root_folder']
+
+
+
 def get_Burgess_video_folders_to_crop(video_root_folder):
     """
     find all the lowest level directories within video_root_folder, which are presumably the lowest level folders that

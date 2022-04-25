@@ -6,6 +6,7 @@ import navigation_utilities
 import skilled_reaching_io
 import matplotlib.pyplot as plt
 import computer_vision_basics as cvb
+import scipy.interpolate
 import pandas as pd
 import scipy.io as sio
 
@@ -355,10 +356,10 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
         projected_pts.append(ppts)
         reproj_errors[:, i_cam] = calculate_reprojection_errors(ppts, frame_pts[i_cam, :, :])
 
-    #     overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, parent_directories, reprojected_pts=projected_pts,
-    #                               rotate_img=pickle_metadata[i_cam]['isrotated'])
+        # overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, parent_directories, reprojected_pts=projected_pts,
+        #                           rotate_img=pickle_metadata[i_cam]['isrotated'])
     # draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories)
-    #
+
     # plt.show()
 
     return projected_pts, reproj_errors
@@ -738,6 +739,9 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
         # undistort points
         pt_ud_norm = np.squeeze(cv2.undistortPoints(points_in_img, mtx, dist))
         pt_ud = cvb.unnormalize_points(pt_ud_norm, mtx)
+        if np.shape(points_in_img)[0] == 1:
+            # only one point
+            pt_ud = [pt_ud]
         for i_pt, pt in enumerate(pt_ud):
             if len(pt) > 0:
                 try:
@@ -753,10 +757,16 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
                 y2 = points_in_img[i_pt,1]
                 axs[0][i_cam].plot(x2, y2, marker='+', ms=dotsize, color=bp_color)   # point from DLC with original image disortion
 
-                x3 = reproj_pts[i_cam][i_pt, 0]
-                y3 = reproj_pts[i_cam][i_pt, 1]
+                if reproj_pts[i_cam].ndim == 1:
+                    x3 = reproj_pts[i_cam][0]
+                    y3 = reproj_pts[i_cam][1]
+                else:
+                    x3 = reproj_pts[i_cam][i_pt, 0]
+                    y3 = reproj_pts[i_cam][i_pt, 1]
                 axs[0][i_cam].plot(x3, y3, marker='*', ms=dotsize, color=bp_color)    # reprojected point
 
+        if np.shape(points_in_img)[0] == 1:
+            pt_ud = pt_ud[0].reshape((1, -1, 2))  # needed to get correct array shape for computeCorrespondEpilines in draw_epipolar_lines_on_img
         draw_epipolar_lines_on_img(pt_ud, i_cam+1, cal_data['F'], im_size, bodyparts, axs[0][1-i_cam])
 
     plt.show()
@@ -882,6 +892,8 @@ def smooth_3d_trajectory(r3d_data, frame_valid_pts, pt_euc_diffs):
 
     worldpoints = r3d_data['worldpoints']
 
+
+
 def refine_trajectories(parent_directories):
 
     reconstruct_3d_parent = parent_directories['reconstruct3d_parent']
@@ -895,11 +907,10 @@ def refine_trajectories(parent_directories):
 
             r3d_data = skilled_reaching_io.read_pickle(r3d_file)
 
-            frame_valid_pts = identify_valid_points_in_frames(r3d_data)
-
+            frame_valid_pts = identify_valid_points_in_frames(r3d_data)   # based on reprojection error and dlc confidence
             pt_euc_diffs = calculate_interframe_point_jumps(r3d_data)
-
-            correct_pellet_locations(r3d_data, frame_valid_pts, pt_euc_diffs)
+            # pt_euc_diffs is num_cameras x num_frames-1 x num_bodyparts numpy array
+            correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diffs)
 
             smooth_3d_trajectory(r3d_data, frame_valid_pts, pt_euc_diffs)
             pass
@@ -911,9 +922,151 @@ def refine_trajectories(parent_directories):
             # 4) correct pellet locations (maybe do all the pellet locations separately from the other bodyparts?)
 
 
-def correct_pellet_locations(r3d_data, frame_valid_pts, pt_euc_diffs):
+def correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diffs, max_reproj_error=10, min_conf=0.9):
+    video_root_folder = parent_directories['video_root_folder']
+    full_pickles, meta_pickles = navigation_utilities.find_dlc_pickles_from_r3d_filename(r3d_file, parent_directories)
+    # r3d_metadata = navigation_utilities.parse_3d_reconstruction_pickle_name(r3d_file)
 
-    pellet_idx = ['pellet' in str for str in r3d_dadta['bodyparts']]
+    dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in meta_pickles]
+    pickle_metadata = []
+    orig_vid_names = []
+    for i_cam in range(len(full_pickles)):
+        pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(full_pickles[i_cam]))
+        orig_vid_names.append(navigation_utilities.find_original_optitrack_video(video_root_folder, pickle_metadata[i_cam]))
+    jump_thresh = 20
+
+    cal_data = r3d_data['cal_data']
+    projMatr1 = np.eye(3, 4)
+    projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+
+    pellet_idx = ['pellet' in str for str in r3d_data['bodyparts']]
+    num_pellets = len(np.argwhere(pellet_idx))
+    pellet_framepoints = r3d_data['frame_points'][:, :, pellet_idx, :]
+    pellet_reproj_errors = r3d_data['reprojection_errors'][:, :, pellet_idx]
+    pellet_conf = r3d_data['frame_confidence'][:, :, pellet_idx]
+    pellet_euc_diffs = pt_euc_diffs[:, :, pellet_idx]
+
+    num_frames = np.shape(pellet_framepoints)[0]
+    num_cameras = np.shape(pellet_framepoints)[1]
+    # establish final pellet 1 and pellet 2 locations
+    validated_pellet_framepoints = np.zeros((num_frames, num_cameras, num_pellets, 2))
+    mismatched_pellets = np.zeros(num_frames, dtype=bool)
+    for i_frame in range(num_frames):
+        print('working on frame {:04d}'.format(i_frame))
+
+        # how confident are we in the location for each pellet?
+        frame_pellet_conf = pellet_conf[i_frame, :, :]   # frame_pellet_conf contains dlc confidence values for each pellet in each camera view; shape num_cams x num_pellets
+        for i_pellet in range(num_pellets):
+            other_pellet_idx = 1 - i_pellet
+            # is the reprojection error small and the confidence high for this pellet in both camera views?
+            this_pellet_conf = frame_pellet_conf[:, i_pellet]
+            frame_pellet_reproj_error = pellet_reproj_errors[i_frame, :, i_pellet]
+            if all(this_pellet_conf > min_conf) and all(frame_pellet_reproj_error < max_reproj_error):
+                # the pellet was probably correctly identified in this frame for both views
+                for i_cam in range(num_cameras):
+                    validated_pellet_framepoints[i_frame, i_cam, i_pellet, :] = pellet_framepoints[i_frame, i_cam, i_pellet, :]
+                pass
+            elif frame_pellet_conf[0, i_pellet] > min_conf and frame_pellet_conf[1, other_pellet_idx]:
+                # high confidence in this pellet location in camera 1 view despite not having a good pellet 1 match in camera 2
+                # what if the other pellet in camera 2 is its match? test the reprojection error for this pellet ID in camera 1
+                # with the other pellet ID in camera 2
+
+                # undistort this pellet's coordinates in camera 1
+                this_pellet_ud = cv2.undistortPoints(pellet_framepoints[i_frame, 0, i_pellet, :], mtx[0], dist[0])
+                # undistort the other pellet's coordinates in camera 2
+                other_pellet_ud = cv2.undistortPoints(pellet_framepoints[i_frame, 1, other_pellet_idx, :], mtx[0], dist[0])
+
+                point4D = cv2.triangulatePoints(projMatr1, projMatr2, this_pellet_ud[0][0], other_pellet_ud[0][0])
+                pellet_wp = np.squeeze(cv2.convertPointsFromHomogeneous(point4D.T))
+
+                test_frame_pts = np.zeros((num_cameras, 1, 2))
+                test_frame_pts[0, 0, :] = pellet_framepoints[i_frame, 0, i_pellet, :]
+                test_frame_pts[1, 0, :] = pellet_framepoints[i_frame, 1, other_pellet_idx, :]
+                ppts, reproj_errors = check_3d_reprojection(pellet_wp, test_frame_pts, cal_data, dlc_metadata, pickle_metadata, i_frame, parent_directories)
+
+                if (reproj_errors < max_reproj_error).all():
+                    # pellets are accurately labeled in each view, but pellet ID's are swapped in each frame
+                    # for now, assume i_pellet was correctly identified in camera 0, so other_pellet_idx should be reassigned to i_pellet
+                    validated_pellet_framepoints[i_frame, 0, i_pellet, :] = pellet_framepoints[i_frame, 0, i_pellet, :]
+                    validated_pellet_framepoints[i_frame, 1, i_pellet, :] = pellet_framepoints[i_frame, 1, other_pellet_idx, :]
+
+                    mismatched_pellets[i_frame] = True
+
+    # should now have an array of points for which we have high confidence that corresponding pellet locations in both
+    # views have been found
+
+    fig = []
+    ax = []
+    for i_cam in range(2):
+        fig.append(plt.figure())
+        ax.append(fig[i_cam].subplots(3, 2))
+        ax[i_cam][0].scatter(validated_pellet_framepoints[:, i_cam, 0, 0], validated_pellet_framepoints[:, i_cam, 0, 1])
+        ax[i_cam][0].scatter(validated_pellet_framepoints[:, i_cam, 1, 0], validated_pellet_framepoints[:, i_cam, 1, 1])
+
+        if i_cam == 0:
+            ax[i_cam][0].set_xlim(800, 1200)
+        else:
+            ax[i_cam][0].set_ylim(400, 1200)
+        ax[i_cam][0].invert_yaxis()
+
+        ax[i_cam][1].plot(validated_pellet_framepoints[:, i_cam, 0, 0])  # pellet 1, x
+        ax[i_cam][1].plot(validated_pellet_framepoints[:, i_cam, 1, 0])  # pellet 2, x
+
+        ax[i_cam][2].plot(validated_pellet_framepoints[:, i_cam, 0, 1])  # pellet 1, y
+        ax[i_cam][2].plot(validated_pellet_framepoints[:, i_cam, 1, 1])  # pellet 2, y
+
+    bool_fig = plt.figure()
+    bool_ax = bool_fig.add_subplot(111)
+
+    bool_ax.plot(mismatched_pellets)
+
+    plt.show()
+    pass
+
+
+'''
+:param frame_pts: num_cams x num_points x 2 numpy array containing (x,y) pairs of deeplabcut output rotated/
+        translated into the original video frame so that the images are upright (i.e., if camera 1 is rotated 180
+        degrees, the image/coordinates for camera 1 are rotated)
+        '''
+
+        # if any(pellet_euc_diffs[0, i_frame, :] > jump_thresh):   # did either pellet location jump a lot in this camera?
+        #     fig = plt.figure()
+        #     ax = fig.add_subplot(111)
+        #     ax.plot(pellet_euc_diffs[0, :, 0])
+        #
+        #     fig2 = plt.figure()
+        #     ax2 = fig2.add_subplot(111)
+        #     ax2.plot(frame_valid_pts[:, 0, 15])
+        #     ax2.plot(frame_valid_pts[:, 0, 16])
+        #
+        #     #pellets 1 and 2 in camera 1
+        #     fig3 = plt.figure()
+        #     ax3 = fig3.add_subplot(111)
+        #     # camera 1, pellet 1
+        #     ax3.plot(pellet_framepoints[:, 0, 0, 0], pellet_framepoints[:, 0, 0, 1])
+        #     # camera 1, pellet 2
+        #     ax3.plot(pellet_framepoints[:, 0, 1, 0], pellet_framepoints[:, 0, 1, 1])
+        #     ax3.set_xlim((700, 1200))
+        #     ax3.set_ylim((800, 1000))
+        #     ax3.invert_yaxis()
+        #
+        #     #pellets 1 and 2 in camera 2
+        #     fig4 = plt.figure()
+        #     ax4 = fig4.add_subplot(111)
+        #     # camera 2, pellet 1
+        #     ax4.plot(pellet_framepoints[:, 1, 0, 0], pellet_framepoints[:, 1, 0, 1])
+        #     # camera 2, pellet 2
+        #     ax4.plot(pellet_framepoints[:, 1, 1, 0], pellet_framepoints[:, 1, 1, 1])
+        #     ax4.set_xlim((700, 1200))
+        #     ax4.set_ylim((450, 600))
+        #     ax4.invert_yaxis()
+        #
+        #     plt.show()
+        #     pass
+
 
 def calculate_interframe_point_jumps(r3d_data):
     '''
@@ -941,6 +1094,7 @@ def calculate_interframe_point_jumps(r3d_data):
 
 def identify_valid_points_in_frames(r3d_data, max_reproj_error=20, min_conf=0.9):
     '''
+    identifies invalid points based on whether confidence is too low and/or reprojection error is too large
 
     :param r3d_data: 3d reconstruction data. dictionary with the following keys:
         frame_points - num_frames x num_cams x num_points x 2 array containing points identified by dlc in each frame

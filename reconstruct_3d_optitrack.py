@@ -1001,26 +1001,36 @@ def correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diff
     ax = []
     for i_cam in range(2):
         fig.append(plt.figure())
-        ax.append(fig[i_cam].subplots(3, 2))
+        ax.append(fig[i_cam].subplots(3, 1))
         ax[i_cam][0].scatter(validated_pellet_framepoints[:, i_cam, 0, 0], validated_pellet_framepoints[:, i_cam, 0, 1])
         ax[i_cam][0].scatter(validated_pellet_framepoints[:, i_cam, 1, 0], validated_pellet_framepoints[:, i_cam, 1, 1])
 
         if i_cam == 0:
             ax[i_cam][0].set_xlim(800, 1200)
+            ax[i_cam][0].set_ylim(700, 1000)
         else:
-            ax[i_cam][0].set_ylim(400, 1200)
+            ax[i_cam][0].set_xlim(800, 1200)
+            ax[i_cam][0].set_ylim(400, 700)
         ax[i_cam][0].invert_yaxis()
 
         ax[i_cam][1].plot(validated_pellet_framepoints[:, i_cam, 0, 0])  # pellet 1, x
         ax[i_cam][1].plot(validated_pellet_framepoints[:, i_cam, 1, 0])  # pellet 2, x
+        ax[i_cam][1].set_ylabel('x')
 
         ax[i_cam][2].plot(validated_pellet_framepoints[:, i_cam, 0, 1])  # pellet 1, y
         ax[i_cam][2].plot(validated_pellet_framepoints[:, i_cam, 1, 1])  # pellet 2, y
+        ax[i_cam][2].set_ylabel('y')
+
+        fig[i_cam].suptitle('camera {:02d}'.format(i_cam + 1))
 
     bool_fig = plt.figure()
     bool_ax = bool_fig.add_subplot(111)
 
     bool_ax.plot(mismatched_pellets)
+    bool_fig.suptitle('mismatch between cam1 and cam2 pellet IDs')
+
+    wp_fig = plt.figure()
+    wp_ax = wp_fig.add_subplot(111, projection='3d')
 
     plt.show()
     pass

@@ -1016,12 +1016,12 @@ def correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diff
                         axs[i_cam].scatter(ppts[1][0], ppts[1][1], s=2, c='r', marker='*')
 
                         if i_cam == 0:
-                            axs[i_cam][0].set_xlim(800, 1200)
-                            axs[i_cam][0].set_ylim(700, 1000)
+                            axs[i_cam].set_xlim(800, 1200)
+                            axs[i_cam].set_ylim(700, 1000)
                         else:
-                            axs[i_cam][0].set_xlim(800, 1200)
-                            axs[i_cam][0].set_ylim(400, 700)
-                        axs[i_cam][0].invert_yaxis()
+                            axs[i_cam].set_xlim(800, 1200)
+                            axs[i_cam].set_ylim(400, 700)
+                        axs[i_cam].invert_yaxis()
 
                     plt.show()
 

@@ -968,7 +968,7 @@ def correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diff
                 for i_cam in range(num_cameras):
                     validated_pellet_framepoints[i_frame, i_cam, i_pellet, :] = pellet_framepoints[i_frame, i_cam, i_pellet, :]
                 pass
-            elif frame_pellet_conf[0, i_pellet] > min_conf and frame_pellet_conf[1, other_pellet_idx]:
+            elif frame_pellet_conf[0, i_pellet] > min_conf and frame_pellet_conf[1, other_pellet_idx] > min_conf:
                 # high confidence in this pellet location in camera 1 view despite not having a good pellet 1 match in camera 2
                 # what if the other pellet in camera 2 is its match? test the reprojection error for this pellet ID in camera 1
                 # with the other pellet ID in camera 2
@@ -992,7 +992,44 @@ def correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diff
                     validated_pellet_framepoints[i_frame, 0, i_pellet, :] = pellet_framepoints[i_frame, 0, i_pellet, :]
                     validated_pellet_framepoints[i_frame, 1, i_pellet, :] = pellet_framepoints[i_frame, 1, other_pellet_idx, :]
 
+                    figs = []
+                    axs = []
+                    for i_cam in range(2):
+                        figs.append(plt.figure())
+                        axs.append(figs[i_cam].add_subplot(111))
+
+                        # original pellet 1 as black circle
+                        axs[i_cam].scatter(validated_pellet_framepoints[i_frame, i_cam, 0, 0],
+                                           validated_pellet_framepoints[i_frame, i_cam, 0, 1], s=2, c='k', marker='o')
+                        # new pellet 1 as black plus
+                        axs[i_cam].scatter(validated_pellet_framepoints[i_frame, i_cam, i_pellet, 0], validated_pellet_framepoints[i_frame, i_cam, i_pellet, 1], s=2, c='k', marker='+')
+
+                        # original pellet 2 as blue circle
+                        axs[i_cam].scatter(validated_pellet_framepoints[i_frame, i_cam, 0, 0],
+                                           validated_pellet_framepoints[i_frame, i_cam, 0, 1], s=2, c='b', marker='o')
+                        # new pellet 2 as blue plus
+                        axs[i_cam].scatter(validated_pellet_framepoints[i_frame, i_cam, i_pellet, 0], validated_pellet_framepoints[i_frame, i_cam, i_pellet, 1], s=2, c='b', marker='+')
+
+                        # reprojected point 1 as green star
+                        axs[i_cam].scatter(ppts[0, 0], ppts[0, 1], s=2, c='g', marker='*')
+                        # reprojected point 2 as red star
+                        axs[i_cam].scatter(ppts[1, 0], ppts[1, 1], s=2, c='r', marker='*')
+
+                        if i_cam == 0:
+                            axs[i_cam][0].set_xlim(800, 1200)
+                            axs[i_cam][0].set_ylim(700, 1000)
+                        else:
+                            axs[i_cam][0].set_xlim(800, 1200)
+                            axs[i_cam][0].set_ylim(400, 700)
+                        axs[i_cam][0].invert_yaxis()
+
+                    plt.show()
+
                     mismatched_pellets[i_frame] = True
+
+    # now assume that the pellet ID in validated_pellet_framepoints is correct at the end of the recording, and working backwards identify that pellet earlier on
+
+    # find the last 100
 
     # should now have an array of points for which we have high confidence that corresponding pellet locations in both
     # views have been found

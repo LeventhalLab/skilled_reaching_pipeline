@@ -1011,9 +1011,9 @@ def correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diff
                         axs[i_cam].scatter(validated_pellet_framepoints[i_frame, i_cam, i_pellet, 0], validated_pellet_framepoints[i_frame, i_cam, i_pellet, 1], s=2, c='b', marker='+')
 
                         # reprojected point 1 as green star
-                        axs[i_cam].scatter(ppts[0, 0], ppts[0, 1], s=2, c='g', marker='*')
+                        axs[i_cam].scatter(ppts[0][0], ppts[0][1], s=2, c='g', marker='*')
                         # reprojected point 2 as red star
-                        axs[i_cam].scatter(ppts[1, 0], ppts[1, 1], s=2, c='r', marker='*')
+                        axs[i_cam].scatter(ppts[1][0], ppts[1][1], s=2, c='r', marker='*')
 
                         if i_cam == 0:
                             axs[i_cam][0].set_xlim(800, 1200)

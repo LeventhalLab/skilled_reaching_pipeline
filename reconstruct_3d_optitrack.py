@@ -925,6 +925,14 @@ def refine_trajectories(parent_directories):
 def correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diffs, max_reproj_error=10, min_conf=0.9):
     video_root_folder = parent_directories['video_root_folder']
     full_pickles, meta_pickles = navigation_utilities.find_dlc_pickles_from_r3d_filename(r3d_file, parent_directories)
+    pickle_metadata = []
+    for full_pickle in full_pickles:
+        pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(full_pickle))
+
+    month_dir = pickle_metadata[0]['mouseID'] + '_' + pickle_metadata[0]['trialtime'].strftime('%Y%m')
+    day_dir = pickle_metadata[0]['mouseID'] + '_' + pickle_metadata[0]['trialtime'].strftime('%Y%m%d')
+    orig_vid_folder = os.path.join(video_root_folder, pickle_metadata[0]['mouseID'], month_dir, day_dir)
+
     # r3d_metadata = navigation_utilities.parse_3d_reconstruction_pickle_name(r3d_file)
 
     dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in meta_pickles]
@@ -958,6 +966,9 @@ def correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diff
 
         # how confident are we in the location for each pellet?
         frame_pellet_conf = pellet_conf[i_frame, :, :]   # frame_pellet_conf contains dlc confidence values for each pellet in each camera view; shape num_cams x num_pellets
+        all_ppts = [np.zeros((2, 2)), np.zeros((2, 2))]
+        all_reproj_errors = [np.zeros((2, 2)), np.zeros((2, 2))]
+        swapped_points = [False, False]
         for i_pellet in range(num_pellets):
             other_pellet_idx = 1 - i_pellet
             # is the reprojection error small and the confidence high for this pellet in both camera views?
@@ -967,7 +978,10 @@ def correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diff
                 # the pellet was probably correctly identified in this frame for both views
                 for i_cam in range(num_cameras):
                     validated_pellet_framepoints[i_frame, i_cam, i_pellet, :] = pellet_framepoints[i_frame, i_cam, i_pellet, :]
-                pass
+            elif all(frame_pellet_reproj_error < max_reproj_error):
+                # even though low confidence in pellet location, they still seem to be a good match, put this case in for possible future modifications
+                for i_cam in range(num_cameras):
+                    validated_pellet_framepoints[i_frame, i_cam, i_pellet, :] = pellet_framepoints[i_frame, i_cam, i_pellet, :]
             elif frame_pellet_conf[0, i_pellet] > min_conf and frame_pellet_conf[1, other_pellet_idx] > min_conf:
                 # high confidence in this pellet location in camera 1 view despite not having a good pellet 1 match in camera 2
                 # what if the other pellet in camera 2 is its match? test the reprojection error for this pellet ID in camera 1
@@ -986,46 +1000,86 @@ def correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diff
                 test_frame_pts[1, 0, :] = pellet_framepoints[i_frame, 1, other_pellet_idx, :]
                 ppts, reproj_errors = check_3d_reprojection(pellet_wp, test_frame_pts, cal_data, dlc_metadata, pickle_metadata, i_frame, parent_directories)
 
+                # first element in list is for pellet 1, second is for pellet 2 reprojections; first row is camera 1, second row camera 2 in each ppts array
+                all_ppts[i_pellet] = ppts
+                all_reproj_errors[i_pellet] = reproj_errors
+
                 if (reproj_errors < max_reproj_error).all():
                     # pellets are accurately labeled in each view, but pellet ID's are swapped in each frame
-                    # for now, assume i_pellet was correctly identified in camera 0, so other_pellet_idx should be reassigned to i_pellet
+                    # for now, assume i_pellet was correctly identified in camera 0, so other_pellet_idx should be reassigned to i_pellet in camera 2
                     validated_pellet_framepoints[i_frame, 0, i_pellet, :] = pellet_framepoints[i_frame, 0, i_pellet, :]
+                    validated_pellet_framepoints[i_frame, 0, other_pellet_idx, :] = pellet_framepoints[i_frame, 0, other_pellet_idx, :]
                     validated_pellet_framepoints[i_frame, 1, i_pellet, :] = pellet_framepoints[i_frame, 1, other_pellet_idx, :]
+                    validated_pellet_framepoints[i_frame, 1, other_pellet_idx, :] = pellet_framepoints[i_frame, 1,
+                                                                            i_pellet, :]
+                    swapped_points[i_pellet] = True
 
-                    figs = []
-                    axs = []
-                    for i_cam in range(2):
-                        figs.append(plt.figure())
-                        axs.append(figs[i_cam].add_subplot(111))
+        if any(swapped_points):
+            figs = []
+            axs = []
+            markersize = 15
+            for i_cam in range(2):
+                cam_dir = day_dir + '_' + 'cam{:02d}'.format(i_cam)
+                # cropped_vid_folder = os.path.join(cropped_vids_parent, pickle_metadata['mouseID'], month_dir, day_dir, cam_dir)
 
-                        # original pellet 1 as black circle
-                        axs[i_cam].scatter(validated_pellet_framepoints[i_frame, i_cam, 0, 0],
-                                           validated_pellet_framepoints[i_frame, i_cam, 0, 1], s=2, c='k', marker='o')
-                        # new pellet 1 as black plus
-                        axs[i_cam].scatter(validated_pellet_framepoints[i_frame, i_cam, i_pellet, 0], validated_pellet_framepoints[i_frame, i_cam, i_pellet, 1], s=2, c='k', marker='+')
+                orig_vid_name_base = '_'.join([pickle_metadata[0]['mouseID'],
+                                               pickle_metadata[0]['trialtime'].strftime('%Y%m%d_%H-%M-%S'),
+                                               '{:d}'.format(pickle_metadata[0]['session_num']),
+                                               '{:03d}'.format(pickle_metadata[0]['video_number']),
+                                               'cam{:02d}'.format(i_cam+1)
+                                               ])
+                orig_vid_name = os.path.join(orig_vid_folder, orig_vid_name_base + '.avi')
 
-                        # original pellet 2 as blue circle
-                        axs[i_cam].scatter(validated_pellet_framepoints[i_frame, i_cam, 0, 0],
-                                           validated_pellet_framepoints[i_frame, i_cam, 0, 1], s=2, c='b', marker='o')
-                        # new pellet 2 as blue plus
-                        axs[i_cam].scatter(validated_pellet_framepoints[i_frame, i_cam, i_pellet, 0], validated_pellet_framepoints[i_frame, i_cam, i_pellet, 1], s=2, c='b', marker='+')
+                video_object = cv2.VideoCapture(orig_vid_name)
 
-                        # reprojected point 1 as green star
-                        axs[i_cam].scatter(ppts[0][0], ppts[0][1], s=2, c='g', marker='*')
-                        # reprojected point 2 as red star
-                        axs[i_cam].scatter(ppts[1][0], ppts[1][1], s=2, c='r', marker='*')
+                video_object.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
+                ret, cur_img = video_object.read()
+                width = video_object.get(cv2.CAP_PROP_FRAME_WIDTH)  # float `width`
+                height = video_object.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
-                        if i_cam == 0:
-                            axs[i_cam].set_xlim(800, 1200)
-                            axs[i_cam].set_ylim(700, 1000)
-                        else:
-                            axs[i_cam].set_xlim(800, 1200)
-                            axs[i_cam].set_ylim(400, 700)
-                        axs[i_cam].invert_yaxis()
+                video_object.release()
 
-                    plt.show()
+                if pickle_metadata[i_cam]['isrotated']:
+                    cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
 
-                    mismatched_pellets[i_frame] = True
+                figs.append(plt.figure())
+                axs.append(figs[i_cam].add_subplot(111))
+                axs[i_cam].axis("off")
+                axs[i_cam].set_xlim(0, width)
+                axs[i_cam].set_ylim(0, height)
+                axs[i_cam].invert_yaxis()
+
+                axs[i_cam].imshow(cur_img)
+
+                # original pellet 1 as black circle
+                axs[i_cam].scatter(pellet_framepoints[i_frame, i_cam, 0, 0],
+                                   pellet_framepoints[i_frame, i_cam, 0, 1], s=markersize, facecolors='None', edgecolors='k', marker='o')
+                # new pellet 1 as black plus
+                axs[i_cam].scatter(validated_pellet_framepoints[i_frame, i_cam, 0, 0], validated_pellet_framepoints[i_frame, i_cam, 0, 1], s=markersize, c='k', marker='+')
+
+                # original pellet 2 as blue circle
+                axs[i_cam].scatter(pellet_framepoints[i_frame, i_cam, 1, 0],
+                                   pellet_framepoints[i_frame, i_cam, 1, 1], s=markersize, facecolors='None', edgecolors='b', marker='o')
+                # new pellet 2 as blue plus
+                axs[i_cam].scatter(validated_pellet_framepoints[i_frame, i_cam, 1, 0], validated_pellet_framepoints[i_frame, i_cam, 1, 1], s=markersize, c='b', marker='+')
+
+                # reprojected point 1 as green star
+                axs[i_cam].scatter(all_ppts[0][i_cam][0], all_ppts[0][i_cam][1], s=markersize, c='g', marker='*')
+                # reprojected point 2 as red star                axs[i_cam].scatter(all_ppts[1][i_cam][0], ppts[1][i_cam][1], s=markersize, c='r', marker='*')
+                axs[i_cam].scatter(all_ppts[1][i_cam][0], all_ppts[1][i_cam][1], s=markersize, c='r', marker='*')
+
+                # if i_cam == 0:
+                #     axs[i_cam].set_xlim(800, 1100)
+                #     axs[i_cam].set_ylim(800, 950)
+                # else:
+                #     axs[i_cam].set_xlim(850, 1100)
+                #     axs[i_cam].set_ylim(400, 600)
+                figs[i_cam].suptitle('frame {:d}, camera {:d}'.format(i_frame, i_cam+1))
+                # axs[i_cam].invert_yaxis()
+
+            plt.show()
+
+            mismatched_pellets[i_frame] = True
 
     # now assume that the pellet ID in validated_pellet_framepoints is correct at the end of the recording, and working backwards identify that pellet earlier on
 

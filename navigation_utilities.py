@@ -1031,7 +1031,7 @@ def create_calibration_data_name(cal_data_parent, session_datetime):
     return cal_data_name
 
 
-def create_multiview_calibration_data_name(cal_data_parent, session_datetime, basename='calibrationdata'):
+def create_multiview_calibration_data_name(cal_data_parent, box_num, session_datetime, basename='calibrationdata'):
     '''
 
     :param cal_data_parent: parent directory for folders containing pickle files with calibration results. Has structure:
@@ -1040,21 +1040,20 @@ def create_multiview_calibration_data_name(cal_data_parent, session_datetime, ba
     :return:
     '''
 
-    cal_data_name = basename + '_' + datetime_to_string_for_fname(session_datetime) + '.pickle'
+    cal_data_name = basename + '_box{:2d}'.format(box_num) + datetime_to_string_for_fname(session_datetime) + '.pickle'
 
-    cal_data_folder = create_calibration_data_folder(cal_data_parent, session_datetime)
+    cal_data_folder = create_calibration_data_folder(cal_data_parent, box_num, session_datetime)
     cal_data_name = os.path.join(cal_data_folder, cal_data_name)
 
     return cal_data_name
 
 
-def find_multiview_calibration_data_name(cal_data_parent, session_datetime, basename='calibrationdata'):
+def find_multiview_calibration_data_name(cal_data_parent, session_datetime, box_num, basename='calibrationdata'):
 
-
-    cal_data_folder = create_calibration_data_folder(cal_data_parent, session_datetime)
+    cal_data_folder = create_calibration_data_folder(cal_data_parent, box_num, session_datetime)
 
     # search in cal_data_folder for calibration files from this date
-    test_name = basename + '_' + date_to_string_for_fname(session_datetime) + '_*.pickle'
+    test_name = basename + '_box{:2d}'.format(box_num) + date_to_string_for_fname(session_datetime) + '_*.pickle'
 
     cal_data_files = glob.glob(os.path.join(cal_data_folder, test_name))
     cal_data_datetimes = []
@@ -1164,6 +1163,45 @@ def parse_3d_reconstruction_pickle_name(r3d_fullpath):
 
     return r3d_metadata
 
+
+def find_folders_to_reconstruct(cropped_videos_parent):
+    '''
+    find all session folders in cropped_videos_parent that contain.pickle files with labeled coordinates
+    :param cropped_videos_parent:
+    :return:
+    '''
+    rat_folder_list = glob.glob(os.path.join(cropped_videos_parent, 'R*'))
+
+    folders_to_reconstruct = []
+    for rat_folder in rat_folder_list:
+        _, rat_folder_name = os.path.split(rat_folder)
+        ratID = rat_folder_name[:5]
+        session_folder_list = glob.glob(os.path.join(rat_folder, ratID + '_*'))
+
+        for session_folder in session_folder_list:
+            _, session_folder_name = os.path.split(session_folder)
+
+            # check for a direct view folder; if doesn't exist, just continue the loop
+            test_direct_folder = os.path.join(session_folder, session_folder_name + '_direct')
+            if not os.path.exists(test_direct_folder):
+                continue
+            # check to see if there are .pickle files containing labeled data
+            ratID, session_name = parse_session_dir_name(session_folder_name)
+            test_pickle_name = '_'.join((ratID, session_name[:-1], '*', 'full.pickle'))
+            full_test_pickle_name = os.path.join(test_direct_folder, test_pickle_name)
+            full_pickle_list = glob.glob(full_test_pickle_name)
+
+            if not full_pickle_list:
+                # if full_pickle_list is empty, continue the loop; don't need calibration if bodyparts aren't labeled yet
+                continue
+
+            pickle_metadata = parse_dlc_output_pickle_name(full_pickle_list[0])
+            session_metadata = {'session_folder': session_folder,
+                                'session_date': pickle_metadata['triggertime'],
+                                'session_box': pickle_metadata['boxnum']}
+            folders_to_reconstruct.append(session_metadata)
+
+    return folders_to_reconstruct
 
 
 def find_dlc_pickles_from_r3d_filename(r3d_file, parent_directories):
@@ -1310,12 +1348,13 @@ def parse_Burgess_vid_name(full_vid_path):
     return vid_metadata
 
 
-def create_calibration_data_folder(cal_data_parent, session_datetime):
+def create_calibration_data_folder(cal_data_parent, box_num, session_datetime):
 
-    year_folder = 'calibration_data_' + session_datetime.strftime('%Y')
+    year_folder = 'calibrationfiles_' + session_datetime.strftime('%Y')
     month_folder = year_folder + session_datetime.strftime('%m')
+    box_folder = month_folder + '_box{:2d}'.format(box_num)
 
-    cal_data_folder = os.path.join(cal_data_parent, year_folder, month_folder)
+    cal_data_folder = os.path.join(cal_data_parent, year_folder, month_folder, box_folder)
 
     if not os.path.exists(cal_data_folder):
         os.makedirs(cal_data_folder)

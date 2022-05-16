@@ -913,7 +913,7 @@ def refine_trajectories(parent_directories):
             correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diffs)
 
             smooth_3d_trajectory(r3d_data, frame_valid_pts, pt_euc_diffs)
-            pass
+                pass
 
             #todo:
             # 1) find valid points on a per-frame basis (DONE?)

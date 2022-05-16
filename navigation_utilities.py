@@ -572,6 +572,16 @@ def create_calibration_file_tree(calibration_parent, vid_metadata):
     return calibration_file_tree
 
 
+def find_calibration_files_folder(session_date, box_num, calibration_parent):
+
+    calibration_metadata = {'time': session_date,
+                            'box_num': box_num}
+
+    cal_file_folder = create_calibration_file_folder_name(calibration_metadata, calibration_parent)
+
+    return cal_file_folder
+
+
 def find_calibration_vid_folders(calibration_parent):
     '''
     find all calibration videos. assume directory structure:
@@ -805,19 +815,25 @@ def parse_camera_calibration_video_name(calibration_video_name):
 
 def create_calibration_filename(calibration_metadata, calibration_parent):
 
-    date_string = calibration_metadata['time'].strftime('%Y%m%d')
-    datetime_string = calibration_metadata['time'].strftime('%Y%m%d_%H-%M-%S')
-    year_folder = os.path.join(calibration_parent, date_string[0:4])
-    month_folder = os.path.join(year_folder, date_string[0:6] + '_calibration')
-    calibration_folder = os.path.join(month_folder, date_string[0:6] + '_calibration_files')
-
+    calibration_folder = create_calibration_file_folder_name(calibration_metadata, calibration_parent)
     if not os.path.isdir(calibration_folder):
         os.makedirs(calibration_folder)
+
+    datetime_string = calibration_metadata['time'].strftime('%Y%m%d_%H-%M-%S')
 
     calibration_name = 'calibration_box{:02d}_{}.pickle'.format(calibration_metadata['boxnum'], datetime_string)
     calibration_name = os.path.join(calibration_folder, calibration_name)
 
     return calibration_name
+
+
+def create_calibration_file_folder_name(calibration_metadata, calibration_parent):
+    date_string = calibration_metadata['time'].strftime('%Y%m%d')
+    year_folder = os.path.join(calibration_parent, 'calibrationfiles_' + date_string[0:4])
+    month_folder = os.path.join(year_folder, 'calibrationfiles_' + date_string[0:6])
+    calibration_file_folder_name = os.path.join(month_folder, 'calibrationfiles_' + date_string[0:6] + '_box{:2d}'.format(calibration_metadata['box_num']))
+
+    return calibration_file_folder_name
 
 
 def create_mat_fname_dlc_output(video_metadata, dlc_mat_output_parent):

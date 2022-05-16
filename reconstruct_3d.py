@@ -7,6 +7,20 @@ import pandas as pd
 import scipy.io as sio
 
 
+def reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent):
+
+    for folder_to_reconstruct in folders_to_reconstruct:
+
+        # first, figure out if we have calibration files for this session
+        session_date = folder_to_reconstruct['session_date']
+        box_num = folder_to_reconstruct['session_box']
+        calibration_folder = navigation_utilities.find_calibration_files_folder(session_date, box_num, calibration_files_parent)
+
+        if os.path.exists(calibration_folder):
+            # is there a calibration file for this session?
+
+        pass
+
 def triangulate_video(video_id, videos_parent, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df,
                       view_list=None,
                       min_confidence=0.95):

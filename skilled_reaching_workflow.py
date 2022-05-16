@@ -223,6 +223,7 @@ if __name__ == '__main__':
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
 
     folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(cropped_videos_parent)
+    reconstruct_3d.reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent)
     #todo: complete the camera calibration algorithms
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
     cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi')
@@ -251,5 +252,6 @@ if __name__ == '__main__':
     # step 3: make sure calibration has been run for these sessions
     # find list of all analyzed videos; extract dates and boxes for each session
     folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(cropped_videos_parent)
+    reconstruct_3d.reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_parent)
 
     # step 4: reconstruct the 3d trajectories

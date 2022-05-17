@@ -2,12 +2,14 @@ import numpy as np
 import cv2
 import os
 import navigation_utilities
+import glob
 import skilled_reaching_io
 import pandas as pd
 import scipy.io as sio
+import matplotlib.pyplot as plt
 
 
-def reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent):
+def reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent, rat_df):
 
     for folder_to_reconstruct in folders_to_reconstruct:
 
@@ -19,14 +21,105 @@ def reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibratio
         if os.path.exists(calibration_folder):
             # is there a calibration file for this session?
 
+            cal_data = skilled_reaching_io.get_calibration_data(session_date, box_num, calibration_folder)
+            reconstruct_folder(folder_to_reconstruct, cal_data, rat_df)
+            pass
+
+def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('direct', 'leftmirror', 'rightmirror'), vidtype='.avi'):
+
+    if vidtype[0] is not '.':
+        vidtype = '.' + vidtype
+    _, session_name = os.path.split(folder_to_reconstruct['session_folder'])
+    # assume need at least a direct view for each video
+    view_dirs = [os.path.join(folder_to_reconstruct['session_folder'], session_name + '_' + view) for view in view_list]
+
+    direct_view_dir = [view_dir for view_dir in view_dirs if 'direct' in view_dir][0]
+    ratID, session_name = navigation_utilities.parse_session_dir_name(folder_to_reconstruct['session_folder'])
+
+    rat_num = int(ratID[1:])
+    paw_pref = rat_df[rat_df['ratID'] == rat_num]['pawPref'].values[0]
+
+    if paw_pref == 'left':
+        mirror_view = 'rightmirror'
+        mirror_view_dir = [view_dir for view_dir in view_dirs if 'right' in view_dir][0]
+    elif paw_pref == 'right':
+        mirror_view = 'leftmirror'
+        mirror_view_dir = [view_dir for view_dir in view_dirs if 'left' in view_dir][0]
+    else:
+        print('no paw preference found for rat {}'.format(ratID))
+        return
+
+    session_date = navigation_utilities.fname_string_to_date(session_name[:-1])
+    date_string = navigation_utilities.date_to_string_for_fname(session_date)
+    full_pickle_search_string = os.path.join(direct_view_dir, ratID + '_' + date_string + '_*_direct_*_full.pickle')
+    direct_full_pickles = glob.glob(full_pickle_search_string)
+
+    for direct_full_pickle in direct_full_pickles:
+        direct_pickle_params = navigation_utilities.parse_dlc_output_pickle_name(direct_full_pickle)
+        direct_test_names = navigation_utilities.construct_dlc_output_pickle_names(direct_pickle_params, 'direct')
+        mirror_test_names = navigation_utilities.construct_dlc_output_pickle_names(direct_pickle_params, mirror_view)
+        # returns 2-element tuple containing test string for full.pickle and meta.pickle files, respectively
+
+        full_mirror_pickle = glob.glob(os.path.join(mirror_view_dir, mirror_test_names[0]))[0]
+        meta_mirror_pickle = glob.glob(os.path.join(mirror_view_dir, mirror_test_names[1]))[0]
+        meta_direct_pickle = glob.glob(os.path.join(direct_view_dir, direct_test_names[1]))[0]
+
+        mirror_pickle_params = navigation_utilities.parse_dlc_output_pickle_name(full_mirror_pickle)
+
+        dlc_output = {'direct': skilled_reaching_io.read_pickle(direct_full_pickle),
+                      mirror_view: skilled_reaching_io.read_pickle(full_mirror_pickle)
+                      }
+        dlc_metadata = {'direct': skilled_reaching_io.read_pickle(meta_direct_pickle),
+                        mirror_view: skilled_reaching_io.read_pickle(meta_mirror_pickle)
+                        }
+        trajectory_filename = navigation_utilities.create_trajectory_filename(direct_pickle_params)
+
+        pickle_params = {'direct': direct_pickle_params,
+                         mirror_view: mirror_pickle_params
+                         }
+        trajectory_metadata = extract_trajectory_metadata(dlc_metadata, pickle_params)
+        dlc_data = extract_data_from_dlc_output(dlc_output, trajectory_metadata)
+
+        # translate and undistort points
+        dlc_data = translate_points_to_full_frame(dlc_data, trajectory_metadata)
+        dlc_data = undistort_points(dlc_data, cal_data)
+
+        test_undistortion(dlc_data, dlc_metadata, cal_data, direct_pickle_params)
+
+
         pass
+    pass
+
+
+def test_undistortion(dlc_data, dlc_metadata, cal_data, direct_pickle_params):
+    videos_parent = '/home/levlab/Public/rat_SR_videos_to_analyze'   # on the lambda machine
+    # videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
+    # videos_parent = '/Volumes/Untitled/videos_to_analyze'
+    video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
+    cropped_videos_parent = os.path.join(videos_parent, 'cropped_videos')
+
+    # find original video
+    orig_vid_name = navigation_utilities.find_orig_rat_video(direct_pickle_params, video_root_folder)
+    orig_vid_folder, _ = os.path.split(orig_vid_name)
+
+    test_frame = 300
+    vo = cv2.VideoCapture(orig_vid_name)
+    vo.set(cv2.CAP_PROP_POS_FRAMES, test_frame)
+    ret, cur_img = vo.read()
+    vo.release()
+
+    jpg_name = os.path.join(orig_vid_folder, 'test.jpg')
+    markertype = ['o', '+']
+    overlay_pts_on_orig_ratframe(cur_img, cal_data['mtx'], cal_data['dist'], dlc_data, dlc_metadata, markertype, jpg_name)
+
+
+
+    pass
+
 
 def triangulate_video(video_id, videos_parent, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df,
-                      view_list=None,
+                      view_list=('direct', 'leftmirror', 'rightmirror'),
                       min_confidence=0.95):
-
-    if view_list is None:
-        view_list = ('direct', 'leftmirror', 'rightmirror')
 
     if isinstance(video_id, str):
         video_metadata = navigation_utilities.parse_video_name(video_id)
@@ -250,6 +343,78 @@ def test_pt_alignment(video_name, dlc_data):
     cv2.waitKey(0)
 
     video_object.release()
+
+
+def prepare_img_axes(width, height, scale=1.0, dpi=100, nrows=1, ncols=1):
+    fig_width = (width * scale / dpi) * ncols
+    fig_height = (width * scale / dpi) * nrows
+    fig = plt.figure(
+        frameon=False, figsize=(fig_width, fig_height), dpi=dpi
+    )
+
+    axs = []
+    for i_row in range(nrows):
+        ax_row = []
+        for i_col in range(ncols):
+            idx = (i_row * ncols) + i_col + 1
+            ax_row.append(fig.add_subplot(nrows, ncols, idx))
+            ax_row[i_col].axis("off")
+            ax_row[i_col].set_xlim(0, width)
+            ax_row[i_col].set_ylim(0, height)
+            ax_row[i_col].invert_yaxis()
+        axs.append(ax_row)
+
+    # plt.subplots_adjust(0., 0., 0., 0., 0.)
+
+    return fig, axs
+
+
+def overlay_pts_on_orig_ratframe(img, mtx, dist, dlc_data, dlc_metadata, markertype, jpg_name):
+
+    dotsize = 6
+
+    h, w, _ = np.shape(img)
+    fig, ax = prepare_img_axes(w, h)
+
+    img_ud = cv2.undistort(img, mtx, dist)
+
+    ax[0][0].imshow(img_ud)
+
+    # todo: loop through views to make sure everything is showing up properly
+
+    for i_pt, pt in enumerate(pts):
+
+        if len(pt) > 0:
+            try:
+                x, y = pt[0]
+            except:
+                x, y = pt
+            # x = int(round(x))
+            # y = int(round(y))
+
+            pt_ud_norm = np.squeeze(cv2.undistortPoints(np.array([x, y]), mtx, dist))
+            pt_ud = cvb.unnormalize_points(pt_ud_norm, mtx)
+            bp_color = color_from_bodypart(bodyparts[i_pt])
+
+            ax[0][0].plot(pt_ud[0], pt_ud[1], marker=markertype[0], ms=dotsize, color=bp_color)
+            # ax.plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
+
+    # for i_rpt, rpt in enumerate(reprojected_pts):
+    #     if len(rpt) > 0:
+    #         try:
+    #             x, y = rpt[0]
+    #         except:
+    #             x, y = rpt
+    #         # x = int(round(x))
+    #         # y = int(round(y))
+    #         bp_color = color_from_bodypart(bodyparts[i_rpt])
+    #
+    #         ax[0][0].plot(x, y, marker=markertype[1], ms=dotsize, color=bp_color)
+
+    # plt.show()
+    fig.savefig(jpg_name)
+
+    return fig, ax
 
 
 def package_data_into_mat(dlc_data, video_metadata, trajectory_metadata):

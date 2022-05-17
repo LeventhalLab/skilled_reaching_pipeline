@@ -175,9 +175,10 @@ if __name__ == '__main__':
     # test_video_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/videos_to_crop/R0382/R0382_20201216c/R0382_box02_20201216_17-31-47_010.avi'
     # test_calibration_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/calibration_files/2021/202102_calibration/camera_calibration_videos_202102/CameraCalibration_box02_20210211_14-33-25.avi'
     rat_database_name = '/Users/dan/Documents/deeplabcut/videos_to_analyze/SR_rat_database.csv'
+    rat_database_name = '/home/levlab/Public/rat_SR_videos_to_analyze/SR_rat_database.csv'
     label_videos = True
 
-    # rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
+    rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
 
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
@@ -223,7 +224,7 @@ if __name__ == '__main__':
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
 
     folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(cropped_videos_parent)
-    reconstruct_3d.reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent)
+    reconstruct_3d.reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent, rat_df)
     #todo: complete the camera calibration algorithms
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
     cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi')

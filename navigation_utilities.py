@@ -79,6 +79,34 @@ def create_cropped_video_destination_list(cropped_vids_parent, video_folder_list
     return cropped_video_directories
 
 
+def find_orig_rat_video(video_metadata, video_root_folder, vidtype='.avi'):
+
+    # directory structure:
+    #  video_root_folder --> ratID --> ratID_sessiondateX
+
+    rat_folder = os.path.join(video_root_folder, video_metadata['ratID'])
+    datestring = date_to_string_for_fname(video_metadata['triggertime'])
+    session_folder_test = os.path.join(rat_folder, video_metadata['ratID'] + '_' + datestring + '*')
+    session_folder_list = glob.glob(session_folder_test)
+    if len(session_folder_list) == 1:
+        session_folder = session_folder_list[0]
+    elif len(session_folder_list) > 1:
+        print('more than one session folder for {} on {}', video_metadata['ratID'], datestring)
+        return None
+    else:
+        print('no session folders for {} on {}', video_metadata['ratID'], datestring)
+        return None
+
+    timestring = datetime_to_string_for_fname(video_metadata['triggertime'])
+    vid_name = '_'.join((video_metadata['ratID'],
+                         timestring,
+                         '{:03d}.avi'.format(video_metadata['video_number'])
+                         ))
+    orig_vid_name = os.path.join(session_folder, vid_name)
+
+    return orig_vid_name
+
+
 def parse_session_dir_name(session_dir):
     """
 
@@ -87,7 +115,8 @@ def parse_session_dir_name(session_dir):
     :return:
     """
 
-    dir_name_parts = session_dir.split('_')
+    _, session_dir_name = os.path.split(session_dir)
+    dir_name_parts = session_dir_name.split('_')
     ratID = dir_name_parts[0]
     session_name = dir_name_parts[1]
 
@@ -582,6 +611,16 @@ def find_calibration_files_folder(session_date, box_num, calibration_parent):
     return cal_file_folder
 
 
+def create_mat_cal_filename(calibration_metadata, basename='SR_boxCalibration'):
+
+    datestring = date_to_string_for_fname(calibration_metadata['time'])
+    mat_cal_filename = '_'.join((basename,
+                                 'box{:2d}'.format(calibration_metadata['boxnum']),
+                                 datestring + '.mat'))
+
+    return mat_cal_filename
+
+
 def find_calibration_vid_folders(calibration_parent):
     '''
     find all calibration videos. assume directory structure:
@@ -813,16 +852,16 @@ def parse_camera_calibration_video_name(calibration_video_name):
     return camera_calibration_metadata
 
 
-def create_calibration_filename(calibration_metadata, calibration_parent):
+def create_calibration_filename(calibration_metadata):
 
-    calibration_folder = create_calibration_file_folder_name(calibration_metadata, calibration_parent)
-    if not os.path.isdir(calibration_folder):
-        os.makedirs(calibration_folder)
+    # calibration_folder = create_calibration_file_folder_name(calibration_metadata, calibration_parent)
+    # if not os.path.isdir(calibration_folder):
+    #     os.makedirs(calibration_folder)
 
     datetime_string = calibration_metadata['time'].strftime('%Y%m%d_%H-%M-%S')
 
     calibration_name = 'calibration_box{:02d}_{}.pickle'.format(calibration_metadata['boxnum'], datetime_string)
-    calibration_name = os.path.join(calibration_folder, calibration_name)
+    # calibration_name = os.path.join(calibration_folder, calibration_name)
 
     return calibration_name
 
@@ -1283,6 +1322,7 @@ def find_orig_movies_from_r3d_filename(r3d_file, parent_directories):
 
 
 
+
 def get_Burgess_video_folders_to_crop(video_root_folder):
     """
     find all the lowest level directories within video_root_folder, which are presumably the lowest level folders that
@@ -1402,6 +1442,14 @@ def fname_string_to_datetime(string_to_convert):
     datetime_from_fname = datetime.strptime(string_to_convert, format_string)
 
     return datetime_from_fname
+
+
+def fname_string_to_date(string_to_convert):
+    format_string = '%Y%m%d'
+
+    date_from_fname = datetime.strptime(string_to_convert, format_string)
+
+    return date_from_fname
 
 
 def parse_cropped_calibration_video_name(cropped_calibration_vid_name):

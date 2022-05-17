@@ -178,9 +178,13 @@ def calibrate_camera_from_video(camera_calibration_vid_name, calibration_parent,
 
     calibration_metadata = navigation_utilities.parse_camera_calibration_video_name(camera_calibration_vid_name)
 
-    calibration_name = navigation_utilities.create_calibration_filename(calibration_metadata, calibration_parent)
+    calibration_name = navigation_utilities.create_calibration_filename(calibration_metadata)
+    calibration_folder = create_calibration_file_folder_name(calibration_metadata, calibration_parent)
+    if not os.path.exists(calibration_folder):
+        os.makedirs(calibration_folder)
+    full_calibration_name = os.path.join(calibration_folder, calibration_name)
 
-    skilled_reaching_io.write_pickle(calibration_name, stereo_params)
+    skilled_reaching_io.write_pickle(full_calibration_name, stereo_params)
 
 
 def multi_view_calibration(calibration_vids, cal_data_parent, cb_size=(10, 7)):

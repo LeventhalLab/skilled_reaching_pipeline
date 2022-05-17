@@ -3,6 +3,8 @@ import pandas as pd
 from datetime import datetime
 import numpy as np
 import scipy.io as sio
+import navigation_utilities
+import os
 
 
 def read_crop_params_csv(crop_params_filepath):
@@ -46,7 +48,7 @@ def read_matlab_calibration(mat_calibration_name):
             camera extrinsics (rotation and translation), and A is the camera intrinsic matrix
     So, we need to make the following conversions:
         mtx_opencv = transpose(mtx_matlab) where mtx is the camera intrinsic matrix
-        Pn_opencv = transpoze(Pn_matlab) where Pn is the camera matrix for the virtual camera
+        Pn_opencv = transpose(Pn_matlab) where Pn is the camera matrix for the virtual camera
 
     :param mat_calibration_name:
     :return:
@@ -95,3 +97,25 @@ def read_rat_csv_database(csv_name):
     #             pass
     #
     # return cb_points
+
+
+def get_calibration_data(session_date, box_num, cal_file_folder):
+    # create the expected .mat file name, and expected .pickle file name - .mat file if calibration was previously
+    # done in matlab using the calibration cube, .pickle if calibration was done using video of checkerboard
+    calibration_metadata = {'time': session_date,
+                            'boxnum': box_num}
+
+    pickle_cal_filename = navigation_utilities.create_calibration_filename(calibration_metadata)
+    full_pickle_cal_name = os.path.join(cal_file_folder, pickle_cal_filename)
+
+    mat_cal_filename = navigation_utilities.create_mat_cal_filename(calibration_metadata)
+    full_mat_cal_name = os.path.join(cal_file_folder, mat_cal_filename)
+
+    if os.path.exists(full_pickle_cal_name):
+        cal_data = read_pickle(full_pickle_cal_name)
+    elif os.path.exists(full_mat_cal_name):
+        cal_data = read_matlab_calibration(full_mat_cal_name)
+    else:
+        cal_data = None
+
+    return cal_data

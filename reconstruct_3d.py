@@ -7,6 +7,7 @@ import skilled_reaching_io
 import pandas as pd
 import scipy.io as sio
 import matplotlib.pyplot as plt
+import computer_vision_basics as cvb
 
 
 def reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent, rat_df):
@@ -84,11 +85,79 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('dire
         dlc_data = translate_points_to_full_frame(dlc_data, trajectory_metadata)
         dlc_data = undistort_points(dlc_data, cal_data)
 
-        test_undistortion(dlc_data, dlc_metadata, cal_data, direct_pickle_params)
+        # test_undistortion(dlc_data, dlc_metadata, cal_data, direct_pickle_params)
 
+        # WORKING HERE
+        # todo: preprocessing to get rid of "invalid" points
+
+        find_invalid_DLC_points(dlc_data, paw_pref)
+
+
+        mat_data = package_data_into_mat(dlc_data, video_metadata, trajectory_metadata)
+        mat_name = navigation_utilities.create_mat_fname_dlc_output(video_metadata, dlc_mat_output_parent)
+
+        video_name = navigation_utilities.build_video_name(video_metadata, videos_parent)
+        # test_pt_alignment(video_name, dlc_data)
+
+        sio.savemat(mat_name, mat_data)
 
         pass
     pass
+
+
+def find_invalid_DLC_points(dlc_data, paw_pref, maxdisperframe=30, min_valid_p=0.85, min_certain_p=0.97, max_neighbor_dist=70):
+
+    view_list = tuple(dlc_data.keys())
+
+    bodyparts = tuple(dlc_data['direct'].keys())
+
+    num_frames = np.shape(dlc_data['direct'][bodyparts[0]]['coordinates_ud'])[0]
+
+    for view in view_list:
+        find_invalid_DLC_single_view(dlc_data[view], paw_pref)
+
+    pass
+
+def find_invalid_DLC_single_view(view_dlc_data, paw_pref, maxdisperframe=30, min_valid_p=0.85, min_certain_p=0.97, max_neighbor_dist=70):
+
+    bodyparts = tuple(view_dlc_data.keys())
+
+    num_bodyparts = len(bodyparts)
+    num_frames = np.shape(view_dlc_data[bodyparts[0]]['coordinates_ud'])[0]
+
+    p = np.zeros((num_bodyparts, num_frames))
+    for i_bp, bp in enumerate(bodyparts):
+        p[i_bp, :] = np.squeeze(view_dlc_data[bp]['confidence'])
+
+    invalid_points = p < min_valid_p
+    certain_points = p > min_certain_p
+
+    diff_per_frame = np.zeros((num_bodyparts, num_frames-1))
+    poss_too_far = np.zeros((num_bodyparts, num_frames), dtype=bool)
+
+    for i_bp, bp in enumerate(bodyparts):
+
+        individual_part_coords = view_dlc_data[bp]['coordinates_ud']
+        individual_part_coords[invalid_points[i_bp, :], :] = np.nan
+
+        coord_diffs = np.diff(individual_part_coords, n=1, axis=0)
+        diff_per_frame[i_bp, :] = np.sqrt(np.sum(np.square(coord_diffs), axis=1))
+
+        poss_too_far[i_bp, :-1] = diff_per_frame[i_bp, :] > maxdisperframe
+        poss_too_far[i_bp, 1:] = np.logical_or(poss_too_far[i_bp, :-1], poss_too_far[i_bp, 1:])
+        # logic is that either the point before or point after could be the bad point if there was too big a location jump between frames
+
+        poss_too_far[i_bp, :] = np.logical_or(poss_too_far[i_bp, :], np.isnan(invalid_points[i_bp, :]))
+        pass
+    pass
+
+
+def find_reaching_pawparts(bodyparts, paw_pref):
+
+    if paw_pref.lower() == 'left':
+        pass
+    elif paw_pref.lower() == 'right':
+        pass
 
 
 def test_undistortion(dlc_data, dlc_metadata, cal_data, direct_pickle_params):
@@ -109,10 +178,8 @@ def test_undistortion(dlc_data, dlc_metadata, cal_data, direct_pickle_params):
     vo.release()
 
     jpg_name = os.path.join(orig_vid_folder, 'test.jpg')
-    markertype = ['o', '+']
-    overlay_pts_on_orig_ratframe(cur_img, cal_data['mtx'], cal_data['dist'], dlc_data, dlc_metadata, markertype, jpg_name)
-
-
+    markertypes = ['o', '+']
+    overlay_pts_on_orig_ratframe(cur_img, cal_data, dlc_data, dlc_metadata, markertypes, jpg_name, test_frame)
 
     pass
 
@@ -283,13 +350,16 @@ def undistort_points(dlc_data, camera_params):
             continue
 
         bodyparts = dlc_data[view].keys()
+
         for bp in bodyparts:
+            num_rows = np.shape(dlc_data[view][bp]['coordinates'])[0]
+            dlc_data[view][bp]['coordinates_ud'] = np.zeros((num_rows, 2))
             for i_row, row in enumerate(dlc_data[view][bp]['coordinates']):
                 if not np.all(row == 0):
                     # a point was found in this frame (coordinate == 0 if no point found)
-                    norm_pt_ud = cv2.undistortPoints(row, camera_params['mtx'], camera_params['dist'])  # todo: account for distortion coefficients
+                    norm_pt_ud = cv2.undistortPoints(row, camera_params['mtx'], camera_params['dist'])
                     pt_ud = unnormalize_points(norm_pt_ud, camera_params['mtx'])
-                    dlc_data[view][bp]['coordinates'][i_row, :] = np.squeeze(pt_ud)
+                    dlc_data[view][bp]['coordinates_ud'][i_row, :] = np.squeeze(pt_ud)
 
     return dlc_data
 
@@ -369,52 +439,156 @@ def prepare_img_axes(width, height, scale=1.0, dpi=100, nrows=1, ncols=1):
     return fig, axs
 
 
-def overlay_pts_on_orig_ratframe(img, mtx, dist, dlc_data, dlc_metadata, markertype, jpg_name):
+def overlay_pts_on_orig_ratframe(img, cal_data, dlc_data, dlc_metadata, markertypes, jpg_name, test_frame):
 
     dotsize = 6
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
 
-    h, w, _ = np.shape(img)
-    fig, ax = prepare_img_axes(w, h)
+    bp_c = bp_colors()
 
-    img_ud = cv2.undistort(img, mtx, dist)
+    im_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    h, w, _ = np.shape(im_bgr)
+    fig_ud_direct_epi, ax_ud_direct_epi = prepare_img_axes(w, h)
+    fig_ud_mirror_epi, ax_ud_mirror_epi = prepare_img_axes(w, h)
 
-    ax[0][0].imshow(img_ud)
+    # fig, ax = prepare_img_axes(w, h)
 
-    # todo: loop through views to make sure everything is showing up properly
+    img_ud = cv2.undistort(im_bgr, mtx, dist)
 
-    for i_pt, pt in enumerate(pts):
+    ax_ud_direct_epi[0][0].imshow(img_ud)
+    ax_ud_mirror_epi[0][0].imshow(img_ud)
 
-        if len(pt) > 0:
-            try:
-                x, y = pt[0]
-            except:
-                x, y = pt
-            # x = int(round(x))
-            # y = int(round(y))
+    # ax[0][0].imshow(im_bgr)
 
-            pt_ud_norm = np.squeeze(cv2.undistortPoints(np.array([x, y]), mtx, dist))
-            pt_ud = cvb.unnormalize_points(pt_ud_norm, mtx)
-            bp_color = color_from_bodypart(bodyparts[i_pt])
+    for view in dlc_data.keys():
+        view_dlcdata = dlc_data[view]
 
-            ax[0][0].plot(pt_ud[0], pt_ud[1], marker=markertype[0], ms=dotsize, color=bp_color)
-            # ax.plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
+        bodyparts = view_dlcdata.keys()
 
-    # for i_rpt, rpt in enumerate(reprojected_pts):
-    #     if len(rpt) > 0:
-    #         try:
-    #             x, y = rpt[0]
-    #         except:
-    #             x, y = rpt
-    #         # x = int(round(x))
-    #         # y = int(round(y))
-    #         bp_color = color_from_bodypart(bodyparts[i_rpt])
-    #
-    #         ax[0][0].plot(x, y, marker=markertype[1], ms=dotsize, color=bp_color)
+        for bp in bodyparts:
+            cur_pt = view_dlcdata[bp]['coordinates'][test_frame]
 
-    # plt.show()
-    fig.savefig(jpg_name)
+            if all(cur_pt == 0):
+                continue
 
-    return fig, ax
+            cur_pt_ud = view_dlcdata[bp]['coordinates_ud'][test_frame]
+
+            # ax[0][0].scatter(cur_pt[0], cur_pt[1], edgecolors=bp_c[bp], facecolors='none', marker=markertypes[0])
+            # ax[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], c=bp_c[bp], marker=markertypes[1])
+
+            ax_ud_direct_epi[0][0].scatter(cur_pt[0], cur_pt[1], edgecolors=bp_c[bp], facecolors='none', marker=markertypes[0])
+            ax_ud_direct_epi[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], c=bp_c[bp], marker=markertypes[1])
+
+            ax_ud_mirror_epi[0][0].scatter(cur_pt[0], cur_pt[1], edgecolors=bp_c[bp], facecolors='none', marker=markertypes[0])
+            ax_ud_mirror_epi[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], c=bp_c[bp], marker=markertypes[1])
+
+    # overlay epipolar lines
+    draw_epipolar_lines(dlc_data, cal_data, test_frame, [ax_ud_direct_epi[0][0], ax_ud_mirror_epi[0][0]], (w, h))
+
+    plt.show()
+
+    pass
+
+
+def draw_epipolar_lines(dlc_data, cal_data, test_frame, ax, im_size):
+
+    # F[:,:,0] - fundamental matrix between direct and top mirror views
+    # F[:,:,1] - fundamental matrix between direct and left mirror views
+    # F[:,:,2] - fundamental matrix between direct and right mirror views
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+
+    bp_c = bp_colors()
+
+    view_list = dlc_data.keys()
+    if 'leftmirror' in view_list:
+        F = cal_data['F'][:, :, 2]
+    elif 'rightmirror' in view_list:
+        F = cal_data['F'][:, :, 2]
+    else:
+        print('"leftmirror" or "rightmirror" must be one of the views for 3D reconstruction')
+        return
+
+    for i_view, view in enumerate(view_list):
+        view_dlcdata = dlc_data[view]
+
+        bodyparts = view_dlcdata.keys()
+
+        for bp in bodyparts:
+            cur_pt = view_dlcdata[bp]['coordinates'][test_frame]
+
+            if all(cur_pt == 0):
+                continue
+
+            cur_pt_ud = view_dlcdata[bp]['coordinates_ud'][test_frame]
+
+            cur_epiline = cv2.computeCorrespondEpilines(cur_pt_ud.reshape(-1, 1, 2), 1, F)
+
+            epiline = np.squeeze(cur_epiline)
+            edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
+
+            if not np.all(edge_pts == 0):
+                ax[i_view].plot(edge_pts[:, 0], edge_pts[:, 1], color=bp_c[bp], ls='-', marker='.')
+
+    plt.show()
+
+    pass
+
+
+
+def bp_colors():
+
+    bp_c = {'leftear':(0, 1, 1)}
+    bp_c['rightear'] = tuple(np.array(bp_c['leftear']) * 0.5)
+
+    bp_c['lefteye'] = (1, 0, 1)
+    bp_c['righteye'] = tuple(np.array(bp_c['lefteye']) * 0.5)
+
+    bp_c['nose'] = (1, 1, 1)
+
+    bp_c['leftelbow'] = (1, 1, 0)
+    bp_c['rightelbow'] = tuple(np.array(bp_c['leftelbow']) * 0.5)
+
+    bp_c['rightpawdorsum'] = (0, 0, 1)
+    bp_c['rightpalm'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.5)
+    bp_c['rightmcp1'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.9)
+    bp_c['rightmcp2'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.8)
+    bp_c['rightmcp3'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.7)
+    bp_c['rightmcp4'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.6)
+
+    bp_c['rightpip1'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.9)
+    bp_c['rightpip2'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.8)
+    bp_c['rightpip3'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.7)
+    bp_c['rightpip4'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.6)
+
+    bp_c['rightdig1'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.9)
+    bp_c['rightdig2'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.8)
+    bp_c['rightdig3'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.7)
+    bp_c['rightdig4'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.6)
+
+    bp_c['leftpawdorsum'] = (1, 0, 0)
+    bp_c['leftpalm'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.5)
+    bp_c['leftmcp1'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.9)
+    bp_c['leftmcp2'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.8)
+    bp_c['leftmcp3'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.7)
+    bp_c['leftmcp4'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.6)
+
+    bp_c['leftpip1'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.9)
+    bp_c['leftpip2'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.8)
+    bp_c['leftpip3'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.7)
+    bp_c['leftpip4'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.6)
+
+    bp_c['leftdig1'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.9)
+    bp_c['leftdig2'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.8)
+    bp_c['leftdig3'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.7)
+    bp_c['leftdig4'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.6)
+
+    bp_c['pellet1'] = (0, 0, 0)
+    bp_c['pellet2'] = (0.1, 0.1, 0.1)
+    bp_c['pellet3'] = (0.2, 0.2, 0.2)
+
+    return bp_c
 
 
 def package_data_into_mat(dlc_data, video_metadata, trajectory_metadata):

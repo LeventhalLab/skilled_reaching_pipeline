@@ -129,6 +129,16 @@ def find_invalid_DLC_single_view(view_dlc_data, paw_pref, maxdisperframe=30, min
     for i_bp, bp in enumerate(bodyparts):
         p[i_bp, :] = np.squeeze(view_dlc_data[bp]['confidence'])
 
+    # collect the paw part indices for both paws - index 0 for left paw, index 1 for right paw
+    temp_paw_part_idx, temp_pawdorsum_idx, temp_palm_idx = find_reaching_pawparts(bodyparts, 'left')
+    paw_part_idx = [temp_paw_part_idx]
+    paw_dorsum_idx = [temp_pawdorsum_idx]
+    palm_idx = [temp_palm_idx]
+    temp_paw_part_idx, temp_pawdorsum_idx, temp_palm_idx = find_reaching_pawparts(bodyparts, 'right')
+    paw_part_idx.append(temp_paw_part_idx)
+    paw_dorsum_idx.append(temp_pawdorsum_idx)
+    palm_idx.append(temp_palm_idx)
+
     invalid_points = p < min_valid_p
     certain_points = p > min_certain_p
 
@@ -148,16 +158,49 @@ def find_invalid_DLC_single_view(view_dlc_data, paw_pref, maxdisperframe=30, min
         # logic is that either the point before or point after could be the bad point if there was too big a location jump between frames
 
         poss_too_far[i_bp, :] = np.logical_or(poss_too_far[i_bp, :], np.isnan(invalid_points[i_bp, :]))
-        pass
+        # any nan's from low probability parts should be included as potentially too big a jump
+
+        poss_too_far[i_bp, certain_points[i_bp, :]] = False
+        # keep any points with p > min_certain_p even if it apparently traveled too far in one frame
+
+    invalid_points = np.logical_or(invalid_points, poss_too_far)
+
+    # make sure all the paw parts are close to each other
+    for i_paw in range(2):
+        # left paw is index 1, right paw is index 2
+        for i_frame in range(num_frames):
+            cur_valid_idx = np.nonzero(np.logical_not(invalid_points[paw_part_idx[i_paw], i_frame]))[0]
+            num_valid_points = len(cur_valid_idx)
+
+            if num_valid_points > 3:
+
+                cur_paw_coords =
+                for i_pt in range(num_valid_points):
+                    test_idx = np.zeros(num_valid_points, dtype=bool)
+            pass
+
+
+    # throw out any points on the reaching paw that are too far away from the cluster of other points, except for the paw dorsum
     pass
 
 
-def find_reaching_pawparts(bodyparts, paw_pref):
+def find_reaching_pawparts(bodyparts, paw_pref, mcp_string='mcp', pip_string='pip', dig_string='dig', pawdorsum_string='pawdorsum', palm_string='palm'):
 
-    if paw_pref.lower() == 'left':
-        pass
-    elif paw_pref.lower() == 'right':
-        pass
+    test_mcp_string = paw_pref.lower() + mcp_string
+    test_pip_string = paw_pref.lower() + pip_string
+    test_dig_string = paw_pref.lower() + dig_string
+    test_pawdorsum_string = paw_pref.lower() + pawdorsum_string
+    test_palm_string = paw_pref.lower() + palm_string
+
+    mcp_idx = [i_bp for i_bp, bp in enumerate(bodyparts) if test_mcp_string in bp]
+    pip_idx = [i_bp for i_bp, bp in enumerate(bodyparts) if test_pip_string in bp]
+    dig_idx = [i_bp for i_bp, bp in enumerate(bodyparts) if test_dig_string in bp]
+
+    pawdorsum_idx = [i_bp for i_bp, bp in enumerate(bodyparts) if test_pawdorsum_string in bp]
+    palm_idx = [i_bp for i_bp, bp in enumerate(bodyparts) if test_palm_string in bp]
+
+    # return the full list of paw part indices in the bodyparts list, but also paw dorsum and palm indices separately
+    return mcp_idx + pip_idx + dig_idx + pawdorsum_idx + palm_idx, pawdorsum_idx, palm_idx
 
 
 def test_undistortion(dlc_data, dlc_metadata, cal_data, direct_pickle_params):

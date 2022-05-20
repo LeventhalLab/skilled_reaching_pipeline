@@ -87,10 +87,15 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('dire
 
         # test_undistortion(dlc_data, dlc_metadata, cal_data, direct_pickle_params)
 
-        # WORKING HERE
         # todo: preprocessing to get rid of "invalid" points
 
-        find_invalid_DLC_points(dlc_data, paw_pref)
+        invalid_points, diff_per_frame = find_invalid_DLC_points(dlc_data, paw_pref)
+
+        calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, im_size=(2040, 1024), max_dist_from_neighbor=60)
+
+
+
+
 
 
         mat_data = package_data_into_mat(dlc_data, video_metadata, trajectory_metadata)
@@ -105,6 +110,46 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('dire
     pass
 
 
+def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, im_size=(2040, 1024), max_dist_from_neighbor=60):
+
+    # F[:,:,0] - fundamental matrix between direct and top mirror views
+    # F[:,:,1] - fundamental matrix between direct and left mirror views
+    # F[:,:,2] - fundamental matrix between direct and right mirror views
+
+    K = cal_data['mtx']
+    view_list = dlc_data.keys()
+    bodyparts = []
+    for view in view_list:
+        bodyparts.append(dlc_data[view].keys())
+
+    num_frames = np.shape(dlc_data[view_list[0]][bodyparts[0][0]]['coordinates_ud'])[0]
+    frames_to_check = range(num_frames)
+
+    estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref, frames_to_check, max_dist_from_neighbor=max_dist_from_neighbor)
+
+
+
+    num_frames = dlc_data[view_list[0]]
+    pass
+
+
+def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref, frames_to_check, max_dist_from_neighbor=60):
+
+    # F[:,:,0] - fundamental matrix between direct and top mirror views
+    # F[:,:,1] - fundamental matrix between direct and left mirror views
+    # F[:,:,2] - fundamental matrix between direct and right mirror views
+
+    if paw_pref.lower() == 'left':
+        # use F for right mirror
+        F = cal_data['F'][:, :, 2]
+    elif paw_pref.lower() == 'right':
+        # use F for left mirror
+        F = cal_data['F'][:, :, 1]
+
+
+
+
+    pass
 def find_invalid_DLC_points(dlc_data, paw_pref, maxdisperframe=30, min_valid_p=0.85, min_certain_p=0.97, max_neighbor_dist=70):
 
     view_list = tuple(dlc_data.keys())
@@ -113,12 +158,18 @@ def find_invalid_DLC_points(dlc_data, paw_pref, maxdisperframe=30, min_valid_p=0
 
     num_frames = np.shape(dlc_data['direct'][bodyparts[0]]['coordinates_ud'])[0]
 
+    invalid_points = []
+    diff_per_frame = []
     for view in view_list:
-        find_invalid_DLC_single_view(dlc_data[view], paw_pref)
+        temp_invalid_points, temp_diff_per_frame = find_invalid_DLC_single_view(dlc_data[view], paw_pref)
+        invalid_points.append(temp_invalid_points)
+        diff_per_frame.append(temp_diff_per_frame)
 
-    pass
+    # todo: add in ability to manually invalidate points here?
+    return invalid_points, diff_per_frame
 
-def find_invalid_DLC_single_view(view_dlc_data, paw_pref, maxdisperframe=30, min_valid_p=0.85, min_certain_p=0.97, max_neighbor_dist=70):
+
+def find_invalid_DLC_single_view(view_dlc_data, paw_pref, maxdistperframe=30, min_valid_p=0.85, min_certain_p=0.97, max_neighbor_dist=70):
 
     bodyparts = tuple(view_dlc_data.keys())
 
@@ -145,15 +196,17 @@ def find_invalid_DLC_single_view(view_dlc_data, paw_pref, maxdisperframe=30, min
     diff_per_frame = np.zeros((num_bodyparts, num_frames-1))
     poss_too_far = np.zeros((num_bodyparts, num_frames), dtype=bool)
 
+    all_part_coords = np.zeros((num_bodyparts, num_frames, 2))
     for i_bp, bp in enumerate(bodyparts):
 
         individual_part_coords = view_dlc_data[bp]['coordinates_ud']
         individual_part_coords[invalid_points[i_bp, :], :] = np.nan
+        all_part_coords[i_bp, :, :] = individual_part_coords
 
         coord_diffs = np.diff(individual_part_coords, n=1, axis=0)
-        diff_per_frame[i_bp, :] = np.sqrt(np.sum(np.square(coord_diffs), axis=1))
+        diff_per_frame[i_bp, :] = np.linalg.norm(coord_diffs, axis=1)
 
-        poss_too_far[i_bp, :-1] = diff_per_frame[i_bp, :] > maxdisperframe
+        poss_too_far[i_bp, :-1] = diff_per_frame[i_bp, :] > maxdistperframe
         poss_too_far[i_bp, 1:] = np.logical_or(poss_too_far[i_bp, :-1], poss_too_far[i_bp, 1:])
         # logic is that either the point before or point after could be the bad point if there was too big a location jump between frames
 
@@ -174,14 +227,23 @@ def find_invalid_DLC_single_view(view_dlc_data, paw_pref, maxdisperframe=30, min
 
             if num_valid_points > 3:
 
-                cur_paw_coords =
+                cur_paw_coords = np.squeeze(all_part_coords[paw_part_idx[i_paw], i_frame, :])
+                valid_paw_coords = cur_paw_coords[cur_valid_idx, :]
                 for i_pt in range(num_valid_points):
                     test_idx = np.zeros(num_valid_points, dtype=bool)
-            pass
+                    test_idx[i_pt] = True
+                    test_point = valid_paw_coords[test_idx, :]
+                    other_points = valid_paw_coords[np.logical_not(test_idx)]
 
+                    nn_dist, _ = cvb.find_nearest_neighbor(test_point, other_points)
 
-    # throw out any points on the reaching paw that are too far away from the cluster of other points, except for the paw dorsum
-    pass
+                    if nn_dist > max_neighbor_dist:
+                        # throw out any points on this paw that are too far away from the cluster of other points, except for the paw dorsum or palm
+                        invalidate_idx = cur_valid_idx[i_pt]
+                        if invalidate_idx != paw_dorsum_idx[i_paw] and invalidate_idx != palm_idx[i_paw]:
+                            invalid_points[paw_part_idx[i_paw], i_frame] = True
+
+    return invalid_points, diff_per_frame
 
 
 def find_reaching_pawparts(bodyparts, paw_pref, mcp_string='mcp', pip_string='pip', dig_string='dig', pawdorsum_string='pawdorsum', palm_string='palm'):
@@ -546,7 +608,7 @@ def draw_epipolar_lines(dlc_data, cal_data, test_frame, ax, im_size):
 
     view_list = dlc_data.keys()
     if 'leftmirror' in view_list:
-        F = cal_data['F'][:, :, 2]
+        F = cal_data['F'][:, :, 1]
     elif 'rightmirror' in view_list:
         F = cal_data['F'][:, :, 2]
     else:

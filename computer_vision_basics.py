@@ -351,3 +351,15 @@ def find_line_edge_coordinates(line, im_size):
                 i_pt += 1
 
     return edge_pts
+
+
+def find_nearest_neighbor(x, y, num_neighbors=1):
+
+    pts_diff = y - x
+
+    dist_from_x = np.linalg.norm(pts_diff, axis=1)
+
+    sorted_dist_idx = np.argsort(dist_from_x)
+    sorted_dist = np.sort(dist_from_x)
+
+    return sorted_dist[:num_neighbors], sorted_dist_idx[:num_neighbors]

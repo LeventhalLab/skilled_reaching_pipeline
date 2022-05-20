@@ -178,7 +178,7 @@ if __name__ == '__main__':
     skilled_reaching_calibration.calibrate_all_Burgess_vids(parent_directories, cb_size=cb_size, checkerboard_square_size=checkerboard_square_size)
 
     # step 2 - crop all videos of mice reaching
-    # vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
+    vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
     # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
     # UNCOMMENT BELOW
     cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, cropped_videos_parent, crop_params_df, cam_list, vidtype='avi')

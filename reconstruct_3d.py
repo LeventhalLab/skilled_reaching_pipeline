@@ -117,10 +117,8 @@ def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, im_size
     # F[:,:,2] - fundamental matrix between direct and right mirror views
 
     K = cal_data['mtx']
-    view_list = dlc_data.keys()
-    bodyparts = []
-    for view in view_list:
-        bodyparts.append(dlc_data[view].keys())
+    view_list = tuple(dlc_data.keys())
+    bodyparts = [tuple(dlc_data[view].keys()) for view in view_list]
 
     num_frames = np.shape(dlc_data[view_list[0]][bodyparts[0][0]]['coordinates_ud'])[0]
     frames_to_check = range(num_frames)
@@ -133,23 +131,119 @@ def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, im_size
     pass
 
 
+def collect_bp_data(view_dlc_data, dlc_key):
+
+    bodyparts = tuple(view_dlc_data.keys())
+
+    bp_array_shape = np.shape(view_dlc_data[bodyparts[0]][dlc_key])
+    bp_data = np.zeros((len(bodyparts), bp_array_shape[0], bp_array_shape[1]))
+    for i_bp, bp in enumerate(bodyparts):
+        bp_data[i_bp, :, :] = view_dlc_data[bp][dlc_key]
+
+    return bp_data
+
+
 def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref, frames_to_check, max_dist_from_neighbor=60):
 
     # F[:,:,0] - fundamental matrix between direct and top mirror views
     # F[:,:,1] - fundamental matrix between direct and left mirror views
     # F[:,:,2] - fundamental matrix between direct and right mirror views
 
+    view_list = tuple(dlc_data.keys())
+    bodyparts = [tuple(dlc_data[view].keys()) for view in view_list]
+
+    bp_idx = [group_dlc_bodyparts(bp) for bp in bodyparts]
+    bp_coords = [collect_bp_data(dlc_data[view], 'coordinates_ud') for view in view_list]
+
     if paw_pref.lower() == 'left':
         # use F for right mirror
         F = cal_data['F'][:, :, 2]
+        view_list = ('direct', 'rightmirror')
     elif paw_pref.lower() == 'right':
         # use F for left mirror
         F = cal_data['F'][:, :, 1]
+        view_list = ('direct', 'leftmirror')
+
+    num_frames = len(frames_to_check)
+
+    num_digits = 4
+    digitparts = ('mcp', 'pip', 'dig')
+    for i_frame in frames_to_check:
+
+        # all_pts = [np.squeeze(bp_coords[i_view][all_parts_idx, i_frame, :]) for i_view in range(2)]
+
+        for digitpart in digitparts:
+            for paw in ('left', 'right'):
+                for i_digit in range(num_digits):
+                    digit_string = paw + digitpart + '{:d}'.format(i_digit + 1)
+
+                    direct_part_idx = bodyparts[0].index(digit_string)
+                    mirror_part_idx = bodyparts[1].index(digit_string)
+
+                    if (invalid_points[0][direct_part_idx, i_frame] and invalid_points[1][mirror_part_idx, i_frame]) or (not invalid_points[0][direct_part_idx, i_frame] and not invalid_points[1][mirror_part_idx, i_frame]):
+                        # either neither point was found with certainty or both points were found with certainty. Either way, nothing to do
+                        continue
+
+                    # figure out whether the mirror or direct view point was identified
+                    next_digit_knuckles = np.empty((2, 2))
+                    next_digit_knuckles[:] = np.nan
+                    if invalid_points[0][direct_part_idx, i_frame]:
+                        # the mirror point was identified
+                        # all_paw_points = valid_points[0]
+                        known_pt = dlc_data[view_list[1]][digit_string]['coordinates_ud'][i_frame, :]
+                        # todo: find all the other knuckle points for this paw in the direct view - probably write a subroutine to extract all the knuckles on one paw from dlc_data
+                        other_knuckle_pts = find_other_knuckle_pts(dlc_data[view_list[0]], paw, i_frame)
+                        pass
 
 
+def group_dlc_bodyparts(bodyparts):
+
+    mcp_idx = []
+    pip_idx = []
+    dig_idx = []
+    pawdorsum_idx = []
+    palm_idx = []
+    elbow_idx = []
+    ear_idx = []
+    eye_idx = []
+    for side in ('left', 'right'):
+        test_mcp_string = side + 'mcp'
+        test_pip_string = side + 'pip'
+        test_dig_string = side + 'dig'
+        test_pawdorsum_string = side + 'pawdorsum'
+        test_palm_string = side + 'palm'
+        test_elbow_string = side + 'elbow'
+        test_ear_string = side + 'ear'
+        test_eye_string = side + 'eye'
+
+        mcp_idx.append([i_bp for i_bp, bp in enumerate(bodyparts) if test_mcp_string in bp])
+        pip_idx.append([i_bp for i_bp, bp in enumerate(bodyparts) if test_pip_string in bp])
+        dig_idx.append([i_bp for i_bp, bp in enumerate(bodyparts) if test_dig_string in bp])
+
+        pawdorsum_idx.append([i_bp for i_bp, bp in enumerate(bodyparts) if test_pawdorsum_string in bp])
+        palm_idx.append([i_bp for i_bp, bp in enumerate(bodyparts) if test_palm_string in bp])
+        elbow_idx.append([i_bp for i_bp, bp in enumerate(bodyparts) if test_elbow_string in bp])
+        ear_idx.append([i_bp for i_bp, bp in enumerate(bodyparts) if test_ear_string in bp])
+        eye_idx.append([i_bp for i_bp, bp in enumerate(bodyparts) if test_eye_string in bp])
+
+    nose_idx = [i_bp for i_bp, bp in enumerate(bodyparts) if 'nose' in bp]
+
+    # for all bodyparts that are bilateral, these are lists where the first element is for left side, second element for the right side
+    bp_idx = {
+        'mcp_idx': mcp_idx,
+        'pip_idx': pip_idx,
+        'dig_idx': dig_idx,
+        'pawdorsum_idx': pawdorsum_idx,
+        'palm_idx': palm_idx,
+        'elbow_idx': elbow_idx,
+        'ear_idx': ear_idx,
+        'eye_idx': eye_idx,
+        'nose_idx': nose_idx
+    }
+
+    return bp_idx
 
 
-    pass
 def find_invalid_DLC_points(dlc_data, paw_pref, maxdisperframe=30, min_valid_p=0.85, min_certain_p=0.97, max_neighbor_dist=70):
 
     view_list = tuple(dlc_data.keys())

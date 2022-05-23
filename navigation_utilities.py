@@ -157,7 +157,7 @@ def find_folders_to_analyze(cropped_videos_parent, view_list=None):
     return folders_to_analyze
 
 
-def find_optitrack_folders_to_analyze(cropped_videos_parent, cam_list=(1, 2)):
+def find_optitrack_folders_to_analyze(parent_directories, cam_list=(1, 2)):
     """
     get the full list of directories containing cropped videos in the videos_to_analyze folder
     :param cropped_videos_parent: parent directory with subfolders direct_view and mirror_views, which have subfolders
@@ -166,6 +166,8 @@ def find_optitrack_folders_to_analyze(cropped_videos_parent, cam_list=(1, 2)):
     :return: folders_to_analyze: dictionary containing a key for each member of view_list. Each key holds a list of
         folders to run through deeplabcut
     """
+
+    cropped_videos_parent = parent_directories['cropped_vids_parent']
 
     cam_name_list = ['cam{:02d}'.format(cam_num) for cam_num in cam_list]
     folders_to_analyze = dict.fromkeys(cam_name_list)
@@ -1086,6 +1088,23 @@ def create_calibration_data_name(cal_data_parent, session_datetime):
     return cal_data_name
 
 
+def create_optitrack_calibration_data_name(cal_data_parent, session_datetime, basename='calibrationdata'):
+    '''
+
+    :param cal_data_parent: parent directory for folders containing pickle files with calibration results. Has structure:
+        cal_data_parent-->calibration_data_YYYY-->calibration_data_YYYYmm
+    :param session_datetime:
+    :return:
+    '''
+
+    cal_data_name = basename + datetime_to_string_for_fname(session_datetime) + '.pickle'
+
+    cal_data_folder = create_optitrack_calibration_data_folder(cal_data_parent, session_datetime)
+    cal_data_name = os.path.join(cal_data_folder, cal_data_name)
+
+    return cal_data_name
+
+
 def create_multiview_calibration_data_name(cal_data_parent, box_num, session_datetime, basename='calibrationdata'):
     '''
 
@@ -1411,6 +1430,19 @@ def create_calibration_data_folder(cal_data_parent, box_num, session_datetime):
     box_folder = month_folder + '_box{:2d}'.format(box_num)
 
     cal_data_folder = os.path.join(cal_data_parent, year_folder, month_folder, box_folder)
+
+    if not os.path.exists(cal_data_folder):
+        os.makedirs(cal_data_folder)
+
+    return cal_data_folder
+
+
+def create_optitrack_calibration_data_folder(cal_data_parent, session_datetime):
+
+    year_folder = 'calibrationfiles_' + session_datetime.strftime('%Y')
+    month_folder = year_folder + session_datetime.strftime('%m')
+
+    cal_data_folder = os.path.join(cal_data_parent, year_folder, month_folder)
 
     if not os.path.exists(cal_data_folder):
         os.makedirs(cal_data_folder)

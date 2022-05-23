@@ -10,7 +10,7 @@ import shutil
 from datetime import datetime
 
 
-def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, marked_vids_parent, cropped_vid_type='.avi', gputouse=0, save_as_csv=True):
+def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, parent_directories, cropped_vid_type='.avi', gputouse=0, save_as_csv=True):
     '''
 
     :param folders_to_analyze:
@@ -25,6 +25,8 @@ def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, marked_vid
         pass
     else:
         cropped_vid_type = '.' + cropped_vid_type
+
+    marked_vids_parent = parent_directories['marked_vids_parent']
 
     cam_list = folders_to_analyze.keys()
     for cam_name in cam_list:
@@ -179,14 +181,14 @@ if __name__ == '__main__':
 
     # step 2 - crop all videos of mice reaching
     vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
-    # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
+    crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
     # UNCOMMENT BELOW
-    cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, cropped_videos_parent, crop_params_df, cam_list, vidtype='avi')
+    cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, parent_directories, crop_params_df, cam_list, vidtype='avi')
 
     # step 3 - run DLC on each cropped video
-    folders_to_analyze = navigation_utilities.find_optitrack_folders_to_analyze(cropped_videos_parent, cam_list=cam_list)
+    folders_to_analyze = navigation_utilities.find_optitrack_folders_to_analyze(parent_directories, cam_list=cam_list)
     # UNCOMMENT BELOW
-    scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, marked_videos_parent, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
+    scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, parent_directories, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
 
     # UNCOMMENT BELOW
     # if label_videos:

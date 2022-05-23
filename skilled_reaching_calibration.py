@@ -461,7 +461,7 @@ def calibrate_all_Burgess_vids(parent_directories, cb_size=(7, 10), checkerboard
         calvid_metadata = [navigation_utilities.parse_Burgess_calibration_vid_name(vid) for vid in sorted_vid_pair]
         # sort vid_pair so that file names are in order of camera number
 
-        cal_data_name = navigation_utilities.create_multiview_calibration_data_name(cal_data_parent,
+        cal_data_name = navigation_utilities.create_optitrack_calibration_data_name(cal_data_parent,
                                                                                     calvid_metadata[0]['session_datetime'])
         if not os.path.isfile(cal_data_name):
             # collect the checkerboard points, write to file
@@ -484,7 +484,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10), checker
     # extract metadata from file names. Note that cam 01 is upside down
 
     calvid_metadata = [navigation_utilities.parse_Burgess_calibration_vid_name(vid) for vid in vid_pair]
-    cal_data_name = navigation_utilities.create_multiview_calibration_data_name(cal_data_parent,
+    cal_data_name = navigation_utilities.create_optitrack_calibration_data_name(cal_data_parent,
                                                                                 calvid_metadata[0]['session_datetime'])
     if os.path.isfile(cal_data_name):
         # if file already exists, assume cb points have already been collected

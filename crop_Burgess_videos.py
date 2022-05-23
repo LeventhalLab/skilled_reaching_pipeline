@@ -276,7 +276,7 @@ def optirack_cropped_vid_name(full_vid_path, dest_folder, crop_params):
     return full_dest_name
 
 
-def preprocess_Burgess_videos(vid_folder_list, cropped_vids_parent, crop_params, cam_list, vidtype='avi'):
+def preprocess_Burgess_videos(vid_folder_list, parent_directories, crop_params, cam_list, vidtype='avi'):
     '''
 
     :param vid_folder_list:
@@ -286,6 +286,7 @@ def preprocess_Burgess_videos(vid_folder_list, cropped_vids_parent, crop_params,
     :param vidtype:
     :return: cropped_video_directories:
     '''
+    cropped_vids_parent = parent_directories['cropped_vids_parent']
     cropped_video_directories = crop_Burgess_folders(vid_folder_list, cropped_vids_parent, crop_params, cam_list,
                                                  vidtype='avi')
 

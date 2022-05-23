@@ -85,9 +85,8 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('dire
         dlc_data = translate_points_to_full_frame(dlc_data, trajectory_metadata)
         dlc_data = undistort_points(dlc_data, cal_data)
 
+        # comment back in to show identified points and undistorted points superimposed on frames
         # test_undistortion(dlc_data, dlc_metadata, cal_data, direct_pickle_params)
-
-        # todo: preprocessing to get rid of "invalid" points
 
         invalid_points, diff_per_frame = find_invalid_DLC_points(dlc_data, paw_pref)
 
@@ -164,17 +163,31 @@ def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref
         F = cal_data['F'][:, :, 1]
         view_list = ('direct', 'leftmirror')
 
-    num_frames = len(frames_to_check)
-
     num_digits = 4
     digitparts = ('mcp', 'pip', 'dig')
     for i_frame in frames_to_check:
 
-        # all_pts = [np.squeeze(bp_coords[i_view][all_parts_idx, i_frame, :]) for i_view in range(2)]
-
         for digitpart in digitparts:
-            for paw in ('left', 'right'):
+            for i_paw, paw in enumerate(('left', 'right')):
+
+                all_paw_parts_idx = collect_all_paw_parts_idx(bp_idx, i_paw)
+
+                all_paw_pts = [np.squeeze(bp_coords[i_view][all_paw_parts_idx[i_view], i_frame, :]) for i_view in range(2)]
+                valid_paw_pts = [all_paw_pts[i_view][np.logical_not(invalid_points[i_view][all_paw_parts_idx[i_view], i_frame])] for i_view in range(2)]
+
                 for i_digit in range(num_digits):
+
+                    if digitpart == 'mcp':
+                        next_knuckle_test_string = paw + 'pip' + '{:d}'.format(i_digit + 1)
+                    elif digitpart == 'pip':
+                        next_knuckle_test_string = paw + 'dig' + '{:d}'.format(i_digit + 1)
+                    elif digitpart == 'dig':
+                        next_knuckle_test_string = paw + 'pip' + '{:d}'.format(i_digit + 1)
+
+                    next_knuckle_idx = [bp.index(next_knuckle_test_string) for bp in bodyparts]
+                    # direct_next_knuckle_idx = bodyparts[0].index(next_knuckle_test_string)
+                    # mirror_next_knuckle_idx = bodyparts[1].index(next_knuckle_test_string)
+
                     digit_string = paw + digitpart + '{:d}'.format(i_digit + 1)
 
                     direct_part_idx = bodyparts[0].index(digit_string)
@@ -190,11 +203,102 @@ def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref
                     if invalid_points[0][direct_part_idx, i_frame]:
                         # the mirror point was identified
                         # all_paw_points = valid_points[0]
-                        known_pt = dlc_data[view_list[1]][digit_string]['coordinates_ud'][i_frame, :]
-                        # todo: find all the other knuckle points for this paw in the direct view - probably write a subroutine to extract all the knuckles on one paw from dlc_data
-                        other_knuckle_pts = find_other_knuckle_pts(dlc_data[view_list[0]], paw, i_frame)
-                        pass
+                        view_to_reconstruct = 0
+                        known_view = 1
+                    else:
+                        view_to_reconstruct = 1
+                        known_view = 0
 
+                    known_pt = dlc_data[view_list[known_view]][digit_string]['coordinates_ud'][i_frame, :]
+
+                    # find the marked points at neighboring knuckles (e.g., if mcp2, find the location of mcp1 and mcp3)
+                    # note offset because python indexes starting at 0, so mcp1 is indexed as point 0
+                    other_knuckle_pts = find_other_knuckle_pts(bp_coords[view_to_reconstruct], bodyparts[view_to_reconstruct], invalid_points[view_to_reconstruct], paw, digitpart, i_frame)
+                    if i_digit == 0:
+                        if not invalid_points[view_to_reconstruct][bp_idx[view_to_reconstruct][digitpart][i_paw][1], i_frame]:
+                            next_digit_knuckles[1, :] = bp_coords[view_to_reconstruct][bp_idx[view_to_reconstruct][digitpart][i_paw][1], i_frame, :]
+                    elif i_digit in (1, 2):
+                        if not invalid_points[view_to_reconstruct][bp_idx[view_to_reconstruct][digitpart][i_paw][i_digit - 1], i_frame]:
+                            next_digit_knuckles[0, :] = bp_coords[view_to_reconstruct][bp_idx[view_to_reconstruct][digitpart][i_paw][i_digit - 1], i_frame, :]
+                        if not invalid_points[view_to_reconstruct][bp_idx[view_to_reconstruct][digitpart][i_paw][i_digit + 1], i_frame]:
+                            next_digit_knuckles[1, :] = bp_coords[view_to_reconstruct][bp_idx[view_to_reconstruct][digitpart][i_paw][i_digit + 1], i_frame, :]
+                    elif i_digit == 3:
+                        if not invalid_points[view_to_reconstruct][bp_idx[view_to_reconstruct][digitpart][i_paw][2], i_frame]:
+                            next_digit_knuckles[0, :] = bp_coords[view_to_reconstruct][bp_idx[view_to_reconstruct][digitpart][i_paw][2], i_frame, :]
+
+                    # find the point marked at the next knuckle on the same digit
+                    if not invalid_points[view_to_reconstruct][next_knuckle_idx[view_to_reconstruct], i_frame]:
+                        next_knuckle_pt = bp_coords[view_to_reconstruct][next_knuckle_idx[view_to_reconstruct], i_frame, :]
+                    else:
+                        next_knuckle_pt = []
+                    # else:
+                    #     # the direct point was identified
+                    #     known_pt = dlc_data[view_list[0]][digit_string]['coordinates_ud'][i_frame, :]
+                    #
+                    #     # find the marked points at neighboring knuckles (e.g., if mcp2, find the location of mcp1 and mcp3)
+                    #     # note offset because python indexes starting at 0, so mcp1 is indexed as point 0
+                    #     other_knuckle_pts = find_other_knuckle_pts(bp_coords[1], bodyparts[1], invalid_points[1], paw, digitpart, i_frame)
+                    #
+                    #     if i_digit == 0:
+                    #         if not invalid_points[1][bp_idx[1][digitpart][i_paw][1], i_frame]:
+                    #             next_digit_knuckles[1, :] = bp_coords[1][bp_idx[1][digitpart][i_paw][1], i_frame, :]
+                    #     elif i_digit in (1, 2):
+                    #         if not invalid_points[1][bp_idx[1][digitpart][i_paw][i_digit - 1], i_frame]:
+                    #             next_digit_knuckles[0, :] = bp_coords[1][bp_idx[1][digitpart][i_paw][i_digit - 1], i_frame, :]
+                    #         if not invalid_points[1][bp_idx[1][digitpart][i_paw][i_digit + 1], i_frame]:
+                    #             next_digit_knuckles[1, :] = bp_coords[1][bp_idx[1][digitpart][i_paw][i_digit + 1], i_frame, :]
+                    #     elif i_digit == 3:
+                    #         if not invalid_points[1][bp_idx[digitpart][i_paw][2], i_frame]:
+                    #             next_digit_knuckles[0, :] = bp_coords[1][bp_idx[digitpart][i_paw][2], i_frame, :]
+                    #
+                    #     # find the point marked at the next knuckle on the same digit
+                    #     if not invalid_points[1][direct_next_knuckle_idx, i_frame]:
+                    #         next_knuckle_pt = bp_coords[1][direct_next_knuckle_idx, i_frame, :]
+                    #     else:
+                    #         next_knuckle_pt = []
+
+                    if len(next_knuckle_pt) == 0 and len(other_knuckle_pts) == 0:
+                        # did not find any adjacent knuckles with which to match the point from the other view
+                        continue
+
+                    new_pt = estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knuckle_pt, valid_paw_pts[view_to_reconstruct], F, im_size, max_dist_from_neighbor)
+                    pass
+
+
+def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knuckle_pt, valid_paw_pts, F, im_size, max_dist_from_neighbor):
+
+    # WORKING HERE...need to find boundary of valid_paw_pts
+
+    pass
+
+def collect_all_paw_parts_idx(bp_idx, i_paw):
+
+    all_parts_idx = [[], []]
+    bp_keys = tuple(bp_idx[0].keys())
+
+    for i_view in range(2):
+
+        for bp_group in bp_keys:
+
+            if bp_group in ('mcp', 'pip', 'dig', 'pawdorsum', 'palm'):
+                all_parts_idx[i_view].extend(bp_idx[i_view][bp_group][i_paw])
+
+    return all_parts_idx
+
+
+
+def find_other_knuckle_pts(view_bp_coords, view_bodyparts, view_invalid_points, paw, digitpart, i_frame):
+    # extract the locations of knuckles in this view for the paw ('left' or 'right') at the given knuckle ('mcp', 'pip',
+    # or 'dig'). i.e., if 'mcp', left paw, find coordinates of the mcp of all four digits for the left paw
+
+    test_string = paw + digitpart
+
+    knuckle_indices = [i_bp for i_bp, bp in enumerate(view_bodyparts) if test_string in bp]
+
+    other_knuckle_pts = view_bp_coords[knuckle_indices, i_frame, :]
+    valid_knuckle_pts = other_knuckle_pts[np.logical_not(view_invalid_points[knuckle_indices, i_frame]), :]
+
+    return valid_knuckle_pts
 
 def group_dlc_bodyparts(bodyparts):
 
@@ -230,15 +334,15 @@ def group_dlc_bodyparts(bodyparts):
 
     # for all bodyparts that are bilateral, these are lists where the first element is for left side, second element for the right side
     bp_idx = {
-        'mcp_idx': mcp_idx,
-        'pip_idx': pip_idx,
-        'dig_idx': dig_idx,
-        'pawdorsum_idx': pawdorsum_idx,
-        'palm_idx': palm_idx,
-        'elbow_idx': elbow_idx,
-        'ear_idx': ear_idx,
-        'eye_idx': eye_idx,
-        'nose_idx': nose_idx
+        'mcp': mcp_idx,
+        'pip': pip_idx,
+        'dig': dig_idx,
+        'pawdorsum': pawdorsum_idx,
+        'palm': palm_idx,
+        'elbow': elbow_idx,
+        'ear': ear_idx,
+        'eye': eye_idx,
+        'nose': nose_idx
     }
 
     return bp_idx

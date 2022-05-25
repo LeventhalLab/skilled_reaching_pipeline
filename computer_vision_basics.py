@@ -1,5 +1,10 @@
 import numpy as np
 import cv2
+import shapely.geometry as sg
+import shapely.ops as so
+import plot_utilities
+import matplotlib.pyplot as plt
+
 
 def unnormalize_points(points2d_norm, mtx):
     '''
@@ -353,7 +358,64 @@ def find_line_edge_coordinates(line, im_size):
     return edge_pts
 
 
+def line_polygon_intersect(line_pts, poly_points, tolerance=1):
+    '''
+
+    :param line_coeffs: vector [A, B, C] such that Ax + By + C = 0
+    :param poly_points:
+    :param tolerance:
+    :return:
+    '''
+
+    epi_line = sg.asLineString(line_pts)
+    paw_poly = sg.asPolygon(poly_points)
+
+
+    # ax = plot_utilities.plot_shapely_point(sh_objects[0], fc='red')
+    # plot_utilities.plot_polygon(sh_objects[1], ax=ax)
+    # plt.show()
+    # find points within tolerance of the line
+
+    if epi_line.intersects(paw_poly):
+        epi_paw_intersect = epi_line.intersection(paw_poly)
+        pass
+    else:
+        epi_paw_intersect = None
+
+    return epi_paw_intersect
+
+    # min_x = min(poly_points[:, 0])
+    # max_x = max(poly_points[:, 0])
+    # min_y = min(poly_points[:, 1])
+    # max_y = max(poly_points[:, 1])
+    #
+    # intersect_points = []
+    #
+    # iterations = 0
+    #
+    # for ii in range(round(min_x), round(max_x)):
+    #     iterations = iterations + 1
+    #     if iterations > 1000:
+    #         print('iterations = {:d}'.format(iterations))
+    #
+    #     iterations2 = 0
+    #     for jj in range(round(min_y), round(max_y)):
+    #         iterations2 = iterations2 + 1
+    #         if iterations2 > 1000:
+    #             print('iterations2 = {:d}'.format(iterations2))
+    #
+    #         line_val = ii * line_coeffs[0] + jj * line_coeffs[1] + line_coeffs[2]
+    #
+    #         # WORKING HERE...
+
 def find_nearest_neighbor(x, y, num_neighbors=1):
+    '''
+
+    :param x: object borders as an m x 2 numpy array, where m is the number of points
+    :param y: object borders as an n x 2 numpy array, where n is the number of points
+    :param num_neighbors:
+    :return:
+    '''
 
     pts_diff = y - x
 

@@ -272,6 +272,7 @@ def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knu
 
     # WORKING HERE...need to find boundary of valid_paw_pts
     # try finding the convex hull of the paw parts that were identified in the "other" view
+    # is there a better way to find the boundary using shapely?
     if np.shape(valid_paw_pts)[0] > 2:
         # need at least 3 points to calculate a convex hull
         paw_hull = ConvexHull(valid_paw_pts)
@@ -281,6 +282,17 @@ def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knu
     epiline = cv2.computeCorrespondEpilines(known_pt.reshape(-1, 1, 2), 1, F)   # since it's a mirror in the same image, does it matter if we label it image 1 or 2?
     epiline = np.squeeze(epiline)
     edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
+
+    # find intersection between epipolar line and polygon defined by paw boundary
+    epi_paw_intersect = cvb.line_polygon_intersect(edge_pts, valid_paw_pts[paw_hull.vertices, :])
+
+    if epi_paw_intersect is None:
+        # no intersection between the epipolar line and polygon bounded by other paw points
+
+        # WORKING HERE...
+    else:
+
+        pass
 
 
 

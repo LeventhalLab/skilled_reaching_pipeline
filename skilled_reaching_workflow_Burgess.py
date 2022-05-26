@@ -56,7 +56,7 @@ def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, parent_dir
     return scorername
 
 
-def create_labeled_optitrack_videos(folders_to_analyze, marked_vids_parent, config_path, scorername,
+def create_labeled_optitrack_videos(folders_to_analyze, parent_directories, config_path, scorername,
                                   cropped_vid_type='.avi'):
     '''
     :param folders_to_analyze:
@@ -67,6 +67,8 @@ def create_labeled_optitrack_videos(folders_to_analyze, marked_vids_parent, conf
         to make it easier to move them to another computer without taking the original videos with them
     :return:
     '''
+
+    marked_vids_parent = parent_directories['marked_vids_parent']
     if cropped_vid_type[0]=='.':
         pass
     else:
@@ -195,7 +197,7 @@ if __name__ == '__main__':
         #todo: working here - create labeled videos
         try:
             create_labeled_optitrack_videos(folders_to_analyze,
-                                      marked_videos_parent,
+                                      parent_directories,
                                       Burgess_DLC_config_path,
                                       scorername,
                                       cropped_vid_type=cropped_vid_type
@@ -203,6 +205,6 @@ if __name__ == '__main__':
         except:
             pass
     # step 4 - reconstruct 3D images
-    reconstruct_optitrack_3d(parent_directories)
-
-    reconstruct_3d_optitrack.refine_trajectories(parent_directories)
+    # reconstruct_optitrack_3d(parent_directories)
+    #
+    # reconstruct_3d_optitrack.refine_trajectories(parent_directories)

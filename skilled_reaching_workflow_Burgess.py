@@ -191,17 +191,17 @@ if __name__ == '__main__':
     scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, parent_directories, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
 
     # UNCOMMENT BELOW
-    # if label_videos:
-    #     #todo: working here - create labeled videos
-    #     try:
-    #         create_labeled_optitrack_videos(folders_to_analyze,
-    #                                   marked_videos_parent,
-    #                                   Burgess_DLC_config_path,
-    #                                   scorername,
-    #                                   cropped_vid_type=cropped_vid_type
-    #                                   )
-    #     except:
-    #         pass
+    if label_videos:
+        #todo: working here - create labeled videos
+        try:
+            create_labeled_optitrack_videos(folders_to_analyze,
+                                      marked_videos_parent,
+                                      Burgess_DLC_config_path,
+                                      scorername,
+                                      cropped_vid_type=cropped_vid_type
+                                      )
+        except:
+            pass
     # step 4 - reconstruct 3D images
     reconstruct_optitrack_3d(parent_directories)
 

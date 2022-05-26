@@ -425,3 +425,52 @@ def find_nearest_neighbor(x, y, num_neighbors=1):
     sorted_dist = np.sort(dist_from_x)
 
     return sorted_dist[:num_neighbors], sorted_dist_idx[:num_neighbors]
+
+
+def find_nearest_point_on_line(line_pts, pts):
+
+    if type(line_pts) is sg.LineString:
+        sg_line = line_pts
+    else:
+        sg_line = sg.asLineString(line_pts)
+
+    sg_point = sg.asPoint(pts)
+
+    near_pts = so.nearest_points(sg_line, sg_point)
+    nndist = near_pts[0].distance(near_pts[1])
+    nn_pt = near_pts[0]
+
+    return nndist, nn_pt
+
+
+def find_nearest_point_to_line(line_pts, pts):
+
+    if type(line_pts) is sg.LineString:
+        sg_line = line_pts
+    else:
+        sg_line = sg.asLineString(line_pts)
+
+    sg_point = sg.asPoint(pts)
+
+    near_pts = so.nearest_points(sg_line, sg_point)
+    nndist = near_pts[0].distance(near_pts[1])
+    nn_pt = near_pts[1]
+
+    return nndist, nn_pt
+
+
+def find_line_intersection(line1, line2):
+
+    if type(line1) is sg.LineString:
+        sg_line1 = line1
+    else:
+        sg_line1 = sg.asLineString(line1)
+
+    if type(line2) is sg.LineString:
+        sg_line2 = line2
+    else:
+        sg_line2 = sg.asLineString(line2)
+
+    line_intersect = sg_line1.intersection(sg_line2)
+
+    pass

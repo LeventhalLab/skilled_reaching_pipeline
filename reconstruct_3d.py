@@ -153,9 +153,11 @@ def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref
 
     view_list = tuple(dlc_data.keys())
     bodyparts = [tuple(dlc_data[view].keys()) for view in view_list]
-
+    num_bodyparts = len(bodyparts)
+    num_frames = np.shape()
     bp_idx = [group_dlc_bodyparts(bp) for bp in bodyparts]
     bp_coords = [collect_bp_data(dlc_data[view], 'coordinates_ud') for view in view_list]
+    is_estimate = [np.zeros((num_bodyparts, num_frames), dtype=bool)]
 
     if paw_pref.lower() == 'left':
         # use F for right mirror
@@ -265,6 +267,14 @@ def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref
                         continue
 
                     new_pt = estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knuckle_pt, valid_paw_pts[view_to_reconstruct], F, im_size, max_dist_from_neighbor)
+
+                    if new_pt is None:
+                        continue
+
+                    if invalid_points[0][direct_part_idx, i_frame]:
+                        # the mirror point was identified
+                        bp_coords[0][direct_part_idx, i_frame, :] = new_pt
+                        is_estimate[0][direct_part_idx, i_frame] = True    # direct point for this body part in this frame is estimated
                     pass
 
 
@@ -289,14 +299,61 @@ def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knu
     if epi_paw_intersect is None:
         # no intersection between the epipolar line and polygon bounded by other paw points
 
+        if len(other_knuckle_pts) == 0:
+            # didn't find any other of this knuckle on other digits (I think) - that is, if the reference knuckle is
+            # mcp1, didn't find mcp2, 3, or 4
+            # find the point on the epipolar line closest to the neck knuckle up the same digit
+            nndist, nn_idx = cvb.find_nearest_point_on_line(edge_pts, next_knuckle_pt)
+            pass
+        # else:
+        #     nndist, nn_idx = cvb.find_nearest_point_on_line(edge_pts, other_knuckle_pts)
+
         # WORKING HERE...
     else:
 
-        pass
+        if len(next_knuckle_pt) == 0:
+            # the epipolar line intersects the polygon defined by the points that were found in the other view, but the
+            # point for the next knuckle on the same digit wasn't found either
 
+            if np.logical_not(np.isnan(next_digit_knuckles[:])).any():
+                # at least one knuckle on a neighboring digit was found.
+                # is this digit 2 or 3, and were both neighboring digits found?
+                if np.logical_not(np.isnan(next_digit_knuckles[:])).all():
+                    # both neighboring digits were found
+                    # find the intersection between the epipolar line and the segment connecting the two adjacent
+                    # knuckles
+                    li = cvb.find_line_intersection(edge_pts, next_digit_knuckles)
+                    pass
 
+                else:
+                    # only one neighboring digit was found
+                    # look for the closest point in the intersection of the epipolar line with the same knuckle on the
+                    # neighboring digits
 
-    pass
+                    nndist, nn_pt = cvb.find_nearest_point_on_line(edge_pts, next_digit_knuckles)
+                    if nndist < max_dist_from_neighbor:
+                        new_pt = np.array([nn_pt.coords.xy[0][0], nn_pt.coords.xy[1][0]])
+                    else:
+                        new_pt = None
+            else:
+                # the neighboring digits for the same knuckle weren't found either
+                # find index of other_pts that is closest to the epipolar line
+                nndist, nn_pt = cvb.find_nearest_point_on_line(edge_pts, other_knuckle_pts)
+                if nndist < max_dist_from_neighbor:
+                    new_pt = np.array([nn_pt.coords.xy[0][0], nn_pt.coords.xy[1][0]])
+                else:
+                    new_pt = None
+        else:
+            # the epipolar line intersects the polygoin defined by the points that were found in the other view. look
+            # for the intersection point closest to the next knuckle on the same digit
+            nndist, nn_pt = cvb.find_nearest_point_on_line(epi_paw_intersect, next_knuckle_pt)
+            if nndist < max_dist_from_neighbor:
+                new_pt = np.array([nn_pt.coords.xy[0][0], nn_pt.coords.xy[1][0]])
+            else:
+                new_pt = None
+
+    return new_pt
+
 
 def collect_all_paw_parts_idx(bp_idx, i_paw):
 

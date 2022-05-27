@@ -93,7 +93,7 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('dire
 
 
 
-        calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, im_size=(2040, 1024), max_dist_from_neighbor=60)
+        calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_pickle_params, im_size=(2040, 1024), max_dist_from_neighbor=60)
 
 
 
@@ -112,7 +112,7 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('dire
     pass
 
 
-def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, im_size=(2040, 1024), max_dist_from_neighbor=60):
+def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_pickle_params, im_size=(2040, 1024), max_dist_from_neighbor=60):
 
     # F[:,:,0] - fundamental matrix between direct and top mirror views
     # F[:,:,1] - fundamental matrix between direct and left mirror views
@@ -125,7 +125,7 @@ def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, im_size
     num_frames = np.shape(dlc_data[view_list[0]][bodyparts[0][0]]['coordinates_ud'])[0]
     frames_to_check = range(num_frames)
 
-    estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref, frames_to_check, max_dist_from_neighbor=max_dist_from_neighbor)
+    estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref, frames_to_check, direct_pickle_params, max_dist_from_neighbor=max_dist_from_neighbor)
 
 
 
@@ -145,7 +145,7 @@ def collect_bp_data(view_dlc_data, dlc_key):
     return bp_data
 
 
-def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref, frames_to_check, max_dist_from_neighbor=60):
+def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref, frames_to_check, direct_pickle_params, max_dist_from_neighbor=60):
 
     # F[:,:,0] - fundamental matrix between direct and top mirror views
     # F[:,:,1] - fundamental matrix between direct and left mirror views
@@ -153,11 +153,12 @@ def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref
 
     view_list = tuple(dlc_data.keys())
     bodyparts = [tuple(dlc_data[view].keys()) for view in view_list]
-    num_bodyparts = len(bodyparts)
-    num_frames = np.shape()
+    num_bodyparts = [len(bp) for bp in bodyparts]
+
     bp_idx = [group_dlc_bodyparts(bp) for bp in bodyparts]
     bp_coords = [collect_bp_data(dlc_data[view], 'coordinates_ud') for view in view_list]
-    is_estimate = [np.zeros((num_bodyparts, num_frames), dtype=bool)]
+    num_frames = np.shape(bp_coords[0])[1]
+    is_estimate = [np.zeros((num_bodyparts[i_view], num_frames), dtype=bool) for i_view, view in enumerate(view_list)]
 
     if paw_pref.lower() == 'left':
         # use F for right mirror
@@ -275,8 +276,33 @@ def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref
                         # the mirror point was identified
                         bp_coords[0][direct_part_idx, i_frame, :] = new_pt
                         is_estimate[0][direct_part_idx, i_frame] = True    # direct point for this body part in this frame is estimated
-                    pass
+                    else:
+                        bp_coords[1][mirror_part_idx, i_frame, :] = new_pt
+                        is_estimate[1][mirror_part_idx, i_frame] = True
 
+                    bp = digitpart + '{:d}'.format(i_digit + 1)
+                    # test_estimated_pts(dlc_data, new_pt, paw, bp, invalid_points, cal_data, direct_pickle_params)
+
+    final_direct_pawdorsum_pts, is_paw_dorsum_estimate = estimate_direct_paw_dorsum(bp_coords, invalid_points, bodyparts, cal_data, im_size, paw_pref, max_dist_from_neighbor=max_dist_from_neighbor)
+
+
+def estimate_direct_paw_dorsum(bp_coords, invalid_points, bodyparts, cal_data, im_size, paw_pref, max_dist_from_neighbor=60):
+
+    if paw_pref.lower() == 'left':
+        # use F for right mirror
+        F = cal_data['F'][:, :, 2]
+        view_list = ('direct', 'rightmirror')
+    elif paw_pref.lower() == 'right':
+        # use F for left mirror
+        F = cal_data['F'][:, :, 1]
+        view_list = ('direct', 'leftmirror')
+
+    num_frames = np.shape(bp_coords[0])[1]
+
+    #todo: complete this algorithm
+
+
+    pass
 
 def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knuckle_pt, valid_paw_pts, F, im_size, max_dist_from_neighbor):
 
@@ -303,14 +329,18 @@ def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knu
             # didn't find any other of this knuckle on other digits (I think) - that is, if the reference knuckle is
             # mcp1, didn't find mcp2, 3, or 4
             # find the point on the epipolar line closest to the neck knuckle up the same digit
-            nndist, nn_idx = cvb.find_nearest_point_on_line(edge_pts, next_knuckle_pt)
-            pass
-        # else:
-        #     nndist, nn_idx = cvb.find_nearest_point_on_line(edge_pts, other_knuckle_pts)
-
-        # WORKING HERE...
+            nndist, nn_pt = cvb.find_nearest_point_on_line(edge_pts, next_knuckle_pt)
+            if nndist < max_dist_from_neighbor:
+                new_pt = np.array([nn_pt.coords.xy[0][0], nn_pt.coords.xy[1][0]])
+            else:
+                new_pt = None
+        else:
+            nndist, nn_pt = cvb.find_nearest_point_on_line(edge_pts, other_knuckle_pts)
+            if nndist < max_dist_from_neighbor:
+                new_pt = np.array([nn_pt.coords.xy[0][0], nn_pt.coords.xy[1][0]])
+            else:
+                new_pt = None
     else:
-
         if len(next_knuckle_pt) == 0:
             # the epipolar line intersects the polygon defined by the points that were found in the other view, but the
             # point for the next knuckle on the same digit wasn't found either
@@ -323,7 +353,6 @@ def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knu
                     # find the intersection between the epipolar line and the segment connecting the two adjacent
                     # knuckles
                     li = cvb.find_line_intersection(edge_pts, next_digit_knuckles)
-                    pass
 
                 else:
                     # only one neighboring digit was found
@@ -344,7 +373,7 @@ def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knu
                 else:
                     new_pt = None
         else:
-            # the epipolar line intersects the polygoin defined by the points that were found in the other view. look
+            # the epipolar line intersects the polygon defined by the points that were found in the other view. look
             # for the intersection point closest to the next knuckle on the same digit
             nndist, nn_pt = cvb.find_nearest_point_on_line(epi_paw_intersect, next_knuckle_pt)
             if nndist < max_dist_from_neighbor:
@@ -571,7 +600,28 @@ def test_undistortion(dlc_data, invalid_points, cal_data, direct_pickle_params):
     markertypes = ['o', '+']
     overlay_pts_on_orig_ratframe(cur_img, cal_data, dlc_data, invalid_points, markertypes, jpg_name, test_frame, min_p)
 
-    pass
+
+def test_estimated_pts(dlc_data, new_pt, paw, bp, invalid_points, cal_data, direct_pickle_params):
+
+    videos_parent = '/home/levlab/Public/rat_SR_videos_to_analyze'   # on the lambda machine
+    # videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
+    # videos_parent = '/Volumes/Untitled/videos_to_analyze'
+    video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
+    cropped_videos_parent = os.path.join(videos_parent, 'cropped_videos')
+
+    # find original video
+    orig_vid_name = navigation_utilities.find_orig_rat_video(direct_pickle_params, video_root_folder)
+    orig_vid_folder, _ = os.path.split(orig_vid_name)
+
+    test_frame = 300
+    vo = cv2.VideoCapture(orig_vid_name)
+    vo.set(cv2.CAP_PROP_POS_FRAMES, test_frame)
+    ret, cur_img = vo.read()
+    vo.release()
+
+    bp_name = paw + bp
+    markertypes = ['o', '+']
+    overlay_estimated_pts_on_orig_ratframe(cur_img, cal_data, dlc_data, invalid_points, markertypes, bp_name, test_frame, new_pt)
 
 
 def triangulate_video(video_id, videos_parent, marked_videos_parent, calibration_parent, dlc_mat_output_parent, rat_df,
@@ -829,7 +879,32 @@ def prepare_img_axes(width, height, scale=1.0, dpi=100, nrows=1, ncols=1):
     return fig, axs
 
 
-def overlay_pts_on_orig_ratframe(img, cal_data, dlc_data, invalid_points, markertypes, jpg_name, test_frame, min_p=0):
+def test_undistortion(dlc_data, invalid_points, cal_data, direct_pickle_params):
+
+    min_p = 0.9
+
+    videos_parent = '/home/levlab/Public/rat_SR_videos_to_analyze'   # on the lambda machine
+    # videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
+    # videos_parent = '/Volumes/Untitled/videos_to_analyze'
+    video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
+    cropped_videos_parent = os.path.join(videos_parent, 'cropped_videos')
+
+    # find original video
+    orig_vid_name = navigation_utilities.find_orig_rat_video(direct_pickle_params, video_root_folder)
+    orig_vid_folder, _ = os.path.split(orig_vid_name)
+
+    test_frame = 300
+    vo = cv2.VideoCapture(orig_vid_name)
+    vo.set(cv2.CAP_PROP_POS_FRAMES, test_frame)
+    ret, cur_img = vo.read()
+    vo.release()
+
+    jpg_name = os.path.join(orig_vid_folder, 'test.jpg')
+    markertypes = ['o', '+']
+    overlay_pts_on_orig_ratframe(cur_img, cal_data, dlc_data, invalid_points, markertypes, jpg_name, test_frame, min_p)
+
+
+def overlay_estimated_pts_on_orig_ratframe(img, cal_data, dlc_data, invalid_points, markertypes, bp_name, test_frame, new_pt):
 
     dotsize = 6
     mtx = cal_data['mtx']
@@ -840,14 +915,17 @@ def overlay_pts_on_orig_ratframe(img, cal_data, dlc_data, invalid_points, marker
     im_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     h, w, _ = np.shape(im_bgr)
     fig_ud_direct_epi, ax_ud_direct_epi = prepare_img_axes(w, h)
-    fig_ud_mirror_epi, ax_ud_mirror_epi = prepare_img_axes(w, h)
+    fig_ud_direct_epi.suptitle(bp_name)
+    # fig_ud_mirror_epi, ax_ud_mirror_epi = prepare_img_axes(w, h)
 
     # fig, ax = prepare_img_axes(w, h)
 
     img_ud = cv2.undistort(im_bgr, mtx, dist)
 
     ax_ud_direct_epi[0][0].imshow(img_ud)
-    ax_ud_mirror_epi[0][0].imshow(img_ud)
+    # ax_ud_mirror_epi[0][0].imshow(img_ud)
+
+    ax_ud_direct_epi[0][0].scatter(new_pt[0], new_pt[1], edgecolors='k', facecolors='none', marker=markertypes[0])
 
     # ax[0][0].imshow(im_bgr)
 
@@ -877,15 +955,99 @@ def overlay_pts_on_orig_ratframe(img, cal_data, dlc_data, invalid_points, marker
                 ax_ud_direct_epi[0][0].scatter(cur_pt[0], cur_pt[1], edgecolors=bp_c[bp], facecolors='none', marker=markertypes[0])
                 ax_ud_direct_epi[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], c=bp_c[bp], marker=markertypes[1])
 
-                ax_ud_mirror_epi[0][0].scatter(cur_pt[0], cur_pt[1], edgecolors=bp_c[bp], facecolors='none', marker=markertypes[0])
-                ax_ud_mirror_epi[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], c=bp_c[bp], marker=markertypes[1])
+                # ax_ud_mirror_epi[0][0].scatter(cur_pt[0], cur_pt[1], edgecolors=bp_c[bp], facecolors='none', marker=markertypes[0])
+                # ax_ud_mirror_epi[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], c=bp_c[bp], marker=markertypes[1])
 
-    # overlay epipolar lines
-    draw_epipolar_lines(dlc_data, cal_data, test_frame, [ax_ud_direct_epi[0][0], ax_ud_mirror_epi[0][0]], (w, h), invalid_points, min_p)
-
+    # overlay epipolar line
+    draw_epi_line(new_pt, dlc_data, cal_data, test_frame, ax_ud_direct_epi[0][0], (w, h))
+    # draw_epi_line(new_pt, cal_data, test_frame, ax_ud_mirror_epi[0][0], (w, h))
     plt.show()
 
     pass
+
+
+def overlay_pts_on_orig_ratframe(img, cal_data, dlc_data, invalid_points, markertypes, jpg_name, test_frame, min_p=0):
+
+    dotsize = 6
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+
+    bp_c = bp_colors()
+
+    im_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    h, w, _ = np.shape(im_bgr)
+    fig_ud_direct_epi, ax_ud_direct_epi = prepare_img_axes(w, h)
+    fig_ud_mirror_epi, ax_ud_mirror_epi = prepare_img_axes(w, h)
+
+    fig, ax = prepare_img_axes(w, h)
+
+    img_ud = cv2.undistort(im_bgr, mtx, dist)
+
+    ax_ud_direct_epi[0][0].imshow(img_ud)
+    ax_ud_mirror_epi[0][0].imshow(img_ud)
+
+    # ax[0][0].imshow(im_bgr)
+
+    for i_view, view in enumerate(dlc_data.keys()):
+        view_dlcdata = dlc_data[view]
+        view_invalidpoints = invalid_points[i_view]
+
+        bodyparts = view_dlcdata.keys()
+
+        for i_bp, bp in enumerate(bodyparts):
+            p = view_dlcdata[bp]['confidence'][test_frame][0]
+            isvalid = not view_invalidpoints[i_bp, test_frame]
+
+            # if p > min_p:
+            if isvalid:
+
+                cur_pt = view_dlcdata[bp]['coordinates'][test_frame]
+
+                if all(cur_pt == 0):
+                    continue
+
+                cur_pt_ud = view_dlcdata[bp]['coordinates_ud'][test_frame]
+
+                ax[0][0].scatter(cur_pt[0], cur_pt[1], edgecolors=bp_c[bp], facecolors='none', marker=markertypes[0])
+                ax[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], c=bp_c[bp], marker=markertypes[1])
+
+                ax_ud_direct_epi[0][0].scatter(cur_pt[0], cur_pt[1], edgecolors=bp_c[bp], facecolors='none', marker=markertypes[0])
+                ax_ud_direct_epi[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], c=bp_c[bp], marker=markertypes[1])
+
+                ax_ud_mirror_epi[0][0].scatter(cur_pt[0], cur_pt[1], edgecolors=bp_c[bp], facecolors='none', marker=markertypes[0])
+                ax_ud_mirror_epi[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], c=bp_c[bp], marker=markertypes[1])
+
+    # overlay epipolar line
+    draw_epipolar_lines(dlc_data, cal_data, test_frame, ax_ud_direct_epi[0][0], (w, h), invalid_points)
+    draw_epipolar_lines(dlc_data, cal_data, test_frame, ax_ud_mirror_epi[0][0], (w, h), invalid_points)
+    plt.show()
+
+
+def draw_epi_line(test_pt, dlc_data, cal_data, test_frame, ax, im_size):
+    # F[:,:,0] - fundamental matrix between direct and top mirror views
+    # F[:,:,1] - fundamental matrix between direct and left mirror views
+    # F[:,:,2] - fundamental matrix between direct and right mirror views
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+
+    bp_c = bp_colors()
+
+    view_list = dlc_data.keys()
+    if 'leftmirror' in view_list:
+        F = cal_data['F'][:, :, 1]
+    elif 'rightmirror' in view_list:
+        F = cal_data['F'][:, :, 2]
+    else:
+        print('"leftmirror" or "rightmirror" must be one of the views for 3D reconstruction')
+        return
+
+    cur_epiline = cv2.computeCorrespondEpilines(test_pt.reshape(-1, 1, 2), 1, F)
+
+    epiline = np.squeeze(cur_epiline)
+    edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
+
+    if not np.all(edge_pts == 0):
+        ax.plot(edge_pts[:, 0], edge_pts[:, 1], color='k', ls='-', marker='.')
 
 
 def draw_epipolar_lines(dlc_data, cal_data, test_frame, ax, im_size, invalid_points, min_p=0):
@@ -937,7 +1099,6 @@ def draw_epipolar_lines(dlc_data, cal_data, test_frame, ax, im_size, invalid_poi
     plt.show()
 
     pass
-
 
 
 def bp_colors():

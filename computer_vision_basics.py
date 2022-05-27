@@ -434,9 +434,25 @@ def find_nearest_point_on_line(line_pts, pts):
     else:
         sg_line = sg.asLineString(line_pts)
 
-    sg_point = sg.asPoint(pts)
+    if pts.ndim == 1:
+        num_pts = 1
+    else:
+        num_pts = np.shape(pts)[0]
+    if num_pts > 1:
+        min_dist = 1000
+        for i_pt in range(num_pts):
+            test_pt = sg.asPoint(pts[i_pt, :])
+            test_dist = test_pt.distance(sg_line)
+            if test_dist < min_dist:
+                min_dist = test_dist
+                closest_pt = test_pt
+
+        sg_point = test_pt
+    else:
+        sg_point = sg.asPoint(pts)
 
     near_pts = so.nearest_points(sg_line, sg_point)
+
     nndist = near_pts[0].distance(near_pts[1])
     nn_pt = near_pts[0]
 

@@ -118,18 +118,68 @@ def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_
     # F[:,:,1] - fundamental matrix between direct and left mirror views
     # F[:,:,2] - fundamental matrix between direct and right mirror views
 
-    K = cal_data['mtx']
     view_list = tuple(dlc_data.keys())
     bodyparts = [tuple(dlc_data[view].keys()) for view in view_list]
 
     num_frames = np.shape(dlc_data[view_list[0]][bodyparts[0][0]]['coordinates_ud'])[0]
     frames_to_check = range(num_frames)
 
-    estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref, frames_to_check, direct_pickle_params, max_dist_from_neighbor=max_dist_from_neighbor)
+    bp_coords, is_estimate = estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref, frames_to_check, direct_pickle_params, max_dist_from_neighbor=max_dist_from_neighbor)
+
+    num_frames = np.shape(bp_coords[0])[1]
+    num_bp = len(bodyparts[0])
+    paw_trajectory = np.zeros((num_frames, 3, num_bp))    # for now, assume bodyparts match up, same number in both views
+
+    projMatr1 = np.eye(3, 4)
+    if paw_pref.lower() == 'left':
+        # use F for right mirror
+        projMatr2 = cal_data['Pn'][:, :, 2]
+        view_list = ('direct', 'rightmirror')
+    elif paw_pref.lower() == 'right':
+        # use F for left mirror
+        projMatr2 = cal_data['Pn'][:, :, 1]
+        view_list = ('direct', 'leftmirror')
+    # projMatr2 = cal_data['Pn'][:, :, ]
+
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+
+    for i_bp, bp in enumerate(bodyparts[0]):
+
+        valid_direct = np.logical_not(invalid_points[0][i_bp, :])
+        mirror_bp_idx = bodyparts[1].index(bp)
+        valid_mirror = np.logical_not(invalid_points[1][mirror_bp_idx, :])
+        estimate_direct = np.squeeze(is_estimate[0][i_bp, :])
+        estimate_mirror = np.squeeze(is_estimate[1][mirror_bp_idx, :])
+
+        all_valid_points = np.logical_and(valid_direct, valid_mirror)
+        direct_valid_mirror_est = np.logical_and(valid_direct, estimate_mirror)
+        direct_est_mirror_valid = np.logical_and(estimate_direct, valid_mirror)
+
+        valid_points = all_valid_points | direct_valid_mirror_est | direct_est_mirror_valid
+
+        if not any(valid_points):
+            # don't bother to loop if no valid points for this bodypart
+            continue
+
+        cur_direct_pts = np.squeeze(bp_coords[0][i_bp, valid_points, :])
+        cur_mirror_pts = np.squeeze(bp_coords[1][mirror_bp_idx, valid_points, :])
+
+        norm_direct_pts = cvb.normalize_points(cur_direct_pts, mtx)
+        norm_mirror_pts = cvb.normalize_points(cur_mirror_pts, mtx)
+
+        test1 = cvb.unnormalize_points(norm_direct_pts.T, mtx)
+        test2 = cvb.unnormalize_points(norm_mirror_pts.T, mtx)
+        point4D = cv2.triangulatePoints(projMatr1, projMatr2, norm_direct_pts, norm_mirror_pts)
+        pellet_wp = np.squeeze(cv2.convertPointsFromHomogeneous(point4D.T))
+
+        paw_trajectory[valid_points, :, i_bp] = pellet_wp   # todo: load the scale factor
 
 
 
-    num_frames = dlc_data[view_list[0]]
+
+
+
     pass
 
 
@@ -283,10 +333,17 @@ def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref
                     bp = digitpart + '{:d}'.format(i_digit + 1)
                     # test_estimated_pts(dlc_data, new_pt, paw, bp, invalid_points, cal_data, direct_pickle_params)
 
-    final_direct_pawdorsum_pts, is_paw_dorsum_estimate = estimate_direct_paw_dorsum(bp_coords, invalid_points, bodyparts, cal_data, im_size, paw_pref, max_dist_from_neighbor=max_dist_from_neighbor)
+    final_direct_pawdorsum_pts, is_paw_dorsum_estimate = estimate_direct_paw_dorsum(bp_coords, invalid_points, bodyparts, cal_data, im_size, paw_pref, frames_to_check, max_dist_from_neighbor=max_dist_from_neighbor)
+    for i_paw, paw in enumerate(('left', 'right')):
+        pd_string = paw + 'pawdorsum'
+        pd_idx = bodyparts[0].index(pd_string)
+        bp_coords[0][pd_idx, :, :] = final_direct_pawdorsum_pts[i_paw]
+        is_estimate[0][pd_idx, :] = is_paw_dorsum_estimate[i_paw]
+
+    return bp_coords, is_estimate
 
 
-def estimate_direct_paw_dorsum(bp_coords, invalid_points, bodyparts, cal_data, im_size, paw_pref, max_dist_from_neighbor=60):
+def estimate_direct_paw_dorsum(bp_coords, invalid_points, bodyparts, cal_data, im_size, paw_pref, frames_to_check, max_dist_from_neighbor=60):
 
     if paw_pref.lower() == 'left':
         # use F for right mirror
@@ -297,12 +354,144 @@ def estimate_direct_paw_dorsum(bp_coords, invalid_points, bodyparts, cal_data, i
         F = cal_data['F'][:, :, 1]
         view_list = ('direct', 'leftmirror')
 
-    num_frames = np.shape(bp_coords[0])[1]
+    digitparts = ('mcp', 'pip', 'dig')
 
-    #todo: complete this algorithm
+    num_frames_total = np.shape(bp_coords[0])[1]
+    num_frames_to_check = len(frames_to_check)
 
+    bp_idx = [group_dlc_bodyparts(bp) for bp in bodyparts]
+    # bp_idx[0] is a dict with bodyparts grouped for direct view
+    # bp_idx[1] is a dict with bodyparts grouped for mirror view
 
-    pass
+    is_estimate = [[], []]
+    final_direct_pawdorsum_pts = [[], []]
+    for i_paw, paw in enumerate(('left', 'right')):
+
+        direct_pd_idx = bp_idx[0]['pawdorsum'][i_paw]
+        mirror_pd_idx = bp_idx[1]['pawdorsum'][i_paw]
+
+        direct_pawdorsum_pts_ud = np.squeeze(bp_coords[0][direct_pd_idx, :, :])
+        mirror_pawdorsum_pts_ud = np.squeeze(bp_coords[1][mirror_pd_idx, :, :])
+
+        final_direct_pawdorsum_pts[i_paw] = np.squeeze(bp_coords[0][direct_pd_idx, :, :])
+        is_estimate[i_paw] = np.zeros(num_frames_total, dtype=bool)
+
+        all_direct_digit_idx = []
+        for digitpart in digitparts:
+            all_direct_digit_idx.extend(bp_idx[0][digitpart][i_paw])
+
+        direct_digit_pts = bp_coords[0][all_direct_digit_idx, :, :]
+
+        invalid_direct_pd = np.squeeze(invalid_points[0][direct_pd_idx, :])
+        invalid_mirror_pd = np.squeeze(invalid_points[1][mirror_pd_idx, :])
+
+        for i_ftc in frames_to_check:
+            i_frame = frames_to_check[i_ftc]
+
+            if invalid_direct_pd[i_frame]:
+                # paw dorsum was not reliably found in the direct view
+
+                valid_direct_idx = np.logical_not(invalid_points[0][all_direct_digit_idx, i_frame])
+                valid_direct_points = direct_digit_pts[valid_direct_idx, i_frame, :]
+
+                if not invalid_mirror_pd[i_frame]:
+                    # direct view paw dorsum is constrained to be on the epipolar line through the mirror view point
+                    mirror_pd_pt = mirror_pawdorsum_pts_ud[i_frame, :]
+                    cur_epiline = cv2.computeCorrespondEpilines(mirror_pd_pt.reshape(-1, 1, 2), 1, F)
+                    epiline = np.squeeze(cur_epiline)
+                    edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
+
+                found_valid_points = False
+
+                valid_mcp = np.logical_not(invalid_points[0][bp_idx[0]['mcp'][i_paw], i_frame])
+                valid_pip = np.logical_not(invalid_points[0][bp_idx[0]['pip'][i_paw], i_frame])
+                valid_dig = np.logical_not(invalid_points[0][bp_idx[0]['dig'][i_paw], i_frame])
+                # first, look for valid MCPs, then PIPs, then digit tips
+
+                if all(valid_mcp[[1, 2]]) or all(valid_mcp[[0, 3]]):
+                    digit_pts = bp_coords[0][bp_idx[0]['mcp'][i_paw], i_frame, :]
+                    valid_pts = valid_mcp
+                    found_valid_points = True
+                elif all(valid_pip[[1, 2]]) or all(valid_pip[[0, 3]]):
+                    digit_pts = bp_coords[0][bp_idx[0]['pip'][i_paw], i_frame, :]
+                    valid_pts = valid_pip
+                    found_valid_points = True
+                elif all(valid_dig[[1, 2]]) or all(valid_dig[[0, 3]]):
+                    digit_pts = bp_coords[0][bp_idx[0]['dig'][i_paw], i_frame, :]
+                    valid_pts = valid_dig
+                    found_valid_points = True
+                elif any(valid_mcp):
+                    digit_pts = bp_coords[0][bp_idx[0]['mcp'][i_paw], i_frame, :]
+                    valid_pts = valid_mcp
+                    found_valid_points = True
+                elif any(valid_pip):
+                    digit_pts = bp_coords[0][bp_idx[0]['pip'][i_paw], i_frame, :]
+                    valid_pts = valid_pip
+                    found_valid_points = True
+                elif any(valid_dig):
+                    digit_pts = bp_coords[0][bp_idx[0]['dig'][i_paw], i_frame, :]
+                    valid_pts = valid_dig
+                    found_valid_points = True
+
+                if found_valid_points and not invalid_mirror_pd[i_frame]:
+
+                    digits_midpoint = find_digits_midpoint(digit_pts, valid_pts)
+
+                    # does the epipolar line intersect the region bounded by the identified points?
+                    if np.sum(valid_direct_idx) == 1:
+                        # if only one valid knuckle found, can't be an intersection with the epipolarline
+                        intersect_obj = None
+                    elif np.sum(valid_direct_idx) == 2:
+                        intersect_obj = cvb.find_line_intersection(edge_pts, valid_direct_points)
+                    else:
+                        intersect_obj = cvb.line_convex_hull_intersect(edge_pts, valid_direct_points)
+
+                    # test if there was an intersection between the epipolar line and convex hull
+                    if intersect_obj is None:
+
+                        d, new_pt = cvb.find_nearest_point_on_line(edge_pts, digits_midpoint)
+
+                        if d < max_dist_from_neighbor:
+                            final_direct_pawdorsum_pts[i_paw][i_frame, :] = new_pt
+                            is_estimate[i_paw][i_frame] = True
+
+                    else:
+
+                        d, new_pt = cvb.find_nearest_point_on_line(intersect_obj, digits_midpoint)
+                        if d < max_dist_from_neighbor:
+                            final_direct_pawdorsum_pts[i_paw][i_frame, :] = new_pt
+                            is_estimate[i_paw][i_frame] = True
+
+    return final_direct_pawdorsum_pts, is_estimate
+
+def find_digits_midpoint(digit_pts, valid_pts):
+    '''
+    function to find the presumed midpoint of a set of identified digits from deeplabcut. Algorithm is as follows:
+        1. If the 2nd and 3rd digits were identified, the output is the average location of those 2 digits
+        2. If the 1st and 4th digits were identified, the output is the average location of those 2 digits
+        3. If the 2nd OR 3rd digit is identified (but not the 1st and 4th), take that digit
+        4. If only the 1st or 4th digit is identified, take that one
+    :param digit_pts:
+    :param valid_pts:
+    :return:
+    '''
+    if not any(valid_pts):
+        digit_midpoint = None
+    elif all(valid_pts[[1, 2]]):
+        digit_midpoint = np.mean(digit_pts[1:2, :], axis=0)
+    elif all(valid_pts[[0, 3]]):
+        digit_midpoint = np.mean(digit_pts[[0, 3], :], axis=0)
+    elif valid_pts[1]:
+        digit_midpoint = digit_pts[1, :]
+    elif valid_pts[2]:
+        digit_midpoint = digit_pts[2, :]
+    elif valid_pts[0]:
+        digit_midpoint = digit_pts[0, :]
+    elif valid_pts[3]:
+        digit_midpoint = digit_pts[3, :]
+
+    return digit_midpoint
+
 
 def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knuckle_pt, valid_paw_pts, F, im_size, max_dist_from_neighbor):
 

@@ -62,7 +62,7 @@ def read_matlab_calibration(mat_calibration_name):
     E = np.zeros((3, 3, 3))
     for i_view in range(0, 3):
         Pn[:, :, i_view] = mat_cal['Pn'][:, :, i_view].transpose()
-        F[:, :, i_view] = mat_cal['F'][:, :, i_view]            #todo: check if F and E also should be transposed. I don't think so
+        F[:, :, i_view] = mat_cal['F'][:, :, i_view]            #todo: figure out how to calculate the scale factor
         E[:, :, i_view] = mat_cal['E'][:, :, i_view]
 
     camera_params = {'mtx': mat_cal['K'].transpose(),

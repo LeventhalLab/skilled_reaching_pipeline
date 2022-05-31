@@ -20,19 +20,33 @@ def unnormalize_points(points2d_norm, mtx):
         unnorm_pts = np.dot(mtx, homogeneous_pts)
     else:
         num_pts = max(np.shape(points2d_norm))
-        homogeneous_pts = np.hstack((points2d_norm, np.ones((num_pts, 1))))
+        try:
+            homogeneous_pts = np.hstack((points2d_norm, np.ones((num_pts, 1))))
+        except:
+            pass
         unnorm_pts = np.dot(mtx, homogeneous_pts.T).T
 
     if num_pts == 1:
         unnorm_pts = unnorm_pts[:2] / unnorm_pts[-1]
     else:
-        unnorm_pts = unnorm_pts[:,:2] / unnorm_pts[:, [-1]]
+        unnorm_pts = unnorm_pts[:, :2] / unnorm_pts[:, [-1]]
 
     return unnorm_pts
 
 
 def normalize_points(points2d, mtx):
-    pass
+    if points2d.ndim == 1:
+        num_pts = 1
+        homogeneous_pts = np.append(points2d, 1.)
+        norm_pts = np.linalg.solve(mtx, homogeneous_pts)
+        norm_pts = norm_pts[:2] / norm_pts[-1]
+    else:
+        num_pts = max(np.shape(points2d))
+        homogeneous_pts = np.hstack((points2d, np.ones((num_pts, 1))))
+        norm_pts = np.linalg.solve(mtx, homogeneous_pts.T)
+        norm_pts = norm_pts[:2, :] / norm_pts[-1, :]
+
+    return norm_pts
 
 
 # from Multiple-Quadrotor-SLAM/Work/python_libs/triangulation.py /:
@@ -487,6 +501,30 @@ def find_line_intersection(line1, line2):
     else:
         sg_line2 = sg.asLineString(line2)
 
-    line_intersect = sg_line1.intersection(sg_line2)
+    if sg_line1.intersects(sg_line2):
+        line_intersect = sg_line1.intersection(sg_line2)
+    else:
+        line_intersect = None
 
-    pass
+    return line_intersect
+
+def line_convex_hull_intersect(line1, points):
+
+    if type(line1) is sg.LineString:
+        sg_line1 = line1
+    else:
+        sg_line1 = sg.asLineString(line1)
+
+    if type(points) is sg.MultiPoint:
+        sg_points = points
+    else:
+        sg_points = sg.asMultiPoint(points)
+
+    cvhull_poly = sg_points.convex_hull
+
+    if cvhull_poly.intersects(sg_line1):
+        line_hull_intersect = cvhull_poly.intersection(sg_line1)
+    else:
+        line_hull_intersect = None
+
+    return line_hull_intersect

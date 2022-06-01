@@ -69,7 +69,8 @@ def read_matlab_calibration(mat_calibration_name):
                      'Pn': Pn,
                      'F': F,
                      'E': E,
-                     'dist': np.squeeze(mat_cal['dist'])
+                     'dist': np.squeeze(mat_cal['dist']),
+                     'scalefactor': mat_cal['scaleFactor']
                      }
 
     return camera_params

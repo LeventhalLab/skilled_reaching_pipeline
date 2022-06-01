@@ -84,6 +84,9 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('dire
 
         # translate and undistort points
         dlc_data = translate_points_to_full_frame(dlc_data, trajectory_metadata)
+        # note that for right view, left and right labels are swapped in the translate_points_to_full_frame function
+        # this is because DLC labeling is done on a left-right reversed video of the right mirror, so the labels for
+        # the left paw are really the right paw (mirror reversal)
         dlc_data = undistort_points(dlc_data, cal_data)
 
         invalid_points, diff_per_frame = find_invalid_DLC_points(dlc_data, paw_pref)
@@ -91,10 +94,11 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('dire
         # comment back in to show identified points and undistorted points superimposed on frames
         # test_undistortion(dlc_data, invalid_points, cal_data, direct_pickle_params)
 
+        paw_trajectory = calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_pickle_params, im_size=(2040, 1024), max_dist_from_neighbor=60)
 
-
-        calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_pickle_params, im_size=(2040, 1024), max_dist_from_neighbor=60)
-
+        reproj_error, high_p_invalid, low_p_valid = assess_reconstruction_quality(paw_trajectory, dlc_data, invalid_points, cal_data, paw_pref, direct_pickle_params, p_cutoff=0.9)
+        # todo: check that multiple pellet ID's are handled
+        # todo: save these data, and create movies of reconstructions to see how we're doing...
 
 
 
@@ -110,6 +114,71 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('dire
 
         pass
     pass
+
+
+def assess_reconstruction_quality(paw_trajectory, dlc_data, invalid_points, cal_data, paw_pref, direct_pickle_params, p_cutoff=0.9):
+
+    view_list = tuple(dlc_data.keys())
+    bodyparts = [tuple(dlc_data[view].keys()) for view in view_list]
+    num_bodyparts = [len(bp) for bp in bodyparts]
+
+    bp_idx = [group_dlc_bodyparts(bp) for bp in bodyparts]
+    bp_coords = [collect_bp_data(dlc_data[view], 'coordinates_ud') for view in view_list]
+    bp_conf = [collect_bp_data(dlc_data[view], 'confidence') for view in view_list]
+
+    high_p = [np.squeeze(view_conf > p_cutoff) for view_conf in bp_conf]
+
+    num_frames = np.shape(paw_trajectory)[0]
+    num_bp = np.shape(paw_trajectory)[2]
+
+    high_p_invalid = np.zeros((num_bp, num_frames, 2), dtype=bool)
+    low_p_valid = np.zeros((num_bp, num_frames, 2), dtype=bool)
+    for i_view, view in enumerate(view_list):
+        high_p_invalid[:, :, i_view] = np.logical_and(high_p[i_view], invalid_points[i_view])
+        low_p_valid[:, :, i_view] = np.logical_and(np.logical_not(high_p[i_view]), np.logical_not(invalid_points[i_view]))
+
+    # calculate distance between reconstructed points and origiinally idenifiedpoints in the direct and mirror views
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+    projMatr = [np.eye(3, 4), []]
+    if paw_pref.lower() == 'left':
+        # use F for right mirror
+        projMatr[1] = cal_data['Pn'][:, :, 2]
+        sf = np.mean(cal_data['scalefactor'][2, :])
+        view_list = ('direct', 'rightmirror')
+    elif paw_pref.lower() == 'right':
+        # use F for left mirror
+        projMatr[1] = cal_data['Pn'][:, :, 1]
+        view_list = ('direct', 'leftmirror')
+        sf = np.mean(cal_data['scalefactor'][1, :])
+
+    unscaled_trajectory = paw_trajectory / sf
+    reproj_error = [np.zeros((num_bp, num_frames)), np.zeros((num_bp, num_frames))]
+    proj_points = [np.zeros((num_bp, num_frames, 2)), np.zeros((num_bp, num_frames, 2))]
+
+    for i_bp in range(num_bp):
+        # make sure the correct indexes are identified for the same bodypart each view
+        bp_idx = [i_bp, bodyparts[1].index(bodyparts[0][i_bp])]
+
+        current_3d = np.squeeze(unscaled_trajectory[:, :, i_bp])
+
+        # proj_points = [[], []]
+        for i_view in range(2):
+            rvec, _ = cv2.Rodrigues(projMatr[i_view][:, :3])
+            tvec = projMatr[i_view][:, -1]
+            temp_pts = cvb.project_points(current_3d, projMatr[i_view], mtx)
+            # temp_pts, _ = cv2.projectPoints(current_3d, rvec, tvec, mtx, dist)
+            # proj_points[i_view][i_bp, :, :] = np.squeeze(temp_pts)
+            # note that cv2.projectPoints requires you to change the rotation matrix to a rotation vector. Somehow,
+            # this gets all messed up because we're using mirrors and cv2.Rodrigues can't handle a reflection.
+            # So I wrote a separate reprojection function, which works fine.
+            proj_points[i_view][i_bp, :, :] = temp_pts.T
+
+            orig_pts = bp_coords[i_view][bp_idx[i_view], :, :]
+            reproj_error[i_view][i_bp, :] = np.linalg.norm(orig_pts - proj_points[i_view][i_bp, :, :], axis=1)
+
+    # test_reprojection(dlc_data, invalid_points, proj_points, direct_pickle_params, cal_data)
+    return reproj_error, high_p_invalid, low_p_valid
 
 
 def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_pickle_params, im_size=(2040, 1024), max_dist_from_neighbor=60):
@@ -134,12 +203,13 @@ def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_
     if paw_pref.lower() == 'left':
         # use F for right mirror
         projMatr2 = cal_data['Pn'][:, :, 2]
+        sf = np.mean(cal_data['scalefactor'][2, :])
         view_list = ('direct', 'rightmirror')
     elif paw_pref.lower() == 'right':
         # use F for left mirror
         projMatr2 = cal_data['Pn'][:, :, 1]
         view_list = ('direct', 'leftmirror')
-    # projMatr2 = cal_data['Pn'][:, :, ]
+        sf = np.mean(cal_data['scalefactor'][1, :])
 
     mtx = cal_data['mtx']
     dist = cal_data['dist']
@@ -168,19 +238,38 @@ def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_
         norm_direct_pts = cvb.normalize_points(cur_direct_pts, mtx)
         norm_mirror_pts = cvb.normalize_points(cur_mirror_pts, mtx)
 
-        test1 = cvb.unnormalize_points(norm_direct_pts.T, mtx)
-        test2 = cvb.unnormalize_points(norm_mirror_pts.T, mtx)
         point4D = cv2.triangulatePoints(projMatr1, projMatr2, norm_direct_pts, norm_mirror_pts)
         pellet_wp = np.squeeze(cv2.convertPointsFromHomogeneous(point4D.T))
 
-        paw_trajectory[valid_points, :, i_bp] = pellet_wp   # todo: load the scale factor
+        paw_trajectory[valid_points, :, i_bp] = pellet_wp * sf
 
 
+    # bp_toplot = 'leftdig2'
+    # bp_idx = bodyparts[0].index(bp_toplot)
+    # fig_coords = plt.figure()
+    # ax_coords = fig_coords.subplots(3, 1)
+    #
+    # fig_3d = plt.figure()
+    # ax_3d = fig_3d.add_subplot(111, projection='3d')
+    #
+    # fig_conf = plt.figure()
+    # ax_conf = fig_conf.subplots(2, 1)
+    # for i_ax in range(3):
+    #     ax_coords[i_ax].plot(paw_trajectory[:,i_ax,bp_idx])
+    #
+    # for i_view, view in enumerate(view_list):
+    #     ax_conf[i_view].plot(dlc_data[view][bp_toplot]['confidence'])
+    #
+    # ax_3d.scatter3D(paw_trajectory[:,0,bp_idx], paw_trajectory[:,1,bp_idx], paw_trajectory[:,2,bp_idx])
+    # ax_3d.set_xlabel('x')
+    # ax_3d.set_ylabel('y')
+    # ax_3d.set_zlabel('z')
+    # ax_3d.invert_yaxis()
+    # ax_3d.set_zlim(150, 200)
+    #
+    # plt.show()
 
-
-
-
-    pass
+    return paw_trajectory
 
 
 def collect_bp_data(view_dlc_data, dlc_key):
@@ -790,6 +879,91 @@ def test_undistortion(dlc_data, invalid_points, cal_data, direct_pickle_params):
     overlay_pts_on_orig_ratframe(cur_img, cal_data, dlc_data, invalid_points, markertypes, jpg_name, test_frame, min_p)
 
 
+def test_reprojection(dlc_data, invalid_points, proj_points, direct_pickle_params, cal_data):
+
+    min_p = 0.9
+
+    videos_parent = '/home/levlab/Public/rat_SR_videos_to_analyze'   # on the lambda machine
+    # videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
+    # videos_parent = '/Volumes/Untitled/videos_to_analyze'
+    video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
+    cropped_videos_parent = os.path.join(videos_parent, 'cropped_videos')
+
+    # find original video
+    orig_vid_name = navigation_utilities.find_orig_rat_video(direct_pickle_params, video_root_folder)
+    orig_vid_folder, _ = os.path.split(orig_vid_name)
+
+    test_frame = 300
+    vo = cv2.VideoCapture(orig_vid_name)
+    vo.set(cv2.CAP_PROP_POS_FRAMES, test_frame)
+    ret, cur_img = vo.read()
+    vo.release()
+
+    jpg_name = os.path.join(orig_vid_folder, 'test.jpg')
+    markertypes = ['o', '+']
+    overlay_reproj_pts_on_orig_ratframe(cur_img, cal_data, dlc_data, invalid_points, proj_points, markertypes, jpg_name, test_frame, min_p)
+
+
+def overlay_reproj_pts_on_orig_ratframe(img, cal_data, dlc_data, invalid_points, proj_points, markertypes, jpg_name, test_frame, min_p=0):
+
+    dotsize = 6
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+
+    bp_c = bp_colors()
+
+    im_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    h, w, _ = np.shape(im_bgr)
+    fig_ud_direct_epi, ax_ud_direct_epi = prepare_img_axes(w, h)
+    # fig_ud_mirror_epi, ax_ud_mirror_epi = prepare_img_axes(w, h)
+
+    # fig, ax = prepare_img_axes(w, h)
+
+    img_ud = cv2.undistort(im_bgr, mtx, dist)
+
+    ax_ud_direct_epi[0][0].imshow(img_ud)
+    # ax_ud_mirror_epi[0][0].imshow(img_ud)
+
+    # ax[0][0].imshow(im_bgr)
+
+    for i_view, view in enumerate(dlc_data.keys()):
+        view_dlcdata = dlc_data[view]
+        view_invalidpoints = invalid_points[i_view]
+
+        bodyparts = view_dlcdata.keys()
+
+        for i_bp, bp in enumerate(bodyparts):
+            p = view_dlcdata[bp]['confidence'][test_frame][0]
+            isvalid = not view_invalidpoints[i_bp, test_frame]
+
+            # if p > min_p:
+            if isvalid:
+
+                cur_pt = view_dlcdata[bp]['coordinates'][test_frame]
+
+                if all(cur_pt == 0):
+                    continue
+
+                cur_pt_ud = view_dlcdata[bp]['coordinates_ud'][test_frame]
+                cur_proj_pt = proj_points[i_view][i_bp, test_frame, :]
+
+                # ax[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], c=bp_c[bp], marker=markertypes[0])
+                # ax[0][0].scatter(cur_proj_pt[0], cur_proj_pt[1], edgecolors=bp_c[bp], facecolors='none', marker=markertypes[1])
+
+                ax_ud_direct_epi[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], edgecolors=bp_c[bp], facecolors='none', marker=markertypes[0])
+                ax_ud_direct_epi[0][0].scatter(cur_proj_pt[0], cur_proj_pt[1], c=bp_c[bp], marker=markertypes[1])
+
+                # ax_ud_mirror_epi[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], edgecolors=bp_c[bp], facecolors='none', marker=markertypes[0])
+                # ax_ud_mirror_epi[0][0].scatter(cur_proj_pt[0], cur_proj_pt[1], c=bp_c[bp], marker=markertypes[1])
+
+    # overlay epipolar line
+    # draw_epipolar_lines(dlc_data, cal_data, test_frame, [ax_ud_direct_epi[0][0], ax_ud_mirror_epi[0][0]], (w, h), invalid_points)
+    # draw_epipolar_lines(dlc_data, cal_data, test_frame, ax_ud_mirror_epi[0][0], (w, h), invalid_points)
+    plt.show()
+
+    pass
+
+
 def test_estimated_pts(dlc_data, new_pt, paw, bp, invalid_points, cal_data, direct_pickle_params):
 
     videos_parent = '/home/levlab/Public/rat_SR_videos_to_analyze'   # on the lambda machine
@@ -1207,9 +1381,11 @@ def overlay_pts_on_orig_ratframe(img, cal_data, dlc_data, invalid_points, marker
                 ax_ud_mirror_epi[0][0].scatter(cur_pt_ud[0], cur_pt_ud[1], c=bp_c[bp], marker=markertypes[1])
 
     # overlay epipolar line
-    draw_epipolar_lines(dlc_data, cal_data, test_frame, ax_ud_direct_epi[0][0], (w, h), invalid_points)
-    draw_epipolar_lines(dlc_data, cal_data, test_frame, ax_ud_mirror_epi[0][0], (w, h), invalid_points)
+    draw_epipolar_lines(dlc_data, cal_data, test_frame, [ax_ud_direct_epi[0][0], ax_ud_mirror_epi[0][0]], (w, h), invalid_points)
+    # draw_epipolar_lines(dlc_data, cal_data, test_frame, ax_ud_mirror_epi[0][0], (w, h), invalid_points)
     plt.show()
+
+    pass
 
 
 def draw_epi_line(test_pt, dlc_data, cal_data, test_frame, ax, im_size):
@@ -1283,6 +1459,7 @@ def draw_epipolar_lines(dlc_data, cal_data, test_frame, ax, im_size, invalid_poi
                 edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
 
                 if not np.all(edge_pts == 0):
+                    # ax[i_view].plot(edge_pts[:, 0], edge_pts[:, 1], color=bp_c[bp], ls='-', marker='.')
                     ax[i_view].plot(edge_pts[:, 0], edge_pts[:, 1], color=bp_c[bp], ls='-', marker='.')
 
     plt.show()

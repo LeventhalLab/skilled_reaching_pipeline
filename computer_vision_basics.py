@@ -6,6 +6,23 @@ import plot_utilities
 import matplotlib.pyplot as plt
 
 
+def project_points(world_points, proj_matrix, mtx):
+
+    # make sure world_points is a 3 x n array, where n is the number of points
+    if world_points.ndim == 1:
+        # world_points is a vector
+        wp_hom = np.append(world_points, 1.)
+    elif np.shape(world_points)[0] != 3:
+        wp_hom = np.vstack((world_points.T, np.ones(np.shape(world_points)[0])))
+    else:
+        wp_hom = np.vstack((world_points, np.ones(np.shape(world_points)[1])))
+
+    pp_hom = np.linalg.multi_dot((mtx, proj_matrix, wp_hom))
+
+    proj_points = pp_hom[:2, :] / pp_hom[-1, :]
+
+    return proj_points
+
 def unnormalize_points(points2d_norm, mtx):
     '''
 

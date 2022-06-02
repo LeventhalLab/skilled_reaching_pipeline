@@ -79,6 +79,16 @@ def create_cropped_video_destination_list(cropped_vids_parent, video_folder_list
     return cropped_video_directories
 
 
+def trajectory_folder(trajectories_parent, ratID, session_name):
+
+    session_folder = ratID + '_' + session_name
+    traj_folder = os.path.join(trajectories_parent, ratID, session_folder)
+    if not os.path.isdir(traj_folder):
+        os.makedirs(traj_folder)
+
+    return traj_folder
+
+
 def find_orig_rat_video(video_metadata, video_root_folder, vidtype='.avi'):
 
     # directory structure:

@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import computer_vision_basics as cvb
 
 
-def reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent, rat_df):
+def reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent, trajectories_parent, rat_df):
 
     for folder_to_reconstruct in folders_to_reconstruct:
 
@@ -24,10 +24,10 @@ def reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibratio
             # is there a calibration file for this session?
 
             cal_data = skilled_reaching_io.get_calibration_data(session_date, box_num, calibration_folder)
-            reconstruct_folder(folder_to_reconstruct, cal_data, rat_df)
+            reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
             pass
 
-def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('direct', 'leftmirror', 'rightmirror'), vidtype='.avi'):
+def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent, view_list=('direct', 'leftmirror', 'rightmirror'), vidtype='.avi'):
 
     if vidtype[0] is not '.':
         vidtype = '.' + vidtype
@@ -75,6 +75,8 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('dire
                         mirror_view: skilled_reaching_io.read_pickle(meta_mirror_pickle)
                         }
         trajectory_filename = navigation_utilities.create_trajectory_filename(direct_pickle_params)
+        trajectory_folder = navigation_utilities.trajectory_folder(trajectories_parent, ratID, session_name)
+        full_traj_fname = os.path.join(trajectory_folder, trajectory_filename)
 
         pickle_params = {'direct': direct_pickle_params,
                          mirror_view: mirror_pickle_params
@@ -94,26 +96,39 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, view_list=('dire
         # comment back in to show identified points and undistorted points superimposed on frames
         # test_undistortion(dlc_data, invalid_points, cal_data, direct_pickle_params)
 
-        paw_trajectory = calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_pickle_params, im_size=(2040, 1024), max_dist_from_neighbor=60)
+        paw_trajectory, is_estimate = calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_pickle_params, im_size=(2040, 1024), max_dist_from_neighbor=60)
 
         reproj_error, high_p_invalid, low_p_valid = assess_reconstruction_quality(paw_trajectory, dlc_data, invalid_points, cal_data, paw_pref, direct_pickle_params, p_cutoff=0.9)
         # todo: check that multiple pellet ID's are handled
         # todo: save these data, and create movies of reconstructions to see how we're doing...
 
+        traj_data = package_trajectory_data_for_pickle(paw_trajectory, is_estimate, invalid_points, paw_pref,
+                                                       reproj_error, high_p_invalid, low_p_valid, cal_data)
+        skilled_reaching_io.write_pickle(full_traj_fname, traj_data)
 
 
 
+        # mat_data = package_data_into_mat(dlc_data, video_metadata, trajectory_metadata)
+        # mat_name = navigation_utilities.create_mat_fname_dlc_output(video_metadata, dlc_mat_output_parent)
+        #
+        # video_name = navigation_utilities.build_video_name(video_metadata, videos_parent)
+        # # test_pt_alignment(video_name, dlc_data)
+        #
+        # sio.savemat(mat_name, mat_data)
 
-        mat_data = package_data_into_mat(dlc_data, video_metadata, trajectory_metadata)
-        mat_name = navigation_utilities.create_mat_fname_dlc_output(video_metadata, dlc_mat_output_parent)
 
-        video_name = navigation_utilities.build_video_name(video_metadata, videos_parent)
-        # test_pt_alignment(video_name, dlc_data)
+def package_trajectory_data_for_pickle(paw_trajectory, is_estimate, invalid_points, paw_pref, reproj_error, high_p_invalid, low_p_valid, cal_data):
 
-        sio.savemat(mat_name, mat_data)
-
-        pass
-    pass
+    traj_data = {'paw_trajectory': paw_trajectory,
+                 'is_estimate': is_estimate,
+                 'invalid_points': invalid_points,
+                 'paw_pref': paw_pref,
+                 'reproj_error': reproj_error,
+                 'high_p_invalid': high_p_invalid,
+                 'low_p_valid': low_p_valid,
+                 'cal_data': cal_data
+                 }
+    return traj_data
 
 
 def assess_reconstruction_quality(paw_trajectory, dlc_data, invalid_points, cal_data, paw_pref, direct_pickle_params, p_cutoff=0.9):
@@ -243,7 +258,7 @@ def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_
 
         paw_trajectory[valid_points, :, i_bp] = pellet_wp * sf
 
-
+    return paw_trajectory, is_estimate
     # bp_toplot = 'leftdig2'
     # bp_idx = bodyparts[0].index(bp_toplot)
     # fig_coords = plt.figure()
@@ -269,7 +284,7 @@ def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_
     #
     # plt.show()
 
-    return paw_trajectory
+
 
 
 def collect_bp_data(view_dlc_data, dlc_key):

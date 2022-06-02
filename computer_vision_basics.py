@@ -478,7 +478,7 @@ def find_nearest_point_on_line(line_pts, pts):
                 min_dist = test_dist
                 closest_pt = test_pt
 
-        sg_point = test_pt
+        sg_point = closest_pt
     else:
         sg_point = sg.asPoint(pts)
 

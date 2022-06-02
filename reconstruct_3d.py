@@ -9,6 +9,7 @@ import scipy.io as sio
 from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
 import computer_vision_basics as cvb
+import shapely.geometry as sg
 
 
 def reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent, trajectories_parent, rat_df):
@@ -561,7 +562,11 @@ def estimate_direct_paw_dorsum(bp_coords, invalid_points, bodyparts, cal_data, i
 
                     else:
 
-                        d, new_pt = cvb.find_nearest_point_on_line(intersect_obj, digits_midpoint)
+                        if type(intersect_obj) is sg.LineString:
+                            d, new_pt = cvb.find_nearest_point_on_line(intersect_obj, digits_midpoint)
+                        elif type(intersect_obj) is sg.Point:
+                            new_pt = np.array(intersect_obj.coords.xy[0][0], intersect_obj.coords.xy[1][0])
+                            d = intersect_obj.distance(sg.asPoint(digits_midpoint))
                         if d < max_dist_from_neighbor:
                             final_direct_pawdorsum_pts[i_paw][i_frame, :] = new_pt
                             is_estimate[i_paw][i_frame] = True

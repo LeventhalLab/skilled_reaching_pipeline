@@ -674,6 +674,7 @@ def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knu
             # the epipolar line intersects the polygon defined by the points that were found in the other view. look
             # for the intersection point closest to the next knuckle on the same digit
             nndist, nn_pt = cvb.find_nearest_point_on_line(epi_paw_intersect, next_knuckle_pt)
+
             if nndist < max_dist_from_neighbor:
                 new_pt = np.array([nn_pt.coords.xy[0][0], nn_pt.coords.xy[1][0]])
             else:
@@ -709,7 +710,10 @@ def find_other_knuckle_pts(view_bp_coords, view_bodyparts, view_invalid_points, 
     other_knuckle_pts = view_bp_coords[knuckle_indices, i_frame, :]
     valid_knuckle_pts = other_knuckle_pts[np.logical_not(view_invalid_points[knuckle_indices, i_frame]), :]
 
+    valid_knuckle_pts = np.squeeze(valid_knuckle_pts)
+
     return valid_knuckle_pts
+
 
 def group_dlc_bodyparts(bodyparts):
 

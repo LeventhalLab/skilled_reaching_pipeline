@@ -565,7 +565,7 @@ def estimate_direct_paw_dorsum(bp_coords, invalid_points, bodyparts, cal_data, i
                         if type(intersect_obj) is sg.LineString:
                             d, new_pt = cvb.find_nearest_point_on_line(intersect_obj, digits_midpoint)
                         elif type(intersect_obj) is sg.Point:
-                            new_pt = np.array(intersect_obj.coords.xy[0][0], intersect_obj.coords.xy[1][0])
+                            new_pt = np.array([intersect_obj.coords.xy[0][0], intersect_obj.coords.xy[1][0]])
                             d = intersect_obj.distance(sg.asPoint(digits_midpoint))
                         if d < max_dist_from_neighbor:
                             final_direct_pawdorsum_pts[i_paw][i_frame, :] = new_pt

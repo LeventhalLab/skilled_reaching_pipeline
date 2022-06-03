@@ -24,7 +24,7 @@ def plot_polygon(poly, ax=None, fc='blue'):
         fig = plt.figure()
         ax = fig.add_subplot(111)
 
-    a = [poly.exterior.coords[ii] for ii in range(len(poly.exterior.coords))]
+    # a = [poly.exterior.coords[ii] for ii in range(len(poly.exterior.coords))]
     add_polygon_patch(poly.exterior.coords, ax, fc=fc)
 
     for interior in poly.interiors:
@@ -36,9 +36,8 @@ def plot_polygon(poly, ax=None, fc='blue'):
 def add_polygon_patch(coords, ax, fc='blue'):
     patch = patches.Polygon(np.array(coords.xy).T, fc=fc)
     ax.add_patch(patch)
-    ax.set_xlim(1000, 1200)
-    ax.set_ylim(700, 900)
-    ax.invert_yaxis()
+
+
 
 
 

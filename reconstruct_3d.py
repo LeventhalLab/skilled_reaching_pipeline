@@ -78,6 +78,8 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_par
         trajectory_filename = navigation_utilities.create_trajectory_filename(direct_pickle_params)
         trajectory_folder = navigation_utilities.trajectory_folder(trajectories_parent, ratID, session_name)
         full_traj_fname = os.path.join(trajectory_folder, trajectory_filename)
+        if os.path.exists(full_traj_fname):
+            continue
 
         pickle_params = {'direct': direct_pickle_params,
                          mirror_view: mirror_pickle_params
@@ -604,12 +606,6 @@ def find_digits_midpoint(digit_pts, valid_pts):
 
 def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knuckle_pt, valid_paw_pts, F, im_size, max_dist_from_neighbor):
 
-    # WORKING HERE...need to find boundary of valid_paw_pts
-    # try finding the convex hull of the paw parts that were identified in the "other" view
-    # is there a better way to find the boundary using shapely?
-    if np.shape(valid_paw_pts)[0] > 2:
-        # need at least 3 points to calculate a convex hull
-        paw_hull = ConvexHull(valid_paw_pts)
 
     # doesn't matter if we label it as image 1 or 2 (2nd argument of computeCorrespondEpilines). You get the same edge
     # points either way
@@ -617,8 +613,18 @@ def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knu
     epiline = np.squeeze(epiline)
     edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
 
-    # find intersection between epipolar line and polygon defined by paw boundary
-    epi_paw_intersect = cvb.line_polygon_intersect(edge_pts, valid_paw_pts[paw_hull.vertices, :])
+    # try finding the convex hull of the paw parts that were identified in the "other" view if there are at least 3
+    # valid points identified on the paw. If only 2 valid points, create the line between those two points
+    if np.shape(valid_paw_pts)[0] > 2:
+        # need at least 3 points to calculate a convex hull
+
+        # find intersection between epipolar line and polygon defined by paw boundary
+        paw_hull = ConvexHull(valid_paw_pts)
+        epi_paw_intersect = cvb.line_polygon_intersect(edge_pts, valid_paw_pts[paw_hull.vertices, :])
+    elif np.shape(valid_paw_pts)[0] == 2:
+        epi_paw_intersect = cvb.find_line_intersection(edge_pts, valid_paw_pts)
+    elif np.shape(valid_paw_pts)[0] < 2:
+        epi_paw_intersect = None
 
     if epi_paw_intersect is None:
         # no intersection between the epipolar line and polygon bounded by other paw points
@@ -651,7 +657,10 @@ def estimate_paw_part(known_pt, next_digit_knuckles, other_knuckle_pts, next_knu
                     # find the intersection between the epipolar line and the segment connecting the two adjacent
                     # knuckles
                     li = cvb.find_line_intersection(edge_pts, next_digit_knuckles)
-
+                    if type(li) is sg.Point:
+                        new_pt = np.array([li.coords.xy[0][0], li.coords.xy[1][0]])
+                    elif li is None:
+                        new_pt = None
                 else:
                     # only one neighboring digit was found
                     # look for the closest point in the intersection of the epipolar line with the same knuckle on the

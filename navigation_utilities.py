@@ -117,6 +117,10 @@ def find_orig_rat_video(video_metadata, video_root_folder, vidtype='.avi'):
     return orig_vid_name
 
 
+def parse_paw_trajectory_fname(paw_trajectory_fname):
+
+    _, pt_name = os.path.split(paw_trajectory_fname)
+
 def parse_session_dir_name(session_dir):
     """
 

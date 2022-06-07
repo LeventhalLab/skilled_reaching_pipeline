@@ -447,15 +447,45 @@ def find_nearest_neighbor(x, y, num_neighbors=1):
     :param num_neighbors:
     :return:
     '''
+    if isinstance(x, sg.Point) or isinstance(x, sg.MultiPoint):
+        # x was input as a shapely point/multipoint object
+        point_x = x
+    elif x.ndim == 1 or np.shape(x)[0] == 1:
+        # x is a vector, either shape (2,) or shape (1,2)
+        point_x = sg.asPoint(np.squeeze(x))
+    else:
+        # x is an m x 2 array of multiple points (m > 1)
+        point_x = sg.asMultiPoint(x)
 
-    pts_diff = y - x
+    if isinstance(y, sg.Point) or isinstance(y, sg.MultiPoint):
+        # y was input as a shapely point/multipoint object
+        point_y = y
+    elif y.ndim == 1 or np.shape(y)[0] == 1:
+        # y is a vector, either shape (2,) or shape (1,2)
+        point_y = sg.asPoint(np.squeeze(y))
+    else:
+        # y is an m y 2 array of multiple points (m > 1)
+        point_y = sg.asMultiPoint(y)
 
-    dist_from_x = np.linalg.norm(pts_diff, axis=1)
+    # if type(y) is sg.Point:
+    #     point_y = y
+    # else:
+    #     point_y = sg.asPoint(y)
 
-    sorted_dist_idx = np.argsort(dist_from_x)
-    sorted_dist = np.sort(dist_from_x)
+    near_x, near_y = so.nearest_points(point_x, point_y)
+    nn_dist = near_x.distance(near_y)
 
-    return sorted_dist[:num_neighbors], sorted_dist_idx[:num_neighbors]
+    # left over from when I thought it would be useful to find the n nearest points. Right now, just finds the nearest points
+    # pts_diff = y - x
+    #
+    # dist_from_x = np.linalg.norm(pts_diff, axis=1)
+    #
+    # sorted_dist_idx = np.argsort(dist_from_x)
+    # sorted_dist = np.sort(dist_from_x)
+    #
+    # return sorted_dist[:num_neighbors], sorted_dist_idx[:num_neighbors]
+
+    return nn_dist, near_y
 
 
 def find_nearest_point_on_line(line_pts, pts):
@@ -481,8 +511,11 @@ def find_nearest_point_on_line(line_pts, pts):
         sg_point = closest_pt
     else:
         sg_point = sg.asPoint(pts)
+    try:
+        near_pts = so.nearest_points(sg_line, sg_point)
+    except:
+        pass
 
-    near_pts = so.nearest_points(sg_line, sg_point)
 
     nndist = near_pts[0].distance(near_pts[1])
     nn_pt = near_pts[0]

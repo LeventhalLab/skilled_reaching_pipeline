@@ -32,7 +32,7 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
     for cam01_file in full_pickles[0]:
         pickle_metadata = []
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file))
-        calibration_file = navigation_utilities.find_multiview_calibration_data_name(cal_data_parent, pickle_metadata[0]['trialtime'])
+        calibration_file = navigation_utilities.find_optitrack_calibration_data_name(cal_data_parent, pickle_metadata[0]['trialtime'])
         if not os.path.exists(calibration_file):
             # if there is no calibration file for this session, skip
             continue

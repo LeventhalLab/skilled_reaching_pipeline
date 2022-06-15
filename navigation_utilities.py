@@ -3,7 +3,7 @@ import glob
 import sys
 import cv2
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 def get_video_folders_to_crop(video_root_folder):
@@ -25,6 +25,22 @@ def get_video_folders_to_crop(video_root_folder):
     return crop_dirs
 
 
+def find_traj_files(traj_directory):
+
+    _, dir_name = os.path.split(traj_directory)
+    ratID = dir_name[:5]
+    session_datestring = dir_name[6:-1]
+
+    test_fname = '_'.join((ratID,
+                            'box*',
+                            session_datestring,
+                            '*.pickle'))
+    test_string = os.path.join(traj_directory, test_fname)
+    traj_files = glob.glob(test_string)
+
+    return traj_files
+
+
 def find_original_optitrack_video(video_root_folder, metadata):
 
     mouseID = metadata['mouseID']
@@ -33,7 +49,7 @@ def find_original_optitrack_video(video_root_folder, metadata):
     date_dir = mouseID + '_' + trialtime.strftime('%Y%m%d')
 
     vid_name = '_'.join([mouseID,
-                         trialtime.strftime('%Y%m%d_%H-%M-%S'),
+                         fname_time2string(trialtime),
                          str(metadata['session_num']),
                          '{:03d}'.format(metadata['video_number']),
                          'cam{:02d}.avi'.format(metadata['cam_num'])])
@@ -107,10 +123,15 @@ def find_orig_rat_video(video_metadata, video_root_folder, vidtype='.avi'):
         print('no session folders for {} on {}', video_metadata['ratID'], datestring)
         return None
 
+    if 'vid_num' in video_metadata.keys():
+        vid_num = video_metadata['vid_num']
+    elif 'video_number' in video_metadata.keys():
+        vid_num = video_metadata['video_number']
+
     timestring = datetime_to_string_for_fname(video_metadata['triggertime'])
     vid_name = '_'.join((video_metadata['ratID'],
                          timestring,
-                         '{:03d}.avi'.format(video_metadata['video_number'])
+                         '{:03d}.avi'.format(vid_num)
                          ))
     orig_vid_name = os.path.join(session_folder, vid_name)
 
@@ -120,6 +141,28 @@ def find_orig_rat_video(video_metadata, video_root_folder, vidtype='.avi'):
 def parse_paw_trajectory_fname(paw_trajectory_fname):
 
     _, pt_name = os.path.split(paw_trajectory_fname)
+
+    fname_parts = pt_name.split('_')
+
+    ratID = fname_parts[0]
+    rat_num = int(ratID[1:])
+
+    box_num = int(fname_parts[1][3:])
+
+    triggertime = fname_string_to_datetime(fname_parts[2] + '_' + fname_parts[3])
+
+    vid_num = int(fname_parts[4])
+
+    traj_metadata = {
+        'ratID': ratID,
+        'rat_num': rat_num,
+        'boxnum': box_num,
+        'triggertime': triggertime,
+        'vid_num': vid_num
+    }
+
+    return traj_metadata
+
 
 def parse_session_dir_name(session_dir):
     """
@@ -389,7 +432,7 @@ def build_video_name(video_metadata, videos_parent):
 
     video_name = '{}_box{:02d}_{}_{:03d}.avi'.format(video_metadata['ratID'],
                                                   video_metadata['boxnum'],
-                                                  video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S'),
+                                                  fname_time2string(video_metadata['triggertime']),
                                                   video_metadata['video_number'])
     video_name = os.path.join(videos_parent, 'videos_to_crop', video_metadata['ratID'], video_metadata['session_name'], video_name)
     return video_name
@@ -751,27 +794,39 @@ def construct_dlc_output_pickle_names(video_metadata, view):
     :return:
     """
     if video_metadata['boxnum'] == 99:
-        pickle_name_full = video_metadata['ratID'] + '_' + \
-                           video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S') + '_' + \
-                           '{:03d}'.format(video_metadata['video_number']) + '_' + \
-                           view + '_*_full.pickle'
+        pickle_name_full = '_'.join((video_metadata['ratID'],
+                                     fname_time2string(video_metadata['triggertime']),
+                                     '{:03d}'.format(video_metadata['video_number']),
+                                     view,
+                                     '*',
+                                     'full.pickle'
+                                     ))
 
-        pickle_name_meta = video_metadata['ratID'] + '_' + \
-                           video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S') + '_' + \
-                           '{:03d}'.format(video_metadata['video_number']) + '_' + \
-                           view + '_*_meta.pickle'
+        pickle_name_meta = '_'.join((video_metadata['ratID'],
+                                     fname_time2string(video_metadata['triggertime']),
+                                     '{:03d}'.format(video_metadata['video_number']),
+                                     view,
+                                     '*',
+                                     'meta.pickle'
+                                     ))
     else:
-        pickle_name_full = video_metadata['ratID'] + '_' + \
-                      'box{:02d}'.format(video_metadata['boxnum']) + '_' + \
-                      video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S') + '_' + \
-                      '{:03d}'.format(video_metadata['video_number']) + '_' + \
-                      view + '_*_full.pickle'
+        pickle_name_full = '_'.join((video_metadata['ratID'],
+                                     'box{:02d}'.format(video_metadata['boxnum']),
+                                     fname_time2string(video_metadata['triggertime']),
+                                     '{:03d}'.format(video_metadata['video_number']),
+                                     view,
+                                     '*',
+                                     'full.pickle'
+                                     ))
 
-        pickle_name_meta = video_metadata['ratID'] + '_' + \
-                           'box{:02d}'.format(video_metadata['boxnum']) + '_' + \
-                           video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S') + '_' + \
-                           '{:03d}'.format(video_metadata['video_number']) + '_' + \
-                           view + '_*_meta.pickle'
+        pickle_name_meta = '_'.join((video_metadata['ratID'],
+                                     'box{:02d}'.format(video_metadata['boxnum']),
+                                     fname_time2string(video_metadata['triggertime']),
+                                     '{:03d}'.format(video_metadata['video_number']),
+                                     view,
+                                     '*',
+                                     'meta.pickle'
+                                     ))
 
     return pickle_name_full, pickle_name_meta
 
@@ -800,10 +855,13 @@ def find_calibration_video(video_metadata, calibration_parent):
 
 def create_trajectory_filename(video_metadata):
 
-    trajectory_name = video_metadata['ratID'] + '_' + \
-        'box{:02d}'.format(video_metadata['boxnum']) + '_' + \
-        video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S') + '_' + \
-        '{:03d}'.format(video_metadata['video_number']) + '_3dtrajectory'
+    trajectory_name = '_'.join((
+        video_metadata['ratID'],
+        'box{:02d}'.format(video_metadata['boxnum']),
+        fname_time2string(video_metadata['triggertime']),
+        '{:03d}'.format(video_metadata['video_number']),
+        '3dtrajectory.pickle'
+    ))
 
     return trajectory_name
 
@@ -874,7 +932,7 @@ def create_calibration_filename(calibration_metadata):
     # if not os.path.isdir(calibration_folder):
     #     os.makedirs(calibration_folder)
 
-    datetime_string = calibration_metadata['time'].strftime('%Y%m%d_%H-%M-%S')
+    datetime_string = fname_time2string(calibration_metadata['time'])
 
     calibration_name = 'calibration_box{:02d}_{}.pickle'.format(calibration_metadata['boxnum'], datetime_string)
     # calibration_name = os.path.join(calibration_folder, calibration_name)
@@ -902,7 +960,7 @@ def create_mat_fname_dlc_output(video_metadata, dlc_mat_output_parent):
 
     mat_name = '{}_box{:02d}_{}_{:03d}_dlc-out.mat'.format(video_metadata['ratID'],
                                                            video_metadata['boxnum'],
-                                                           video_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S'),
+                                                           fname_time2string(video_metadata['triggertime']),
                                                            video_metadata['video_number']
                                                            )
     mat_name = os.path.join(mat_path, mat_name)
@@ -968,7 +1026,7 @@ def find_marked_vids_for_3d_reconstruction(marked_vids_parent, dlc_mat_output_pa
 
                                     video_name = '{}_box{:02d}_{}_{:03d}.avi'.format(ratID,
                                                                                      pickle_metadata['boxnum'],
-                                                                                     pickle_metadata['triggertime'].strftime('%Y%m%d_%H-%M-%S'),
+                                                                                     fname_time2string(['triggertime']),
                                                                                      pickle_metadata['video_number'])
                                     video_metadata = {
                                         'ratID': ratID,
@@ -1102,7 +1160,7 @@ def create_calibration_data_name(cal_data_parent, session_datetime):
     return cal_data_name
 
 
-def find_optitrack_calibration_data_name(cal_data_parent, session_datetime, basename='calibrationdata'):
+def find_optitrack_calibration_data_name(cal_data_parent, session_datetime, max_days_to_look_back=5, basename='calibrationdata'):
     '''
 
     :param cal_data_parent: parent directory for folders containing pickle files with calibration results. Has structure:
@@ -1126,12 +1184,69 @@ def find_optitrack_calibration_data_name(cal_data_parent, session_datetime, base
 
         cal_data_datetimes.append(fname_string_to_datetime(cal_data_datestring))
 
+    if not bool(cal_data_datetimes):
+        # didn't find any calibration files for this date
+        cur_datetime = session_datetime
+        session_month = session_datetime.month
+        cur_month = session_month
+
+        while not bool(cal_data_datetimes) and session_datetime - cur_datetime <= timedelta(max_days_to_look_back):
+            # look back max_days_to_look_back days before giving up
+            cur_datetime = cur_datetime - timedelta(1)
+
+            cal_data_folder = create_optitrack_calibration_data_folder(cal_data_parent, cur_datetime)
+            test_name = '_'.join((basename, date_to_string_for_fname(cur_datetime) + '_*.pickle'))
+
+            cal_data_files = glob.glob(os.path.join(cal_data_folder, test_name))
+            cal_data_datetimes = []
+            for cal_data_file in cal_data_files:
+                _, cal_data_root = os.path.split(cal_data_file)
+                cal_data_root, _ = os.path.splitext(cal_data_root)
+                fparts = cal_data_root.split('_')
+                cal_data_datestring = '_'.join(fparts[1:3])
+
+                cal_data_datetimes.append(fname_string_to_datetime(cal_data_datestring))
+
+    if not bool(cal_data_datetimes):
+        # still haven't found any calibration data
+        return None
+
     # find datetime of calibration data file closest to session_datetime
     nearest_datetime = min(cal_data_datetimes, key=lambda x: abs(x - session_datetime))
 
     closest_calibration_file = create_optitrack_calibration_data_name(cal_data_parent, nearest_datetime, basename=basename)
 
     return closest_calibration_file
+
+
+def get_trajectory_folders(trajectories_parent):
+    '''
+    get full list of lowest level folders containing trajectory data. File tree structure is:
+        trajectory_parent-->ratID-->session_name
+    :param trajectories_parent:
+    :return:
+    '''
+    test_string = os.path.join(trajectories_parent, 'R*')
+    poss_rat_directories = glob.glob(test_string)
+    # only accept directories of the format 'RXXXX'
+    rat_directories = []
+    for prd in poss_rat_directories:
+        _, dir_name = os.path.split(prd)
+        if len(dir_name) == 5 and dir_name[1:].isdigit():
+            rat_directories.append(prd)
+
+    traj_directories = []
+    for rd in rat_directories:
+        _, ratID = os.path.split(rd)
+        test_string = os.path.join(rd, ratID + '_*')
+        poss_session_dirs = glob.glob(test_string)
+
+        for psd in poss_session_dirs:
+            _, dir_name = os.path.split(psd)
+            if len(dir_name) == 15:   # name format should be RXXXX_YYYYmmddz, where z = 'a', 'b', etc.
+                traj_directories.append(psd)
+
+    return traj_directories
 
 
 def create_optitrack_calibration_data_name(cal_data_parent, session_datetime, basename='calibrationdata'):
@@ -1515,6 +1630,11 @@ def datetime_to_string_for_fname(datetime_to_convert):
 
 
 def fname_string_to_datetime(string_to_convert):
+    '''
+    short function to make sure date-times are formatted in the same way for all filenames
+    :param string_to_convert:
+    :return:
+    '''
     format_string = '%Y%m%d_%H-%M-%S'
 
     datetime_from_fname = datetime.strptime(string_to_convert, format_string)
@@ -1586,8 +1706,18 @@ def create_calibration_summary_name(full_calib_vid_name, calibration_files_paren
     if not os.path.isdir(calib_file_path):
         os.makedirs(calib_file_path)
 
-    calib_fname = 'calibrationdata_' + calib_metadata['time'].strftime('%Y%m%d_%H-%M-%S') + '_box{:02d}'.format(calib_metadata['boxnum']) + '.pickle'
+    calib_fname = '_'.join(('calibrationdata',
+                            fname_time2string(calib_metadata['time']),
+                            'box{:02d}'.format(calib_metadata['boxnum']) + '.pickle'
+    ))
 
     full_calib_fname = os.path.join(calib_file_path, calib_fname)
 
     return full_calib_fname
+
+
+def fname_time2string(ftime):
+
+    fname_timestring = ftime.strftime('%Y%m%d_%H-%M-%S')
+
+    return fname_timestring

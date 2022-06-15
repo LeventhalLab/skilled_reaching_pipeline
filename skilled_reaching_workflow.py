@@ -162,8 +162,7 @@ def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, cr
 
             # now perform the actual calibration
             skilled_reaching_calibration.multi_mirror_calibration(calibration_data, calibration_summary_name)
-            pass
-    pass
+
 
 if __name__ == '__main__':
 
@@ -207,6 +206,16 @@ if __name__ == '__main__':
     dlc_mat_output_parent = os.path.join(videos_parent, 'matlab_readable_dlc')
     trajectories_parent = os.path.join(videos_parent, 'trajectory_files')
 
+    parent_directories = {
+        'videos_parent': videos_parent,
+        'videos_root_folder': video_root_folder,
+        'cropped_videos_parent': cropped_videos_parent,
+        'marked_videos_parent': marked_videos_parent,
+        'calibration_vids_parent': calibration_vids_parent,
+        'calibration_files_parent': calibration_files_parent,
+        'dlc_mat_output_parent': dlc_mat_output_parent,
+        'trajectories_parent': trajectories_parent
+    }
     crop_params_csv_path = os.path.join(video_root_folder, 'SR_video_crop_regions.csv')
     crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
 
@@ -224,8 +233,11 @@ if __name__ == '__main__':
 
     # vid_folder_list = ['/Users/dan/Documents/deeplabcut/R0382_20200909c','/Users/dan/Documents/deeplabcut/R0230_20181114a']
 
-    folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(cropped_videos_parent)
-    reconstruct_3d.reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent, trajectories_parent, rat_df)
+    # folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(cropped_videos_parent)
+    # reconstruct_3d.reconstruct_folders(folders_to_reconstruct, parent_directories, rat_df)
+
+    reconstruct_3d.test_reconstruction(parent_directories, rat_df)
+
     #todo: complete the camera calibration algorithms
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
     cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi')
@@ -253,7 +265,11 @@ if __name__ == '__main__':
 
     # step 3: make sure calibration has been run for these sessions
     # find list of all analyzed videos; extract dates and boxes for each session
+
+    # step 4: reconstruct the 3d trajectories
     folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(cropped_videos_parent)
     reconstruct_3d.reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent, trajectories_parent)
 
-    # step 4: reconstruct the 3d trajectories
+    # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)
+
+

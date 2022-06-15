@@ -33,7 +33,7 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
         pickle_metadata = []
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file))
         calibration_file = navigation_utilities.find_optitrack_calibration_data_name(cal_data_parent, pickle_metadata[0]['trialtime'])
-        if not os.path.exists(calibration_file):
+        if calibration_file is None or not os.path.exists(calibration_file):
             # if there is no calibration file for this session, skip
             continue
         pickle_files = [cam01_file]  # pickle_files[0] is the full pickle file for camera 1 for the current video
@@ -147,7 +147,10 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
         frame_pts = np.zeros((num_cams, pts_per_frame, 2))
         frame_conf = np.zeros((num_cams, pts_per_frame))
         for i_cam in range(num_cams):
-            frame_pts[i_cam, :, :] = pts_wrt_orig_img[i_cam][i_frame, :, :]
+            try:
+                frame_pts[i_cam, :, :] = pts_wrt_orig_img[i_cam][i_frame, :, :]
+            except:
+                pass
             frame_conf[i_cam, :] = dlc_conf[i_cam][i_frame, :]
 
         frame_worldpoints, frame_reprojected_pts, frame_reproj_errors, valid_frame_points = reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_metadata, i_frame, parent_directories)

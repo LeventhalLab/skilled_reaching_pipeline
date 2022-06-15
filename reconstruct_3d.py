@@ -10,9 +10,59 @@ from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
 import computer_vision_basics as cvb
 import shapely.geometry as sg
+import sr_visualization
 
 
-def reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibration_files_parent, trajectories_parent, rat_df):
+def test_reconstruction(parent_directories, rat_df):
+    trajectories_parent = parent_directories['trajectories_parent']
+
+    traj_directories = navigation_utilities.get_trajectory_folders(trajectories_parent)
+
+    for td in traj_directories:
+        test_singlefolder_reconstruction(td, parent_directories)
+    pass
+
+
+def test_singlefolder_reconstruction(traj_directory, parent_directories):
+
+    traj_files = navigation_utilities.find_traj_files(traj_directory)
+
+    for traj_file in traj_files:
+        test_single_trajectory(traj_file, parent_directories)
+
+    pass
+
+
+def test_single_trajectory(traj_fname, parent_directories):
+
+    videos_root_folder = parent_directories['videos_root_folder']
+    traj_metadata = navigation_utilities.parse_paw_trajectory_fname(traj_fname)
+    traj_data = skilled_reaching_io.read_pickle(traj_fname)
+
+    # todo: create a movie of 3d reconstruction with video of points super-imposed on videos (also show reprojection errors?)
+    # also pick out some specific frames
+
+    orig_video = navigation_utilities.find_orig_rat_video(traj_metadata, videos_root_folder)
+
+    # crop regions is a 2-element list of tuples - first tuple is borders for direct view, second set is for mirror view
+    # each tuple is four elements: left, right, top, bottom
+    direct_crop = (750, 1250, 500, 900)
+    leftmirror_crop = (0, 400, 400, 800)
+    rightmirror_crop = (1650, 2039, 400, 800)
+    if traj_data['paw_pref'].lower() == 'left':
+        # crop right mirror view
+        crop_regions = [direct_crop, rightmirror_crop]
+    else:
+        crop_regions = [direct_crop, leftmirror_crop]
+    sr_visualization.animate_vids_plus3d(traj_data, crop_regions, orig_video)
+    pass
+
+
+def reconstruct_folders(folders_to_reconstruct, parent_directories,  rat_df):
+
+    marked_videos_parent = parent_directories['marked_videos_parent']
+    calibration_files_parent = parent_directories['calibration_files_parent']
+    trajectories_parent = parent_directories['trajectories_parent']
 
     for folder_to_reconstruct in folders_to_reconstruct:
 
@@ -26,7 +76,7 @@ def reconstruct_folders(folders_to_reconstruct, marked_videos_parent, calibratio
 
             cal_data = skilled_reaching_io.get_calibration_data(session_date, box_num, calibration_folder)
             reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
-            pass
+
 
 def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent, view_list=('direct', 'leftmirror', 'rightmirror'), vidtype='.avi'):
 
@@ -105,8 +155,12 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_par
         # todo: check that multiple pellet ID's are handled
         # todo: save these data, and create movies of reconstructions to see how we're doing...
 
+        views = tuple(dlc_data.keys())
+        bodyparts = [tuple(dlc_data[view].keys()) for view in views]
+        bp_coords_ud = [collect_bp_data(dlc_data[view], 'coordinates_ud') for view in views]
+
         traj_data = package_trajectory_data_for_pickle(paw_trajectory, is_estimate, invalid_points, paw_pref,
-                                                       reproj_error, high_p_invalid, low_p_valid, cal_data)
+                                                       reproj_error, high_p_invalid, low_p_valid, cal_data, bp_coords_ud, bodyparts)
         skilled_reaching_io.write_pickle(full_traj_fname, traj_data)
 
 
@@ -120,7 +174,7 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_par
         # sio.savemat(mat_name, mat_data)
 
 
-def package_trajectory_data_for_pickle(paw_trajectory, is_estimate, invalid_points, paw_pref, reproj_error, high_p_invalid, low_p_valid, cal_data):
+def package_trajectory_data_for_pickle(paw_trajectory, is_estimate, invalid_points, paw_pref, reproj_error, high_p_invalid, low_p_valid, cal_data, bp_coords_ud, bodyparts):
 
     traj_data = {'paw_trajectory': paw_trajectory,
                  'is_estimate': is_estimate,
@@ -129,8 +183,11 @@ def package_trajectory_data_for_pickle(paw_trajectory, is_estimate, invalid_poin
                  'reproj_error': reproj_error,
                  'high_p_invalid': high_p_invalid,
                  'low_p_valid': low_p_valid,
-                 'cal_data': cal_data
+                 'cal_data': cal_data,
+                 'bp_coords_ud': bp_coords_ud,
+                 'bodyparts': bodyparts
                  }
+
     return traj_data
 
 
@@ -213,6 +270,8 @@ def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_
 
     bp_coords, is_estimate = estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref, frames_to_check, direct_pickle_params, max_dist_from_neighbor=max_dist_from_neighbor)
 
+    #todo: once points are estimated, should we filter the 2-d trajectories to increase 3-d accuracy before triangulating?
+    # should triangulation and reprojection errors be part of the filtering?
     num_frames = np.shape(bp_coords[0])[1]
     num_bp = len(bodyparts[0])
     paw_trajectory = np.zeros((num_frames, 3, num_bp))    # for now, assume bodyparts match up, same number in both views
@@ -286,9 +345,6 @@ def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_
     # ax_3d.set_zlim(150, 200)
     #
     # plt.show()
-
-
-
 
 def collect_bp_data(view_dlc_data, dlc_key):
 
@@ -946,7 +1002,7 @@ def overlay_reproj_pts_on_orig_ratframe(img, cal_data, dlc_data, invalid_points,
     mtx = cal_data['mtx']
     dist = cal_data['dist']
 
-    bp_c = bp_colors()
+    bp_c = sr_visualization.bp_colors()
 
     im_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     h, w, _ = np.shape(im_bgr)
@@ -1309,7 +1365,7 @@ def overlay_estimated_pts_on_orig_ratframe(img, cal_data, dlc_data, invalid_poin
     mtx = cal_data['mtx']
     dist = cal_data['dist']
 
-    bp_c = bp_colors()
+    bp_c = sr_visualization.bp_colors()
 
     im_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     h, w, _ = np.shape(im_bgr)
@@ -1371,7 +1427,7 @@ def overlay_pts_on_orig_ratframe(img, cal_data, dlc_data, invalid_points, marker
     mtx = cal_data['mtx']
     dist = cal_data['dist']
 
-    bp_c = bp_colors()
+    bp_c = sr_visualization.bp_colors()
 
     im_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
     h, w, _ = np.shape(im_bgr)
@@ -1431,7 +1487,7 @@ def draw_epi_line(test_pt, dlc_data, cal_data, test_frame, ax, im_size):
     mtx = cal_data['mtx']
     dist = cal_data['dist']
 
-    bp_c = bp_colors()
+    bp_c = sr_visualization.bp_colors()
 
     view_list = dlc_data.keys()
     if 'leftmirror' in view_list:
@@ -1459,7 +1515,7 @@ def draw_epipolar_lines(dlc_data, cal_data, test_frame, ax, im_size, invalid_poi
     mtx = cal_data['mtx']
     dist = cal_data['dist']
 
-    bp_c = bp_colors()
+    bp_c = sr_visualization.bp_colors()
 
     view_list = dlc_data.keys()
     if 'leftmirror' in view_list:
@@ -1501,60 +1557,6 @@ def draw_epipolar_lines(dlc_data, cal_data, test_frame, ax, im_size, invalid_poi
     plt.show()
 
     pass
-
-
-def bp_colors():
-
-    bp_c = {'leftear':(0, 1, 1)}
-    bp_c['rightear'] = tuple(np.array(bp_c['leftear']) * 0.5)
-
-    bp_c['lefteye'] = (1, 0, 1)
-    bp_c['righteye'] = tuple(np.array(bp_c['lefteye']) * 0.5)
-
-    bp_c['nose'] = (1, 1, 1)
-
-    bp_c['leftelbow'] = (1, 1, 0)
-    bp_c['rightelbow'] = tuple(np.array(bp_c['leftelbow']) * 0.5)
-
-    bp_c['rightpawdorsum'] = (0, 0, 1)
-    bp_c['rightpalm'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.5)
-    bp_c['rightmcp1'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.9)
-    bp_c['rightmcp2'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.8)
-    bp_c['rightmcp3'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.7)
-    bp_c['rightmcp4'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.6)
-
-    bp_c['rightpip1'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.9)
-    bp_c['rightpip2'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.8)
-    bp_c['rightpip3'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.7)
-    bp_c['rightpip4'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.6)
-
-    bp_c['rightdig1'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.9)
-    bp_c['rightdig2'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.8)
-    bp_c['rightdig3'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.7)
-    bp_c['rightdig4'] = tuple(np.array(bp_c['rightpawdorsum']) * 0.6)
-
-    bp_c['leftpawdorsum'] = (1, 0, 0)
-    bp_c['leftpalm'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.5)
-    bp_c['leftmcp1'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.9)
-    bp_c['leftmcp2'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.8)
-    bp_c['leftmcp3'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.7)
-    bp_c['leftmcp4'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.6)
-
-    bp_c['leftpip1'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.9)
-    bp_c['leftpip2'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.8)
-    bp_c['leftpip3'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.7)
-    bp_c['leftpip4'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.6)
-
-    bp_c['leftdig1'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.9)
-    bp_c['leftdig2'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.8)
-    bp_c['leftdig3'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.7)
-    bp_c['leftdig4'] = tuple(np.array(bp_c['leftpawdorsum']) * 0.6)
-
-    bp_c['pellet1'] = (0, 0, 0)
-    bp_c['pellet2'] = (0.1, 0.1, 0.1)
-    bp_c['pellet3'] = (0.2, 0.2, 0.2)
-
-    return bp_c
 
 
 def package_data_into_mat(dlc_data, video_metadata, trajectory_metadata):

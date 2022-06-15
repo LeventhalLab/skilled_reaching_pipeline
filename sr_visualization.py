@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
+import navigation_utilities
+import reconstruct_3d_optitrack
+
 
 def plot_3d_skeleton(paw_trajectory, bodyparts, ax=None, trail_pts=3):
 
@@ -55,7 +58,7 @@ def animate_vids_plus3d(traj_data, crop_regions, orig_video_name):
     dist = cal_data['dist']
     num_views = len(crop_regions)
     bodyparts = traj_data['bodyparts']
-    bpts2connect = bodyparts2connect()
+    bpts2connect = rat_sr_bodyparts2connect()
     for i_frame in range(num_data_frames):
 
         # read in the first image
@@ -77,13 +80,39 @@ def animate_vids_plus3d(traj_data, crop_regions, orig_video_name):
     vid_obj.release()
 
 
+def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
+    '''
+
+    :param r3d_data: dictionary containing the following keys:
+        frame_points: undistorted points in the original video coordinate system
+    :param cropped_videos:
+    :return:
+    '''
+    num_cams = 2
+
+    fig, axs = create_vids_plus_3danimation_figure()
+    cv_params = [navigation_utilities.parse_cropped_optitrack_video_name(cv_name) for cv_name in cropped_videos]
+
+    fullframe_pts = [np.squeeze(r3d_data['frame_points'][:, i_cam, :, :]) for i_cam in range(num_cams)]
+
+    num_frames = np.shape(r3d_data['frame_points'])[0]
+    for i_frame in range(num_frames):
+        for i_cam in range(num_cams):
+            cur_fullframe_pts = fullframe_pts[i_cam][i_frame, :, :]
+
+            isrotated = cv_params[i_cam]['isrotated']
+            crop_params = cv_params[i_cam]['crop_window']
+            translated_frame_points = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(fullframe_pts, crop_params, isrotated)
+    pass
+
+
 def show_crop_frame_with_pts(img, cw, frame_pts, bodyparts, ax):
     cropped_img = img[cw[2]:cw[3], cw[0]:cw[1], :]
     ax.imshow(cropped_img)
 
 
 
-def bodyparts2connect():
+def rat_sr_bodyparts2connect():
 
     bpts2connect = []
 
@@ -123,6 +152,46 @@ def bodyparts2connect():
 
     return bpts2connect
 
+
+def mouse_sr_bodyparts2connect():
+
+    bpts2connect = []
+
+    bpts2connect.append(['leftelbow', 'leftpawdorsum'])
+
+    bpts2connect.append(['leftpawdorsum', 'leftmcp1'])
+    bpts2connect.append(['leftpawdorsum', 'leftmcp2'])
+    bpts2connect.append(['leftpawdorsum', 'leftmcp3'])
+    bpts2connect.append(['leftpawdorsum', 'leftmcp4'])
+
+    bpts2connect.append(['leftmcp1', 'leftpip1'])
+    bpts2connect.append(['leftmcp2', 'leftpip2'])
+    bpts2connect.append(['leftmcp3', 'leftpip3'])
+    bpts2connect.append(['leftmcp4', 'leftpip4'])
+
+    bpts2connect.append(['leftpip1', 'leftdig1'])
+    bpts2connect.append(['leftpip2', 'leftdig2'])
+    bpts2connect.append(['leftpip3', 'leftdig3'])
+    bpts2connect.append(['leftpip4', 'leftdig4'])
+
+    bpts2connect.append(['rightelbow', 'rightpawdorsum'])
+
+    bpts2connect.append(['rightpawdorsum', 'rightmcp1'])
+    bpts2connect.append(['rightpawdorsum', 'rightmcp2'])
+    bpts2connect.append(['rightpawdorsum', 'rightmcp3'])
+    bpts2connect.append(['rightpawdorsum', 'rightmcp4'])
+
+    bpts2connect.append(['rightmcp1', 'rightpip1'])
+    bpts2connect.append(['rightmcp2', 'rightpip2'])
+    bpts2connect.append(['rightmcp3', 'rightpip3'])
+    bpts2connect.append(['rightmcp4', 'rightpip4'])
+
+    bpts2connect.append(['rightpip1', 'rightdig1'])
+    bpts2connect.append(['rightpip2', 'rightdig2'])
+    bpts2connect.append(['rightpip3', 'rightdig3'])
+    bpts2connect.append(['rightpip4', 'rightdig4'])
+
+    return bpts2connect
 
 def bp_colors():
 

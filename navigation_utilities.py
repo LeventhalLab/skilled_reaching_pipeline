@@ -41,25 +41,84 @@ def find_traj_files(traj_directory):
     return traj_files
 
 
-def find_original_optitrack_video(video_root_folder, metadata):
+def find_optitrack_r3d_files(r3d_folder):
+
+    _, dir_name = os.path.split(r3d_folder)
+    fname_parts = dir_name.split('_')
+    mouseID = fname_parts[0]
+    session_datestring = fname_parts[1]
+
+    test_fname = '_'.join((mouseID,
+                            session_datestring,
+                            '*3dreconstruction.pickle'))
+    test_string = os.path.join(r3d_folder, test_fname)
+    r3d_files = glob.glob(test_string)
+
+    return r3d_files
+
+
+def find_original_optitrack_videos(video_root_folder, metadata, vidtype='.avi'):
+
+    if vidtype[0] != '.':
+        vidtype = '.' + vidtype
 
     mouseID = metadata['mouseID']
-    trialtime =  metadata['trialtime']
+    trialtime =  metadata['time']
     month_dir = mouseID + '_' + trialtime.strftime('%Y%m')
     date_dir = mouseID + '_' + trialtime.strftime('%Y%m%d')
 
-    vid_name = '_'.join([mouseID,
-                         fname_time2string(trialtime),
-                         str(metadata['session_num']),
-                         '{:03d}'.format(metadata['video_number']),
-                         'cam{:02d}.avi'.format(metadata['cam_num'])])
+    test_vid_name = '_'.join(['*' + mouseID,
+                             fname_time2string(trialtime),
+                             str(metadata['session_num']),
+                             '{:03d}'.format(metadata['vid_num']),
+                             'cam*' + vidtype
+                            ])
+    test_vid_name = os.path.join(video_root_folder, mouseID, month_dir, date_dir, test_vid_name)
 
-    full_vid_name = os.path.join(video_root_folder, mouseID, month_dir, date_dir, vid_name)
+    vid_list = glob.glob(test_vid_name)
 
-    if not os.path.exists(full_vid_name):
-        full_vid_name = None
+    # full_vid_name = os.path.join(video_root_folder, mouseID, month_dir, date_dir, vid_name)
+    #
+    # if not os.path.exists(full_vid_name):
+    #     full_vid_name = None
 
-    return full_vid_name
+    return vid_list
+
+
+def find_cropped_optitrack_videos(cropped_vids_parent, metadata, num_cams=2, vidtype='.avi'):
+
+    if vidtype[0] != '.':
+        vidtype = '.' + vidtype
+
+    mouseID = metadata['mouseID']
+    trialtime =  metadata['time']
+    month_dir = mouseID + '_' + trialtime.strftime('%Y%m')
+    date_dir = mouseID + '_' + trialtime.strftime('%Y%m%d')
+    cam_dirs = [date_dir + '_cam{:02d}'.format(i_cam + 1) for i_cam in range(num_cams)]
+
+    test_vid_name = '_'.join(['*' + mouseID,
+                             fname_time2string(trialtime),
+                             str(metadata['session_num']),
+                             '{:03d}'.format(metadata['vid_num']),
+                             'cam*' + vidtype
+                            ])
+    test_vid_names = [os.path.join(cropped_vids_parent, mouseID, month_dir, date_dir, cam_dirs[i_cam], test_vid_name) for i_cam in range(num_cams)]
+
+    cropped_vids = []
+    for i_cam in range(num_cams):
+        vid_list = glob.glob(test_vid_names[i_cam])
+        if len(vid_list) == 1:
+            cropped_vids.append(vid_list[0])
+        else:
+            cropped_vids.append(None)
+    # vid_list = glob.glob(test_vid_name)
+
+    # full_vid_name = os.path.join(video_root_folder, mouseID, month_dir, date_dir, vid_name)
+    #
+    # if not os.path.exists(full_vid_name):
+    #     full_vid_name = None
+
+    return cropped_vids
 
 
 def create_cropped_video_destination_list(cropped_vids_parent, video_folder_list, view_list):
@@ -315,6 +374,62 @@ def parse_cropped_video_name(cropped_video_name):
 def parse_cropped_optitrack_video_name(cropped_video_name):
     """
     extract metadata information from the video name
+    :param cropped_video_name: video name with expected format RXXXX_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
+        where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
+        cropping windows from the original video
+    :return: cropped_vid_metadata: dictionary containing the following keys
+        ratID - rat ID as a string RXXXX
+        boxnum - box number the session was run in. useful for making sure we used the right calibration. If unknown,
+            set to 99
+        triggertime - datetime object with when the trigger event occurred (date and time)
+        video_number - number of the video (ZZZ in the filename). This number is not necessarily unique within a session
+            if it had to be restarted partway through
+        video_type - video type (e.g., '.avi', '.mp4', etc)
+        crop_window - 4-element list [left, right, top, bottom] in pixels
+    """
+
+    cropped_vid_metadata = {
+        'mouseID': '',
+        'triggertime': datetime(1,1,1),
+        'video_number': 0,
+        'view': '',
+        'video_type': '',
+        'crop_window': [],
+        'cropped_video_name': ''
+    }
+    _, vid_name = os.path.split(cropped_video_name)
+    cropped_vid_metadata['cropped_video_name'] = vid_name
+    vid_name, vid_type = os.path.splitext(vid_name)
+
+    metadata_list = vid_name.split('_')
+
+    cropped_vid_metadata['ratID'] = metadata_list[0]
+    num_string = ''.join(filter(lambda i: i.isdigit(), cropped_vid_metadata['ratID']))
+    cropped_vid_metadata['rat_num'] = int(num_string)
+
+    # if box number is stored in file name, then extract it
+    if 'box' in metadata_list[1]:
+        cropped_vid_metadata['boxnum'] = int(metadata_list[1][3:])
+        next_metadata_idx = 2
+    else:
+        next_metadata_idx = 1
+
+    datetime_str = metadata_list[next_metadata_idx] + '_' + metadata_list[1+next_metadata_idx]
+    cropped_vid_metadata['triggertime'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
+
+    cropped_vid_metadata['video_number'] = int(metadata_list[next_metadata_idx + 2])
+    cropped_vid_metadata['video_type'] = vid_type
+    cropped_vid_metadata['view'] = metadata_list[next_metadata_idx + 3]
+
+    left, right, top, bottom = list(map(int, metadata_list[next_metadata_idx + 4].split('-')))
+    cropped_vid_metadata['crop_window'].extend(left, right, top, bottom)
+
+    return cropped_vid_metadata
+
+
+def parse_cropped_optitrack_video_name(cropped_video_name):
+    """
+    extract metadata information from the video name
     :param cropped_video_name: video name with expected format mouseID_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
         where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
         cropping windows from the original video
@@ -331,13 +446,14 @@ def parse_cropped_optitrack_video_name(cropped_video_name):
 
     cropped_vid_metadata = {
         'mouseID': '',
-        'boxnum': 99,
-        'time': datetime(1,1,1),
+        'session_num': 1,
+        'triggertime': datetime(1,1,1),
         'video_number': 0,
         'cam_num': 0,
         'video_type': '',
         'crop_window': [],
-        'cropped_video_name': ''
+        'cropped_video_name': '',
+        'isrotated': False
     }
     _, vid_name = os.path.split(cropped_video_name)
     cropped_vid_metadata['cropped_video_name'] = vid_name
@@ -345,24 +461,27 @@ def parse_cropped_optitrack_video_name(cropped_video_name):
 
     metadata_list = vid_name.split('_')
 
-    cropped_vid_metadata['mouseID'] = metadata_list[0]
+    if metadata_list[0][0:4] == 'stim':
+        cropped_vid_metadata['mouseID'] = metadata_list[0][4:]
+    else:
+        cropped_vid_metadata['mouseID'] = metadata_list[0]
 
-    # # if box number is stored in file name, then extract it
-    # if 'box' in metadata_list[1]:
-    #     cropped_vid_metadata['boxnum'] = int(metadata_list[1][3:])
-    #     next_metadata_idx = 2
-    # else:
-    #     next_metadata_idx = 1
-
-    datetime_str = metadata_list[next_metadata_idx] + '_' + metadata_list[1+next_metadata_idx]
+    datetime_str = metadata_list[1] + '_' + metadata_list[2]
     cropped_vid_metadata['triggertime'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
 
-    cropped_vid_metadata['video_number'] = int(metadata_list[next_metadata_idx + 2])
-    cropped_vid_metadata['video_type'] = vid_type
-    cropped_vid_metadata['view'] = metadata_list[next_metadata_idx + 3]
+    cropped_vid_metadata['session_num'] = int(metadata_list[3])
 
-    left, right, top, bottom = list(map(int, metadata_list[next_metadata_idx + 4].split('-')))
-    cropped_vid_metadata['crop_window'].extend(left, right, top, bottom)
+    cropped_vid_metadata['video_number'] = int(metadata_list[4])
+
+    cropped_vid_metadata['cam_num'] = int(metadata_list[5][3:])
+
+    left, right, top, bottom = list(map(int, metadata_list[6].split('-')))
+    cropped_vid_metadata['crop_window'] = (left, right, top, bottom)
+
+    if metadata_list[7] == 'rotated':
+        cropped_vid_metadata['isrotated'] = True
+
+    cropped_vid_metadata['video_type'] = vid_type
 
     return cropped_vid_metadata
 
@@ -1249,6 +1368,36 @@ def get_trajectory_folders(trajectories_parent):
     return traj_directories
 
 
+def get_optitrack_r3d_folders(reconstruct3d_parent):
+    '''
+    get full list of lowest level folders containing 3d reconstruction data. File tree structure is:
+        reconstruct3d_parent-->ratID-->session_name
+    :param reconstruct3d_parent:
+    :return:
+    '''
+    test_string = os.path.join(reconstruct3d_parent, '*')
+    poss_mouse_directories = glob.glob(test_string)
+    # make sure don't count non-directories
+    mouse_directories = [pmd for pmd in poss_mouse_directories if os.path.isdir(pmd)]
+
+    r3d_directories = []
+    for md in mouse_directories:
+        _, mouseID = os.path.split(md)
+        test_string = os.path.join(md, mouseID + '_*')
+        poss_month_directories = glob.glob(test_string)
+        poss_month_directories = [pmd for pmd in poss_month_directories if os.path.isdir(pmd)]
+
+        for month_dir in poss_month_directories:
+            test_string = os.path.join(month_dir, mouseID + '_*')
+            poss_day_directories = glob.glob(test_string)
+            day_directories = [pdd for pdd in poss_day_directories if os.path.isdir(pdd)]
+
+            if bool(day_directories):
+                r3d_directories.extend(day_directories)
+
+    return r3d_directories
+
+
 def create_optitrack_calibration_data_name(cal_data_parent, session_datetime, basename='calibrationdata'):
     '''
 
@@ -1310,15 +1459,7 @@ def find_multiview_calibration_data_name(cal_data_parent, session_datetime, box_
 
 def create_3dreconstruction_folder(metadata, reconstruction3d_parent):
     trialtime = metadata['trialtime']
-    trial_datetime_string = datetime_to_string_for_fname(trialtime)
     mouseID = metadata['mouseID']
-    reconstruction3d_name = '_'.join(
-        [mouseID,
-        trial_datetime_string,
-        '{:d}'.format(metadata['session_num']),
-        '{:03d}'.format(metadata['video_number']),
-        '3dreconstruction.pickle']
-        )
 
     month_string = trialtime.strftime('%Y%m')
     date_string = date_to_string_for_fname(trialtime)

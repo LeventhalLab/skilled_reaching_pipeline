@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import computer_vision_basics as cvb
 import scipy.interpolate
 import pandas as pd
-import scipy.io as sio
+import sr_visualization
 
 
 def reconstruct_optitrack_session(view_directories, parent_directories):
@@ -30,6 +30,15 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
         # meta_pickles.append(glob.glob(os.path.join(view_dir, '*meta.pickle')))
 
     for cam01_file in full_pickles[0]:
+
+        dlc_output_pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file)
+        reconstruct3d_parent = parent_directories['reconstruct3d_parent']
+        reconstruction3d_fname = navigation_utilities.create_3d_reconstruction_pickle_name(
+            dlc_output_pickle_metadata, reconstruct3d_parent)
+        if os.path.exists(reconstruction3d_fname):
+            print('{} already calculated'.format(reconstruction3d_fname))
+            continue
+
         pickle_metadata = []
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file))
         calibration_file = navigation_utilities.find_optitrack_calibration_data_name(cal_data_parent, pickle_metadata[0]['trialtime'])
@@ -110,9 +119,9 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
     dlc_output_pickle_metadata = [navigation_utilities.parse_dlc_output_pickle_name_optitrack(pf) for pf in pickle_files]
     reconstruction3d_fname = navigation_utilities.create_3d_reconstruction_pickle_name(dlc_output_pickle_metadata[0], reconstruct3d_parent)
 
-    if os.path.exists(reconstruction3d_fname):
-        print('{} already calculated'.format(reconstruction3d_fname))
-        return
+    # if os.path.exists(reconstruction3d_fname):
+    #     print('{} already calculated'.format(reconstruction3d_fname))
+    #     return
 
     mouseID = dlc_output_pickle_metadata[0]['mouseID']
     session_num = dlc_output_pickle_metadata[0]['session_num']
@@ -461,6 +470,83 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
         pts_wrt_orig_img.append(np.zeros((num_frames, num_joints, 2)))
         dlc_conf.append(np.zeros((num_frames, num_joints)))
         #todo: write the new points/confidences into these arrays so they can be returned by this function
+
+        for i_frame, frame in enumerate(frame_list):
+            if frame[:5] != 'frame':
+                continue
+            current_coords = cam_output[frame]['coordinates'][0]
+
+            # current_coords is a list of arrays containing data points as (x,y) pairs
+            # overlay_pts(pickle_metadata[i_cam], current_coords, dlc_metadata[i_cam], i_frame)
+            # if this image was rotated 180 degrees, first reflect back across the midpoint of the current image
+            if cam_metadata['isrotated'] == True:
+                # rotate points around the center of the cropped image, then translate into position in the original
+                # image, then rotate around the center of the original image
+                crop_win = cam_metadata['crop_window']
+
+                crop_win_size = np.array([crop_win[1] - crop_win[0], crop_win[3] - crop_win[2]])
+                reflected_pts = rotate_pts_180(current_coords, crop_win_size)
+
+                # now have the points back in the upside-down version. Now need to rotate the points within the full image
+                # to get into the same reference frame as the calibration image
+                full_im_size = dlc_metadata[i_cam]['data']['frame_dimensions']
+                # full_im_size = (full_im_size[1],full_im_size[0])
+
+                pts_translated_to_orig = translate_back_to_orig_img(pickle_metadata[i_cam], reflected_pts)
+
+                # overlay_pts(pickle_metadata[i_cam], reflected_pts, dlc_metadata[i_cam], i_frame, rotate_img=True)
+                # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_translated_to_orig, dlc_metadata[i_cam], i_frame, rotate_img=False)
+
+                pts_in_calibration_coords = rotate_pts_180(pts_translated_to_orig, orig_im_size)
+                # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
+                #                           rotate_img=True)
+            else:
+                pts_in_calibration_coords = translate_back_to_orig_img(pickle_metadata[i_cam], current_coords)
+                # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
+                #                           rotate_img=False)
+                #todo: align all the points for the two camera views/frames and store them in a way that can be neatly
+                # exported to another function for 3D reconstuction. should also write a function to organize pickled data
+                # into a more reasonable format so if/when start using .h5 files, can write another function to organize
+                # those
+            array_pts = convert_pts_to_array(pts_in_calibration_coords)
+            pts_wrt_orig_img[i_cam][i_frame] = array_pts
+
+            # store and return the confidence array
+            conf = dlc_output[i_cam][frame]['confidence']
+            array_conf = convert_pickle_conf_to_array(conf)
+
+            dlc_conf[i_cam][i_frame, :] = array_conf
+
+    return pts_wrt_orig_img, dlc_conf
+
+
+def optitrack_fullframe_to_cropped_coords(fullframe_pts, crop_params, isrotated):
+    '''
+
+    :param fullframe_pts: n x 2 array where n is the number of points to translate/rotate
+    :param crop_params:
+    :param isrotated:
+    :return:
+    '''
+    # note that current algorithm for camera 1 crops, then rotates. We want a rotated, but uncropped transformation of
+    # coordinates camera 2 is easy - just crops
+
+    # I'm not sure if anything special needs to be done for rotated points if we're going to display the image right-side up
+    translated_pts[:, 0] = fullframe_pts - [crop_params[0], crop_params[1]]
+    pts_wrt_orig_img = []
+    dlc_conf = []
+    for i_cam, cam_output in enumerate(dlc_output):
+        # cam_output is a dictionary where each entry is 'frame0000', 'frame0001', etc.
+        # each frame has keys: 'coordinates', 'confidence', and 'costs'
+
+        cam_metadata = pickle_metadata[i_cam]
+
+        # loop through the frames
+        frame_list = cam_output.keys()
+        num_frames = cam_output['metadata']['nframes']
+        num_joints = len(cam_output['metadata']['all_joints_names'])
+        pts_wrt_orig_img.append(np.zeros((num_frames, num_joints, 2)))
+        dlc_conf.append(np.zeros((num_frames, num_joints)))
 
         for i_frame, frame in enumerate(frame_list):
             if frame[:5] != 'frame':
@@ -1239,3 +1325,45 @@ def identify_valid_points_in_frames(r3d_data, max_reproj_error=20, min_conf=0.9)
         # each frame
 
     return frame_valid_points
+
+
+def test_optitrack_reconstruction(parent_directories):
+
+    reconstruct3d_parent = parent_directories['reconstruct3d_parent']
+
+    r3d_directories = navigation_utilities.get_optitrack_r3d_folders(reconstruct3d_parent)
+
+    for rd in r3d_directories:
+        test_singlefolder_optitrack_reconstruction(rd, parent_directories)
+
+
+def test_singlefolder_optitrack_reconstruction(rd, parent_directories):
+
+    r3d_files = navigation_utilities.find_optitrack_r3d_files(rd)
+
+    for r3d_file in r3d_files:
+        test_single_optitrack_trajectory(r3d_file, parent_directories)
+    pass
+
+
+def test_single_optitrack_trajectory(r3d_file, parent_directories):
+
+    video_root_folder = parent_directories['video_root_folder']
+    cropped_vids_parent = parent_directories['cropped_vids_parent']
+    r3d_metadata = navigation_utilities.parse_3d_reconstruction_pickle_name(r3d_file)
+    r3d_data = skilled_reaching_io.read_pickle(r3d_file)
+
+    # todo: create a movie of 3d reconstruction with video of points super-imposed on videos (also show reprojection errors?)
+    # also pick out some specific frames
+
+    orig_videos = navigation_utilities.find_original_optitrack_videos(video_root_folder, r3d_metadata)
+    cropped_videos = navigation_utilities.find_cropped_optitrack_videos(cropped_vids_parent, r3d_metadata)
+
+    # crop regions is a 2-element list of tuples - first tuple is borders for direct view, second set is for mirror view
+    # each tuple is four elements: left, right, top, bottom
+    # direct_crop = (750, 1250, 500, 900)
+    # leftmirror_crop = (0, 400, 400, 800)
+    # rightmirror_crop = (1650, 2039, 400, 800)
+
+    sr_visualization.animate_optitrack_vids_plus3d(r3d_data, cropped_videos)
+    pass

@@ -122,8 +122,10 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
     # read in the calibration file, make sure we have stereo and camera calibrations
     cal_data = skilled_reaching_io.read_pickle(calibration_file)
 
+    # every now and then, a frame gets dropped. assume it's the last frame, so the first num_frames-1 are aligned
     num_cams = len(pts_wrt_orig_img)
-    num_frames = np.shape(pts_wrt_orig_img[0])[0]
+    num_cam_vid_frames = [np.shape(pts_wrt_orig_img[i_cam])[0] for i_cam in range(num_cams)]
+    num_frames = min(num_cam_vid_frames)
     pts_per_frame = np.shape(dlc_conf[0])[1]
 
     pickle_metadata = []

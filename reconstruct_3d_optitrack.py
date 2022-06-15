@@ -532,7 +532,7 @@ def optitrack_fullframe_to_cropped_coords(fullframe_pts, crop_params, isrotated)
     # coordinates camera 2 is easy - just crops
 
     # I'm not sure if anything special needs to be done for rotated points if we're going to display the image right-side up
-    translated_pts[:, 0] = fullframe_pts - [crop_params[0], crop_params[1]]
+    translated_pts = fullframe_pts - np.array(crop_params[:1])
     pts_wrt_orig_img = []
     dlc_conf = []
     for i_cam, cam_output in enumerate(dlc_output):

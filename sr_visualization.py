@@ -92,7 +92,7 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
 
     fig, axs = create_vids_plus_3danimation_figure()
     cv_params = [navigation_utilities.parse_cropped_optitrack_video_name(cv_name) for cv_name in cropped_videos]
-
+    im_size = r3d_data['cal_data']['im_size']
     fullframe_pts = [np.squeeze(r3d_data['frame_points'][:, i_cam, :, :]) for i_cam in range(num_cams)]
 
     num_frames = np.shape(r3d_data['frame_points'])[0]
@@ -102,7 +102,7 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
 
             isrotated = cv_params[i_cam]['isrotated']
             crop_params = cv_params[i_cam]['crop_window']
-            translated_frame_points = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(fullframe_pts, crop_params, isrotated)
+            translated_frame_points = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(cur_fullframe_pts, crop_params, im_size[i_cam], isrotated)
     pass
 
 

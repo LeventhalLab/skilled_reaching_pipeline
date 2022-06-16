@@ -436,7 +436,8 @@ def rotate_pts_180(pts, im_size):
             try:
                 x, y = pt[0]
             except:
-                pass
+                # must be a vector instead of an array
+                x, y = pt
             # possible that im_size is width x height or height x width
             try:
                 new_x = im_size[0] - x
@@ -520,7 +521,7 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
     return pts_wrt_orig_img, dlc_conf
 
 
-def optitrack_fullframe_to_cropped_coords(fullframe_pts, crop_params, isrotated):
+def optitrack_fullframe_to_cropped_coords(fullframe_pts, crop_params, im_size, isrotated):
     '''
 
     :param fullframe_pts: n x 2 array where n is the number of points to translate/rotate
@@ -531,70 +532,84 @@ def optitrack_fullframe_to_cropped_coords(fullframe_pts, crop_params, isrotated)
     # note that current algorithm for camera 1 crops, then rotates. We want a rotated, but uncropped transformation of
     # coordinates camera 2 is easy - just crops
 
-    # I'm not sure if anything special needs to be done for rotated points if we're going to display the image right-side up
-    translated_pts = fullframe_pts - np.array(crop_params[:1])
-    pts_wrt_orig_img = []
-    dlc_conf = []
-    for i_cam, cam_output in enumerate(dlc_output):
-        # cam_output is a dictionary where each entry is 'frame0000', 'frame0001', etc.
-        # each frame has keys: 'coordinates', 'confidence', and 'costs'
+    if isrotated:
+        # points are translated into the "upright" (already rotated) video. So if video is rotated, need to reflect
+        # the points across the middle of the full frame, then rotate them within the cropped region
+        reflected_pts = rotate_pts_180(fullframe_pts, im_size)
 
-        cam_metadata = pickle_metadata[i_cam]
+        # points are rotated within the full frame. Now subtract the left and top edges of the crop window
+        translated_reflected_pts = reflected_pts - np.array([crop_params[0], crop_params[2]])
 
-        # loop through the frames
-        frame_list = cam_output.keys()
-        num_frames = cam_output['metadata']['nframes']
-        num_joints = len(cam_output['metadata']['all_joints_names'])
-        pts_wrt_orig_img.append(np.zeros((num_frames, num_joints, 2)))
-        dlc_conf.append(np.zeros((num_frames, num_joints)))
+        # now reflect these points across the center within the cropped frame
+        crop_win_size = np.array([crop_params[1] - crop_params[0], crop_params[3] - crop_params[2]])
+        translated_pts = rotate_pts_180(translated_reflected_pts, crop_win_size)
 
-        for i_frame, frame in enumerate(frame_list):
-            if frame[:5] != 'frame':
-                continue
-            current_coords = cam_output[frame]['coordinates'][0]
+    else:
+        translated_pts = fullframe_pts - np.array(crop_params[:1])
 
-            # current_coords is a list of arrays containing data points as (x,y) pairs
-            # overlay_pts(pickle_metadata[i_cam], current_coords, dlc_metadata[i_cam], i_frame)
-            # if this image was rotated 180 degrees, first reflect back across the midpoint of the current image
-            if cam_metadata['isrotated'] == True:
-                # rotate points around the center of the cropped image, then translate into position in the original
-                # image, then rotate around the center of the original image
-                crop_win = cam_metadata['crop_window']
-
-                crop_win_size = np.array([crop_win[1] - crop_win[0], crop_win[3] - crop_win[2]])
-                reflected_pts = rotate_pts_180(current_coords, crop_win_size)
-
-                # now have the points back in the upside-down version. Now need to rotate the points within the full image
-                # to get into the same reference frame as the calibration image
-                full_im_size = dlc_metadata[i_cam]['data']['frame_dimensions']
-                # full_im_size = (full_im_size[1],full_im_size[0])
-
-                pts_translated_to_orig = translate_back_to_orig_img(pickle_metadata[i_cam], reflected_pts)
-
-                # overlay_pts(pickle_metadata[i_cam], reflected_pts, dlc_metadata[i_cam], i_frame, rotate_img=True)
-                # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_translated_to_orig, dlc_metadata[i_cam], i_frame, rotate_img=False)
-
-                pts_in_calibration_coords = rotate_pts_180(pts_translated_to_orig, orig_im_size)
-                # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
-                #                           rotate_img=True)
-            else:
-                pts_in_calibration_coords = translate_back_to_orig_img(pickle_metadata[i_cam], current_coords)
-                # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
-                #                           rotate_img=False)
-                #todo: align all the points for the two camera views/frames and store them in a way that can be neatly
-                # exported to another function for 3D reconstuction. should also write a function to organize pickled data
-                # into a more reasonable format so if/when start using .h5 files, can write another function to organize
-                # those
-            array_pts = convert_pts_to_array(pts_in_calibration_coords)
-            pts_wrt_orig_img[i_cam][i_frame] = array_pts
-
-            # store and return the confidence array
-            conf = dlc_output[i_cam][frame]['confidence']
-            array_conf = convert_pickle_conf_to_array(conf)
-
-            dlc_conf[i_cam][i_frame, :] = array_conf
-
-    return pts_wrt_orig_img, dlc_conf
+    return translated_pts
+    # pts_wrt_orig_img = []
+    # dlc_conf = []
+    # for i_cam, cam_output in enumerate(dlc_output):
+    #     # cam_output is a dictionary where each entry is 'frame0000', 'frame0001', etc.
+    #     # each frame has keys: 'coordinates', 'confidence', and 'costs'
+    #
+    #     cam_metadata = pickle_metadata[i_cam]
+    #
+    #     # loop through the frames
+    #     frame_list = cam_output.keys()
+    #     num_frames = cam_output['metadata']['nframes']
+    #     num_joints = len(cam_output['metadata']['all_joints_names'])
+    #     pts_wrt_orig_img.append(np.zeros((num_frames, num_joints, 2)))
+    #     dlc_conf.append(np.zeros((num_frames, num_joints)))
+    #
+    #     for i_frame, frame in enumerate(frame_list):
+    #         if frame[:5] != 'frame':
+    #             continue
+    #         current_coords = cam_output[frame]['coordinates'][0]
+    #
+    #         # current_coords is a list of arrays containing data points as (x,y) pairs
+    #         # overlay_pts(pickle_metadata[i_cam], current_coords, dlc_metadata[i_cam], i_frame)
+    #         # if this image was rotated 180 degrees, first reflect back across the midpoint of the current image
+    #         if cam_metadata['isrotated'] == True:
+    #             # rotate points around the center of the cropped image, then translate into position in the original
+    #             # image, then rotate around the center of the original image
+    #             crop_win = cam_metadata['crop_window']
+    #
+    #             crop_win_size = np.array([crop_win[1] - crop_win[0], crop_win[3] - crop_win[2]])
+    #             reflected_pts = rotate_pts_180(current_coords, crop_win_size)
+    #
+    #             # now have the points back in the upside-down version. Now need to rotate the points within the full image
+    #             # to get into the same reference frame as the calibration image
+    #             full_im_size = dlc_metadata[i_cam]['data']['frame_dimensions']
+    #             # full_im_size = (full_im_size[1],full_im_size[0])
+    #
+    #             pts_translated_to_orig = translate_back_to_orig_img(pickle_metadata[i_cam], reflected_pts)
+    #
+    #             # overlay_pts(pickle_metadata[i_cam], reflected_pts, dlc_metadata[i_cam], i_frame, rotate_img=True)
+    #             # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_translated_to_orig, dlc_metadata[i_cam], i_frame, rotate_img=False)
+    #
+    #             pts_in_calibration_coords = rotate_pts_180(pts_translated_to_orig, orig_im_size)
+    #             # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
+    #             #                           rotate_img=True)
+    #         else:
+    #             pts_in_calibration_coords = translate_back_to_orig_img(pickle_metadata[i_cam], current_coords)
+    #             # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
+    #             #                           rotate_img=False)
+    #             #todo: align all the points for the two camera views/frames and store them in a way that can be neatly
+    #             # exported to another function for 3D reconstuction. should also write a function to organize pickled data
+    #             # into a more reasonable format so if/when start using .h5 files, can write another function to organize
+    #             # those
+    #         array_pts = convert_pts_to_array(pts_in_calibration_coords)
+    #         pts_wrt_orig_img[i_cam][i_frame] = array_pts
+    #
+    #         # store and return the confidence array
+    #         conf = dlc_output[i_cam][frame]['confidence']
+    #         array_conf = convert_pickle_conf_to_array(conf)
+    #
+    #         dlc_conf[i_cam][i_frame, :] = array_conf
+    #
+    # return pts_wrt_orig_img, dlc_conf
 
 
 def convert_pts_to_array(pickle_format_pts):

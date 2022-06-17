@@ -449,6 +449,9 @@ def rotate_pts_180(pts, im_size):
         else:
             reflected_pts.append(np.array([]))
 
+    reflected_pts = np.array(reflected_pts)
+    reflected_pts = np.squeeze(reflected_pts)
+
     return reflected_pts
 
 
@@ -545,7 +548,13 @@ def optitrack_fullframe_to_cropped_coords(fullframe_pts, crop_params, im_size, i
         translated_pts = rotate_pts_180(translated_reflected_pts, crop_win_size)
 
     else:
-        translated_pts = fullframe_pts - np.array(crop_params[:1])
+        translated_pts = fullframe_pts - np.array([crop_params[0], crop_params[2]])
+
+    # if fullframe_pt was [0,0], reset translated_pts for that point to [0,0]
+    for i_pt, ff_pt in enumerate(fullframe_pts):
+
+        if all(ff_pt == 0):
+            translated_pts[i_pt, :] = ff_pt
 
     return translated_pts
     # pts_wrt_orig_img = []
@@ -1371,7 +1380,7 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
     # todo: create a movie of 3d reconstruction with video of points super-imposed on videos (also show reprojection errors?)
     # also pick out some specific frames
 
-    orig_videos = navigation_utilities.find_original_optitrack_videos(video_root_folder, r3d_metadata)
+    # orig_videos = navigation_utilities.find_original_optitrack_videos(video_root_folder, r3d_metadata)
     cropped_videos = navigation_utilities.find_cropped_optitrack_videos(cropped_vids_parent, r3d_metadata)
 
     # crop regions is a 2-element list of tuples - first tuple is borders for direct view, second set is for mirror view

@@ -94,6 +94,8 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
     cv_cam_nums = [cvp['cam_num'] for cvp in cv_params]
     im_size = r3d_data['cal_data']['im_size']
     fullframe_pts = [np.squeeze(r3d_data['frame_points'][:, i_cam, :, :]) for i_cam in range(num_cams)]
+    reprojected_pts = [np.squeeze(r3d_data['reprojected_points'][:, i_cam, :, :]) for i_cam in range(num_cams)]
+    wpts = r3d_data['worldpoints']
 
     bodyparts = r3d_data['bodyparts']
     num_frames = np.shape(r3d_data['frame_points'])[0]
@@ -113,24 +115,59 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
         crop_wins.append(np.array([0, w, 0, h], dtype=int))
 
     for i_frame in range(num_frames):
+        fullframe_pts_forthisframe = [fullframe_pts[i_cam][i_frame, :, :] for i_cam in range(num_cams)]
+        valid_3dpoints = identify_valid_3dpts(fullframe_pts_forthisframe)
         for i_cam in range(num_cams):
-            cur_fullframe_pts = fullframe_pts[i_cam][i_frame, :, :]
 
+            cur_fullframe_reproj_pts = reprojected_pts[i_cam][i_frame, :, :]
+            cur_fullframe_pts = fullframe_pts_forthisframe[i_cam]
             isrotated = cv_params[i_cam]['isrotated']
             crop_params = cv_params[i_cam]['crop_window']
             translated_frame_points = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(cur_fullframe_pts, crop_params, im_size[i_cam], isrotated)
+            translated_reproj_points = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(cur_fullframe_reproj_pts, crop_params, im_size[i_cam], isrotated)
 
             vid_cap_objs[i_cam].set(cv2.CAP_PROP_POS_FRAMES, i_frame)
             ret, img = vid_cap_objs[i_cam].read()
 
             # todo: overlay points, check that they match with cropped vids
-            show_crop_frame_with_pts(img, crop_wins[i_cam], translated_frame_points, bodyparts, bpts2connect, axs[i_cam])
+            show_crop_frame_with_pts(img, crop_wins[i_cam], translated_frame_points, bodyparts, bpts2connect, valid_3dpoints, axs[i_cam])
+            show_crop_frame_with_pts(img, crop_wins[i_cam], translated_reproj_points, bodyparts, [], valid_3dpoints,
+                                     axs[i_cam], marker='+')
 
+        plt.show()
+        # make the 3d plot
+
+        cur_wpts = np.squeeze(wpts[i_frame, :, :])
+        plot_frame3d(cur_wpts, valid_3dpoints, axs[2])
         plt.show()
     pass
 
 
-def show_crop_frame_with_pts(img, cw, frame_pts, bodyparts, bpts2conect, ax):
+def identify_valid_3dpts(framepts_forallcams):
+
+    num_cams = len(framepts_forallcams)
+    num_bp = np.shape(framepts_forallcams[0])[0]
+
+    valid_3dpts = np.zeros(num_bp, dtype=bool)
+
+    for i_bp in range(num_bp):
+
+        # check each camera view to see if x = y = 0, indicating that point was not correctly identified in that view
+        frame_pt_test = [all(cam_framepts[i_bp, :] == 0) for cam_framepts in framepts_forallcams]
+
+        if any(frame_pt_test):
+            continue
+        valid_3dpts[i_bp] = True
+
+    return valid_3dpts
+
+
+def plot_frame3d(worldpoints, valid_3dpoints, ax3d, **kwargs):
+
+
+    pass
+
+def show_crop_frame_with_pts(img, cw, frame_pts, bodyparts, bpts2conect, valid_3dpoints, ax, **kwargs):
 
     if img.ndim == 2:
         # 2-d array for grayscale image
@@ -141,38 +178,50 @@ def show_crop_frame_with_pts(img, cw, frame_pts, bodyparts, bpts2conect, ax):
 
     ax.imshow(cropped_img)
 
-    overlay_pts(frame_pts, bodyparts, ax)
+    overlay_pts(frame_pts, bodyparts, valid_3dpoints, ax, **kwargs)
 
-    connect_bodyparts(frame_pts, bodyparts, bpts2conect, ax)
+    connect_bodyparts(frame_pts, bodyparts, bpts2conect, valid_3dpoints, ax)
 
 
-def overlay_pts(pts, bodyparts, ax, marker='o', markersize=6):
+def overlay_pts(pts, bodyparts, valid_3dpoints, ax, **kwargs):
+
+    kwargs.setdefault('marker', 'o')
+    kwargs.setdefault('s', 3)
     bp_c = mouse_bp_colors()
 
     for i_pt, pt in enumerate(pts):
-        pt = np.squeeze(pt)
-        if all(pt == 0):
-            continue    # [0, 0] are points that weren't properly identified
+        if valid_3dpoints[i_pt]:
+            pt = np.squeeze(pt)
+            if all(pt == 0):
+                continue    # [0, 0] are points that weren't properly identified
+            kwargs['c'] = bp_c[bodyparts[i_pt]]
+            ax.scatter(pt[0], pt[1], **kwargs)
 
-        ax.scatter(pt[0], pt[1], s=markersize, c=bp_c[bodyparts[i_pt]], marker=marker)
 
-
-def connect_bodyparts(frame_pts, bodyparts, bpts2connect, ax):
-
+def connect_bodyparts(frame_pts, bodyparts, bpts2connect, valid_3dpoints, ax, **kwargs):
+    '''
+    add lines connecting body parts to video frames showing marked bodypart points
+    :param frame_pts: n x 2 numpy array where n is the number of points in the frame
+    :param bodyparts: n-element list of bodypart names in order corresponding to frame_pts
+    :param bpts2connect: list of 2-element lists containing pairs of body parts to connect with lines (named according to bodyparts)
+    :param ax: axes on which to make the plot
+    :param linecolor: color of connecting lines, default gray
+    :param lwidth: width of connecting lines - default 1.5 (pyplot default)
+    :return:
+    '''
+    kwargs.setdefault('c', (0.5, 0.5, 0.5))
+    kwargs.setdefault('lw', 1.5)
     for pt2connect in bpts2connect:
 
         pt_index = [bodyparts.index(bp_name) for bp_name in pt2connect]
 
-        if all(frame_pts[pt_index[0], :] == 0) or all(frame_pts[pt_index[1], :] == 0):
-            continue   # one of the points wasn't found
-        x = frame_pts[pt_index, 0]
-        y = frame_pts[pt_index, 1]
-        ax.plot(x, y)
+        if all(valid_3dpoints[pt_index]):
 
-        # todo: fix up this plotting routine with colors, line width, etc.
-
-        pass
-
+            if all(frame_pts[pt_index[0], :] == 0) or all(frame_pts[pt_index[1], :] == 0):
+                continue   # one of the points wasn't found
+            x = frame_pts[pt_index, 0]
+            y = frame_pts[pt_index, 1]
+            ax.plot(x, y, **kwargs)
 
 
 def rat_sr_bodyparts2connect():

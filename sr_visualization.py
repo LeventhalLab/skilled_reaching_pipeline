@@ -14,7 +14,7 @@ def overlay_pts_on_video(paw_trajectory, cal_data, bodyparts, orig_vid_name, cro
 
     pass
 
-def create_vids_plus_3danimation_figure(figsize=(9, 4), dpi=100.):
+def create_vids_plus_3danimation_figure(figsize=(18, 10), dpi=100.):
 
     fig = plt.figure(figsize=figsize, dpi=dpi)
 
@@ -94,6 +94,7 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
     cv_cam_nums = [cvp['cam_num'] for cvp in cv_params]
     im_size = r3d_data['cal_data']['im_size']
     fullframe_pts = [np.squeeze(r3d_data['frame_points'][:, i_cam, :, :]) for i_cam in range(num_cams)]
+    fullframe_pts_ud = [np.squeeze(r3d_data['frame_points_ud'][:, i_cam, :, :]) for i_cam in range(num_cams)]
     reprojected_pts = [np.squeeze(r3d_data['reprojected_points'][:, i_cam, :, :]) for i_cam in range(num_cams)]
     wpts = r3d_data['worldpoints']
 
@@ -116,11 +117,12 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
 
     for i_frame in range(num_frames):
         fullframe_pts_forthisframe = [fullframe_pts[i_cam][i_frame, :, :] for i_cam in range(num_cams)]
+        fullframe_pts_ud_forthisframe = [fullframe_pts_ud[i_cam][i_frame, :, :] for i_cam in range(num_cams)]
         valid_3dpoints = identify_valid_3dpts(fullframe_pts_forthisframe)
         for i_cam in range(num_cams):
 
             cur_fullframe_reproj_pts = reprojected_pts[i_cam][i_frame, :, :]
-            cur_fullframe_pts = fullframe_pts_forthisframe[i_cam]
+            cur_fullframe_pts = fullframe_pts_ud_forthisframe[i_cam]
             isrotated = cv_params[i_cam]['isrotated']
             crop_params = cv_params[i_cam]['crop_window']
             translated_frame_points = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(cur_fullframe_pts, crop_params, im_size[i_cam], isrotated)
@@ -130,11 +132,10 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
             ret, img = vid_cap_objs[i_cam].read()
 
             # todo: overlay points, check that they match with cropped vids
-            show_crop_frame_with_pts(img, crop_wins[i_cam], translated_frame_points, bodyparts, bpts2connect, valid_3dpoints, axs[i_cam])
+            show_crop_frame_with_pts(img, crop_wins[i_cam], translated_frame_points, bodyparts, bpts2connect, valid_3dpoints, axs[i_cam], s=6)
             show_crop_frame_with_pts(img, crop_wins[i_cam], translated_reproj_points, bodyparts, [], valid_3dpoints,
-                                     axs[i_cam], marker='+')
+                                     axs[i_cam], marker='+', s=6)
 
-        plt.show()
         # make the 3d plot
 
         cur_wpts = np.squeeze(wpts[i_frame, :, :])
@@ -145,7 +146,6 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
 
 def identify_valid_3dpts(framepts_forallcams):
 
-    num_cams = len(framepts_forallcams)
     num_bp = np.shape(framepts_forallcams[0])[0]
 
     valid_3dpts = np.zeros(num_bp, dtype=bool)

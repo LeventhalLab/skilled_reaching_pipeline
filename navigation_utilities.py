@@ -63,7 +63,7 @@ def find_original_optitrack_videos(video_root_folder, metadata, vidtype='.avi'):
         vidtype = '.' + vidtype
 
     mouseID = metadata['mouseID']
-    trialtime =  metadata['time']
+    trialtime = metadata['trialtime']
     month_dir = mouseID + '_' + trialtime.strftime('%Y%m')
     date_dir = mouseID + '_' + trialtime.strftime('%Y%m%d')
 
@@ -91,7 +91,7 @@ def find_cropped_optitrack_videos(cropped_vids_parent, metadata, num_cams=2, vid
         vidtype = '.' + vidtype
 
     mouseID = metadata['mouseID']
-    trialtime =  metadata['time']
+    trialtime =  metadata['trialtime']
     month_dir = mouseID + '_' + trialtime.strftime('%Y%m')
     date_dir = mouseID + '_' + trialtime.strftime('%Y%m%d')
     cam_dirs = [date_dir + '_cam{:02d}'.format(i_cam + 1) for i_cam in range(num_cams)]
@@ -455,7 +455,10 @@ def parse_cropped_optitrack_video_name(cropped_video_name):
         'cropped_video_name': '',
         'isrotated': False
     }
-    _, vid_name = os.path.split(cropped_video_name)
+    try:
+        _, vid_name = os.path.split(cropped_video_name)
+    except:
+        pass
     cropped_vid_metadata['cropped_video_name'] = vid_name
     vid_name, vid_type = os.path.splitext(vid_name)
 
@@ -642,7 +645,7 @@ def parse_dlc_output_pickle_name_optitrack(dlc_output_pickle_name):
         'mouseID': '',
         'trialtime': datetime(1,1,1),
         'session_num': 0,
-        'video_number': 0,
+        'vid_num': 0,
         'cam_num': 0,
         'crop_window': [],
         'isrotated': False,
@@ -670,7 +673,7 @@ def parse_dlc_output_pickle_name_optitrack(dlc_output_pickle_name):
     pickle_metadata['trialtime'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
 
     pickle_metadata['session_num'] = int(metadata_list[next_metadata_idx + 2])
-    pickle_metadata['video_number'] = int(metadata_list[next_metadata_idx + 3])
+    pickle_metadata['vid_num'] = int(metadata_list[next_metadata_idx + 3])
     pickle_metadata['cam_num'] = int(metadata_list[next_metadata_idx + 4][3:])
 
     # 'DLC' gets appended to the last cropping parameter in the filename by deeplabcut
@@ -1502,7 +1505,7 @@ def create_3d_reconstruction_pickle_name(metadata, reconstruction3d_parent):
         [mouseID,
         trial_datetime_string,
         '{:d}'.format(metadata['session_num']),
-        '{:03d}'.format(metadata['video_number']),
+        '{:03d}'.format(metadata['vid_num']),
         '3dreconstruction.pickle']
         )
 
@@ -1523,6 +1526,12 @@ def parse_3d_reconstruction_pickle_name(r3d_fullpath):
 
     r3d_name_parts = r3d_fname.split('_')
 
+    if r3d_name_parts[0][:4] == 'stim':
+        mouseID = r3d_name_parts[0][4:]
+    elif r3d_name_parts[0][:4] == 'post':
+        mouseID = r3d_name_parts[0][8:]   # poststim
+    else:
+        mouseID = r3d_name_parts[0]
     trial_datetimestring = r3d_name_parts[1] + '_' + r3d_name_parts[2]
     trial_datetime = fname_string_to_datetime(trial_datetimestring)
 
@@ -1531,8 +1540,8 @@ def parse_3d_reconstruction_pickle_name(r3d_fullpath):
     vid_num = int(r3d_name_parts[4])
 
     r3d_metadata = {
-        'mouseID': r3d_name_parts[0],
-        'time': trial_datetime,
+        'mouseID': mouseID,
+        'trialtime': trial_datetime,
         'vid_num': vid_num,
         'session_num': session_num,
     }

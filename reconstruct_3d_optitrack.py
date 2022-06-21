@@ -64,6 +64,8 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
         # read in the points
         dlc_output = [skilled_reaching_io.read_pickle(pickle_file) for pickle_file in pickle_files]
 
+        dlc_output = [clean_dlc_output(dlco) for dlco in dlc_output]
+
         cam_meta_files = [pickle_file.replace('full.pickle', 'meta.pickle') for pickle_file in pickle_files]
         dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in cam_meta_files]
         # dlc_metadata.append(skilled_reaching_io.read_pickle(cam01_meta))
@@ -80,6 +82,54 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
         # that frame)
 
         reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf, pickle_files, dlc_metadata, parent_directories)
+
+
+def clean_dlc_output(dlc_output):
+    # for some reason, dlc occasionally identifies multiple candidate points for a specific bodypart/joint
+    frame_list = dlc_output.keys()
+
+    for frame in frame_list:
+        if frame[:5] != 'frame':
+            continue
+        frame_coords = np.squeeze(dlc_output[frame]['coordinates'])
+        frame_conf = np.squeeze(dlc_output[frame]['confidence'])
+        if frame_coords.ndim == 2:
+            # I'm pretty sure this means that all bodyparts are associated with a single point
+            dlc_output[frame]['coordinates'] = frame_coords
+            dlc_output[frame]['confidence'] = frame_conf
+
+        else:
+            # at least one bodypart/joint had multiple points identified for it, figure out which one and pick the highest
+            # confidence point for that bodypart/joint
+
+            num_pts = len(frame_coords)
+            new_frame_coords = np.zeros((num_pts, 2))
+            new_frame_conf = np.zeros(num_pts)
+            for i_pt, pt in enumerate(frame_coords):
+
+                if pt.size == 0:
+                    # no point identified here, assign [0., 0.] to coordinates and 0. to confidence
+                    new_frame_coords[i_pt, :] = np.zeros(2)
+                    new_frame_conf[i_pt] = 0.
+                elif np.shape(pt)[0] > 1:
+                    # multiple points were identified; need to pick one of them
+                    pt_conf = np.squeeze(frame_conf[i_pt])
+                    max_ptconf = max(pt_conf)
+                    max_conf_idx = np.where(pt_conf == max_ptconf)[0][0]
+                    # takes the first element of the tuple returned by np.where (possible there are multiple max confidence points, I think?)
+
+                    new_frame_coords[i_pt, :] = pt[max_conf_idx, :]
+                    new_frame_conf[i_pt] = max_ptconf
+                    pass
+                else:
+                    # one point was identified for this bodypart, so just keep the old coordinates/confidence
+                    new_frame_coords[i_pt, :] = pt
+                    new_frame_conf[i_pt] = np.squeeze(frame_conf[i_pt])
+
+            dlc_output[frame]['coordinates'] = new_frame_coords
+            dlc_output[frame]['confidence'] = new_frame_conf
+
+    return dlc_output
 
 
 def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf, pickle_files, dlc_metadata, parent_directories):
@@ -125,7 +175,7 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
 
     mouseID = dlc_output_pickle_metadata[0]['mouseID']
     session_num = dlc_output_pickle_metadata[0]['session_num']
-    video_num = dlc_output_pickle_metadata[0]['video_number']
+    vid_num = dlc_output_pickle_metadata[0]['vid_num']
     session_datestring = dlc_output_pickle_metadata[0]['trialtime'].strftime('%m/%d/%Y')
 
     # read in the calibration file, make sure we have stereo and camera calibrations
@@ -141,12 +191,13 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
     orig_vid_names = []
     for i_cam in range(num_cams):
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(pickle_files[i_cam]))
-        orig_vid_names.append(navigation_utilities.find_original_optitrack_video(video_root_folder, pickle_metadata[i_cam]))
+        orig_vid_names.append(navigation_utilities.find_original_optitrack_videos(video_root_folder, pickle_metadata[i_cam]))
 
     # perform frame-by-frame reconstruction
     # set up numpy arrays to accept world points, measured points, dlc confidence values, reprojected points, and reprojection errors
     reconstructed_data = {
         'frame_points': np.zeros((num_frames, num_cams, pts_per_frame, 2)),
+        'frame_points_ud': np.zeros((num_frames, num_cams, pts_per_frame, 2)),
         'worldpoints': np.zeros((num_frames, pts_per_frame, 3)),
         'reprojected_points': np.zeros((num_frames, num_cams, pts_per_frame, 2)),
         'reprojection_errors': np.zeros((num_frames, num_cams, pts_per_frame)),
@@ -154,20 +205,19 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
         'cal_data': cal_data
     }
     for i_frame in range(num_frames):
-        print('triangulating frame {:04d} for {}, session number {:d} on {}, video {:03d}'.format(i_frame, mouseID, session_num, session_datestring, video_num))
+        print('triangulating frame {:04d} for {}, session number {:d} on {}, video {:03d}'.format(i_frame, mouseID, session_num, session_datestring, vid_num))
         frame_pts = np.zeros((num_cams, pts_per_frame, 2))
         frame_conf = np.zeros((num_cams, pts_per_frame))
         for i_cam in range(num_cams):
-            try:
-                frame_pts[i_cam, :, :] = pts_wrt_orig_img[i_cam][i_frame, :, :]
-            except:
-                pass
+            frame_pts[i_cam, :, :] = pts_wrt_orig_img[i_cam][i_frame, :, :]
             frame_conf[i_cam, :] = dlc_conf[i_cam][i_frame, :]
 
-        frame_worldpoints, frame_reprojected_pts, frame_reproj_errors, valid_frame_points = reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_metadata, i_frame, parent_directories)
+        frame_worldpoints, frame_reprojected_pts, frame_reproj_errors, frame_pts_ud, valid_frame_points = \
+            reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_metadata, i_frame, parent_directories)
         # at this point, worldpoints is still in units of checkerboards, needs to be scaled by the size of individual checkerboard squares
 
         reconstructed_data['frame_points'][i_frame, :, :, :] = frame_pts
+        reconstructed_data['frame_points_ud'][i_frame, :, :, :] = np.squeeze(frame_pts_ud)
         reconstructed_data['worldpoints'][i_frame, :, :] = frame_worldpoints
         reconstructed_data['reprojected_points'][i_frame, :, :, :] = frame_reprojected_pts
         reconstructed_data['reprojection_errors'][i_frame, :, :] = frame_reproj_errors.T
@@ -214,7 +264,10 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     # worldpoints = points4D_new
 
     #check that there was good reconstruction of individual points (i.e., the matched points were truly well-matched?)
-    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories)
+    frame_pts_ud_unnorm = np.zeros(np.shape(frame_pts))
+    for i_cam in range(num_cams):
+        frame_pts_ud_unnorm[i_cam, :, :] = cvb.unnormalize_points(np.squeeze(frame_pts_ud[i_cam]), mtx[i_cam])
+    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts_ud_unnorm, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories)
 
     #todo: check reprojected points and reproj_errors, look for mislabeled points
     #also, consider looking across frames for jumps, and checking the dlc confidence values. Finally, need to check if
@@ -222,7 +275,7 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
 
     valid_frame_points = validate_frame_points(reproj_errors, frame_conf, max_reproj_error=20, min_conf=0.9)
 
-    return worldpoints, reprojected_pts, reproj_errors, valid_frame_points
+    return worldpoints, reprojected_pts, reproj_errors, frame_pts_ud_unnorm, valid_frame_points
 
 
 def validate_frame_points(reproj_errors, frame_conf, max_reproj_error=20, min_conf=0.9):
@@ -349,6 +402,7 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
     :return reproj_errors:
     '''
     num_cams = np.shape(frame_pts)[0]
+    frame_pts = np.squeeze(frame_pts)
 
     #3d plot of worldpoints if needed to check triangulation
     # plot_worldpoints(worldpoints, dlc_metadata[0], pickle_metadata[0], frame_num, parent_directories=parent_directories)
@@ -357,7 +411,8 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
     reproj_errors = np.zeros((pts_per_frame, num_cams))
     for i_cam in range(num_cams):
         mtx = cal_data['mtx'][i_cam]
-        dist = cal_data['dist'][i_cam]
+        # dist = cal_data['dist'][i_cam]
+        dist = np.zeros(5)    # using the points that already have been undistorted against which to compare the reprojections
         if i_cam == 0:
             rvec = np.zeros((3, 1))
             tvec = np.zeros((3, 1))
@@ -473,12 +528,11 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
         num_joints = len(cam_output['metadata']['all_joints_names'])
         pts_wrt_orig_img.append(np.zeros((num_frames, num_joints, 2)))
         dlc_conf.append(np.zeros((num_frames, num_joints)))
-        #todo: write the new points/confidences into these arrays so they can be returned by this function
 
         for i_frame, frame in enumerate(frame_list):
             if frame[:5] != 'frame':
                 continue
-            current_coords = cam_output[frame]['coordinates'][0]
+            current_coords = cam_output[frame]['coordinates']
 
             # current_coords is a list of arrays containing data points as (x,y) pairs
             # overlay_pts(pickle_metadata[i_cam], current_coords, dlc_metadata[i_cam], i_frame)
@@ -517,9 +571,9 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
 
             # store and return the confidence array
             conf = dlc_output[i_cam][frame]['confidence']
-            array_conf = convert_pickle_conf_to_array(conf)
+            # array_conf = convert_pickle_conf_to_array(conf)
 
-            dlc_conf[i_cam][i_frame, :] = array_conf
+            dlc_conf[i_cam][i_frame, :] = conf
 
     return pts_wrt_orig_img, dlc_conf
 
@@ -557,68 +611,6 @@ def optitrack_fullframe_to_cropped_coords(fullframe_pts, crop_params, im_size, i
             translated_pts[i_pt, :] = ff_pt
 
     return translated_pts
-    # pts_wrt_orig_img = []
-    # dlc_conf = []
-    # for i_cam, cam_output in enumerate(dlc_output):
-    #     # cam_output is a dictionary where each entry is 'frame0000', 'frame0001', etc.
-    #     # each frame has keys: 'coordinates', 'confidence', and 'costs'
-    #
-    #     cam_metadata = pickle_metadata[i_cam]
-    #
-    #     # loop through the frames
-    #     frame_list = cam_output.keys()
-    #     num_frames = cam_output['metadata']['nframes']
-    #     num_joints = len(cam_output['metadata']['all_joints_names'])
-    #     pts_wrt_orig_img.append(np.zeros((num_frames, num_joints, 2)))
-    #     dlc_conf.append(np.zeros((num_frames, num_joints)))
-    #
-    #     for i_frame, frame in enumerate(frame_list):
-    #         if frame[:5] != 'frame':
-    #             continue
-    #         current_coords = cam_output[frame]['coordinates'][0]
-    #
-    #         # current_coords is a list of arrays containing data points as (x,y) pairs
-    #         # overlay_pts(pickle_metadata[i_cam], current_coords, dlc_metadata[i_cam], i_frame)
-    #         # if this image was rotated 180 degrees, first reflect back across the midpoint of the current image
-    #         if cam_metadata['isrotated'] == True:
-    #             # rotate points around the center of the cropped image, then translate into position in the original
-    #             # image, then rotate around the center of the original image
-    #             crop_win = cam_metadata['crop_window']
-    #
-    #             crop_win_size = np.array([crop_win[1] - crop_win[0], crop_win[3] - crop_win[2]])
-    #             reflected_pts = rotate_pts_180(current_coords, crop_win_size)
-    #
-    #             # now have the points back in the upside-down version. Now need to rotate the points within the full image
-    #             # to get into the same reference frame as the calibration image
-    #             full_im_size = dlc_metadata[i_cam]['data']['frame_dimensions']
-    #             # full_im_size = (full_im_size[1],full_im_size[0])
-    #
-    #             pts_translated_to_orig = translate_back_to_orig_img(pickle_metadata[i_cam], reflected_pts)
-    #
-    #             # overlay_pts(pickle_metadata[i_cam], reflected_pts, dlc_metadata[i_cam], i_frame, rotate_img=True)
-    #             # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_translated_to_orig, dlc_metadata[i_cam], i_frame, rotate_img=False)
-    #
-    #             pts_in_calibration_coords = rotate_pts_180(pts_translated_to_orig, orig_im_size)
-    #             # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
-    #             #                           rotate_img=True)
-    #         else:
-    #             pts_in_calibration_coords = translate_back_to_orig_img(pickle_metadata[i_cam], current_coords)
-    #             # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
-    #             #                           rotate_img=False)
-    #             #todo: align all the points for the two camera views/frames and store them in a way that can be neatly
-    #             # exported to another function for 3D reconstuction. should also write a function to organize pickled data
-    #             # into a more reasonable format so if/when start using .h5 files, can write another function to organize
-    #             # those
-    #         array_pts = convert_pts_to_array(pts_in_calibration_coords)
-    #         pts_wrt_orig_img[i_cam][i_frame] = array_pts
-    #
-    #         # store and return the confidence array
-    #         conf = dlc_output[i_cam][frame]['confidence']
-    #         array_conf = convert_pickle_conf_to_array(conf)
-    #
-    #         dlc_conf[i_cam][i_frame, :] = array_conf
-    #
-    # return pts_wrt_orig_img, dlc_conf
 
 
 def convert_pts_to_array(pickle_format_pts):
@@ -630,10 +622,14 @@ def convert_pts_to_array(pickle_format_pts):
     num_joints = len(pickle_format_pts)
     array_pts = np.zeros([num_joints, 2])
     for i_pt, cur_pt in enumerate(pickle_format_pts):
+        cur_pt = np.squeeze(cur_pt)
         if len(cur_pt) == 0:
             continue
         else:
-            array_pts[i_pt, :] = cur_pt[0]
+            try:
+                array_pts[i_pt, :] = cur_pt
+            except:
+                pass
 
     return array_pts
 
@@ -663,8 +659,10 @@ def translate_back_to_orig_img(pickle_metadata, pts):
     translated_pts = []
     for i_pt, pt in enumerate(pts):
         if len(pt) > 0:
+            pt = np.squeeze(pt)
+            x = pt[0]
+            y = pt[1]
 
-            x, y = pt[0]
             new_x = crop_win[0] + x
             new_y = crop_win[2] + y
 
@@ -1380,7 +1378,7 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
     # todo: create a movie of 3d reconstruction with video of points super-imposed on videos (also show reprojection errors?)
     # also pick out some specific frames
 
-    # orig_videos = navigation_utilities.find_original_optitrack_videos(video_root_folder, r3d_metadata)
+    orig_videos = navigation_utilities.find_original_optitrack_videos(video_root_folder, r3d_metadata)
     cropped_videos = navigation_utilities.find_cropped_optitrack_videos(cropped_vids_parent, r3d_metadata)
 
     # crop regions is a 2-element list of tuples - first tuple is borders for direct view, second set is for mirror view

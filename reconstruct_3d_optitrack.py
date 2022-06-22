@@ -267,7 +267,7 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     frame_pts_ud_unnorm = np.zeros(np.shape(frame_pts))
     for i_cam in range(num_cams):
         frame_pts_ud_unnorm[i_cam, :, :] = cvb.unnormalize_points(np.squeeze(frame_pts_ud[i_cam]), mtx[i_cam])
-    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts_ud_unnorm, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories)
+    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories)
 
     #todo: check reprojected points and reproj_errors, look for mislabeled points
     #also, consider looking across frames for jumps, and checking the dlc confidence values. Finally, need to check if
@@ -425,11 +425,11 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
         projected_pts.append(ppts)
         reproj_errors[:, i_cam] = calculate_reprojection_errors(ppts, frame_pts[i_cam, :, :])
 
-        # overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, parent_directories, reprojected_pts=projected_pts,
-        #                           rotate_img=pickle_metadata[i_cam]['isrotated'])
-    # draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories)
+        overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, parent_directories, reprojected_pts=projected_pts,
+                                  rotate_img=pickle_metadata[i_cam]['isrotated'])
+    draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories)
 
-    # plt.show()
+    plt.show()
 
     return projected_pts, reproj_errors
 
@@ -675,7 +675,6 @@ def translate_back_to_orig_img(pickle_metadata, pts):
 
 def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_frame, mtx, dist, parent_directories, reprojected_pts=None, rotate_img=False):
 
-
     cropped_vids_parent = parent_directories['cropped_vids_parent']
     video_root_folder = parent_directories['video_root_folder']
 
@@ -688,13 +687,14 @@ def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_f
     cam_dir = day_dir + '_' + 'cam{:02d}'.format(pickle_metadata['cam_num'])
     cropped_vid_folder = os.path.join(cropped_vids_parent, pickle_metadata['mouseID'], month_dir, day_dir, cam_dir)
 
-    orig_vid_name_base = '_'.join([pickle_metadata['mouseID'],
+    orig_vid_name_base = '_'.join([pickle_metadata['prefix'] + pickle_metadata['mouseID'],
                               pickle_metadata['trialtime'].strftime('%Y%m%d_%H-%M-%S'),
                               '{:d}'.format(pickle_metadata['session_num']),
-                              '{:03d}'.format(pickle_metadata['video_number']),
+                              '{:03d}'.format(pickle_metadata['vid_num']),
                               'cam{:02d}'.format(pickle_metadata['cam_num'])
                               ])
     orig_vid_name = os.path.join(orig_vid_folder, orig_vid_name_base + '.avi')
+    orig_vid_names = navigation_utilities.find_original_optitrack_videos(video_root_folder, pickle_metadata)
 
     video_object = cv2.VideoCapture(orig_vid_name)
 
@@ -706,6 +706,7 @@ def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_f
     jpg_name = orig_vid_name_base + '_{:04d}'.format(i_frame)
     if rotate_img:
         cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
+        # cur_img_ud = cv2.undistort(cur_img, mtx, dist)
         jpg_name = jpg_name + '_rotated'
     jpg_name = os.path.join(cropped_vid_folder, jpg_name + '.jpg')
 
@@ -753,7 +754,7 @@ def prepare_img_axes(width, height, scale=1.0, dpi=100, nrows=1, ncols=1):
 
 def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, markertype, jpg_name):
 
-    dotsize = 6
+    dotsize = 3
 
     h, w, _ = np.shape(img)
     fig, ax = prepare_img_axes(w, h)
@@ -815,10 +816,10 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
 
     cropped_vid_folders = [os.path.join(cropped_vids_parent, mouseID, month_dir, day_dir, cam_dir) for cam_dir in cam_dirs]
 
-    orig_vid_names_base = ['_'.join([mouseID,
+    orig_vid_names_base = ['_'.join([pickle_metadata[0]['prefix'] + mouseID,
                               pickle_metadata[0]['trialtime'].strftime('%Y%m%d_%H-%M-%S'),
                               '{:d}'.format(pickle_metadata[0]['session_num']),
-                              '{:03d}'.format(pickle_metadata[0]['video_number']),
+                              '{:03d}'.format(pickle_metadata[0]['vid_num']),
                               'cam{:02d}'.format(pickle_metadata[i_cam]['cam_num'])
                               ]) for i_cam in range(2)]
     orig_vid_names = [os.path.join(orig_vid_folder, orig_vid_name_base + '.avi') for orig_vid_name_base in orig_vid_names_base]
@@ -882,7 +883,7 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
             pt_ud = pt_ud[0].reshape((1, -1, 2))  # needed to get correct array shape for computeCorrespondEpilines in draw_epipolar_lines_on_img
         draw_epipolar_lines_on_img(pt_ud, i_cam+1, cal_data['F'], im_size, bodyparts, axs[0][1-i_cam])
 
-    plt.show()
+    # plt.show()
     pass
 
 

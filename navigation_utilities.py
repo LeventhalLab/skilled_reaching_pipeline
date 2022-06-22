@@ -642,6 +642,7 @@ def parse_dlc_output_pickle_name_optitrack(dlc_output_pickle_name):
     """
 
     pickle_metadata = {
+        'prefix': '',
         'mouseID': '',
         'trialtime': datetime(1,1,1),
         'session_num': 0,
@@ -658,7 +659,14 @@ def parse_dlc_output_pickle_name_optitrack(dlc_output_pickle_name):
 
     metadata_list = pickle_name.split('_')
 
-    pickle_metadata['mouseID'] = metadata_list[0]
+    if metadata_list[0][:4] == 'stim':
+        pickle_metadata['prefix'] = 'stim'
+        pickle_metadata['mouseID'] = metadata_list[0][4:]
+    elif metadata_list[0][:4] == 'post':
+        pickle_metadata['prefix'] = 'poststim'
+        pickle_metadata['mouseID'] = metadata_list[0][8:]
+    else:
+        pickle_metadata['mouseID'] = metadata_list[0]
     # num_string = ''.join(filter(lambda i: i.isdigit(), pickle_metadata['ratID']))
     # pickle_metadata['rat_num'] = int(num_string)
 

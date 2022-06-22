@@ -349,7 +349,7 @@ def plot_worldpoints(worldpoints, dlc_metadata, pickle_metadata, i_frame, videos
     cam_dir = day_dir + '_' + 'cam{:02d}'.format(pickle_metadata['cam_num'])
     cropped_vid_folder = os.path.join(cropped_videos_parent, pickle_metadata['mouseID'], month_dir, day_dir)
 
-    orig_vid_name_base = '_'.join([pickle_metadata['mouseID'],
+    orig_vid_name_base = '_'.join([pickle_metadata['prefix'] + pickle_metadata['mouseID'],
                               pickle_metadata['trialtime'].strftime('%Y%m%d_%H-%M-%S'),
                               '{:d}'.format(pickle_metadata['session_num']),
                               '{:03d}'.format(pickle_metadata['video_number']),
@@ -427,6 +427,9 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
 
         overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, parent_directories, reprojected_pts=projected_pts,
                                   rotate_img=pickle_metadata[i_cam]['isrotated'])
+        overlay_pts_in_cropped_img(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist,
+                                   parent_directories, reprojected_pts=None, vid_type='.avi')
+
     draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories)
 
     plt.show()
@@ -728,6 +731,47 @@ def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_f
     # cv2.imwrite(jpg_name, new_img)
 
 
+def overlay_pts_in_cropped_img(pickle_metadata, current_coords, dlc_metadata, i_frame, mtx, dist, parent_directories, reprojected_pts=None, vid_type='.avi'):
+
+    if vid_type[0] != '.':
+        vid_type = '.' + vid_type
+
+    cropped_vids_parent = parent_directories['cropped_vids_parent']
+
+    bodyparts = dlc_metadata['data']['DLC-model-config file']['all_joints_names']
+
+    month_dir = pickle_metadata['mouseID'] + '_' + pickle_metadata['trialtime'].strftime('%Y%m')
+    day_dir = pickle_metadata['mouseID'] + '_' + pickle_metadata['trialtime'].strftime('%Y%m%d')
+    cam_dir = day_dir + '_' + 'cam{:02d}'.format(pickle_metadata['cam_num'])
+    cropped_vid_folder = os.path.join(cropped_vids_parent, pickle_metadata['mouseID'], month_dir, day_dir, cam_dir)
+
+    cropped_vid_name_base = '_'.join([pickle_metadata['prefix'] + pickle_metadata['mouseID'],
+                                   pickle_metadata['trialtime'].strftime('%Y%m%d_%H-%M-%S'),
+                                   '{:d}'.format(pickle_metadata['session_num']),
+                                   '{:03d}'.format(pickle_metadata['vid_num']),
+                                   'cam{:02d}'.format(pickle_metadata['cam_num']),
+                                   '*' + vid_type])
+    cropped_vid_name = os.path.join(cropped_vid_folder, cropped_vid_name_base)
+    cropped_vid_list = glob.glob(cropped_vid_name)
+    video_object = cv2.VideoCapture(cropped_vid_list[0])
+
+    video_object.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
+    ret, cur_img = video_object.read()
+
+    video_object.release()
+
+    jpg_name = cropped_vid_name_base + '_{:04d}'.format(i_frame)
+    # if rotate_img:
+    #     cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
+    #     # cur_img_ud = cv2.undistort(cur_img, mtx, dist)
+    #     jpg_name = jpg_name + '_rotated'
+    jpg_name = os.path.join(cropped_vid_folder, jpg_name + '.jpg')
+
+    # overlay points
+    fig, img_ax = overlay_pts_on_image(cur_img, mtx, dist, current_coords, reprojected_pts, bodyparts, ['o', '+'],
+                                       jpg_name, plot_undistorted=False)
+
+
 def prepare_img_axes(width, height, scale=1.0, dpi=100, nrows=1, ncols=1):
     fig_width = (width * scale / dpi) * ncols
     fig_height = (width * scale / dpi) * nrows
@@ -752,7 +796,7 @@ def prepare_img_axes(width, height, scale=1.0, dpi=100, nrows=1, ncols=1):
     return fig, axs
 
 
-def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, markertype, jpg_name):
+def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, markertype, jpg_name, plot_undistorted=True):
 
     dotsize = 3
 
@@ -773,24 +817,28 @@ def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, marker
             # x = int(round(x))
             # y = int(round(y))
 
-            pt_ud_norm = np.squeeze(cv2.undistortPoints(np.array([x, y]), mtx, dist))
-            pt_ud = cvb.unnormalize_points(pt_ud_norm, mtx)
+            if plot_undistorted:
+                pt_ud_norm = np.squeeze(cv2.undistortPoints(np.array([x, y]), mtx, dist))
+                to_plot = cvb.unnormalize_points(pt_ud_norm, mtx)
+            else:
+                to_plot = np.array([x, y])
             bp_color = color_from_bodypart(bodyparts[i_pt])
 
-            ax[0][0].plot(pt_ud[0], pt_ud[1], marker=markertype[0], ms=dotsize, color=bp_color)
+            ax[0][0].plot(to_plot[0], to_plot[1], marker=markertype[0], ms=dotsize, color=bp_color)
             # ax.plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
 
-    for i_rpt, rpt in enumerate(reprojected_pts):
-        if len(rpt) > 0:
-            try:
-                x, y = rpt[0]
-            except:
-                x, y = rpt
-            # x = int(round(x))
-            # y = int(round(y))
-            bp_color = color_from_bodypart(bodyparts[i_rpt])
+    if reprojected_pts is not None:
+        for i_rpt, rpt in enumerate(reprojected_pts):
+            if len(rpt) > 0:
+                try:
+                    x, y = rpt[0]
+                except:
+                    x, y = rpt
+                # x = int(round(x))
+                # y = int(round(y))
+                bp_color = color_from_bodypart(bodyparts[i_rpt])
 
-            ax[0][0].plot(x, y, marker=markertype[1], ms=dotsize, color=bp_color)
+                ax[0][0].plot(x, y, marker=markertype[1], ms=dotsize, color=bp_color)
 
     # plt.show()
     fig.savefig(jpg_name)

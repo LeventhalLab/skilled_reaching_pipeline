@@ -81,6 +81,12 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
         # is an array (num_frames x num_joints). Zeros are stored where dlc was uncertain (no result for that joint on
         # that frame)
 
+        # WORKING HERE
+        # todo: overlay original dlc output on cropped images to see if problem is with original identification or translating/rotating back into full frame for cam 2 (cam 1 looks good)
+        for i_cam in range(2):
+            overlay_pts_in_cropped_img(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist,
+                                       parent_directories, reprojected_pts=None, vid_type='.avi')
+
         reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf, pickle_files, dlc_metadata, parent_directories)
 
 

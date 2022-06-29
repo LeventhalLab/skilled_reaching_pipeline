@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import computer_vision_basics as cvb
 import shapely.geometry as sg
 import sr_visualization
-
+import dlc_utilities
 
 def test_reconstruction(parent_directories, rat_df):
     trajectories_parent = parent_directories['trajectories_parent']
@@ -134,8 +134,8 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_par
         pickle_params = {'direct': direct_pickle_params,
                          mirror_view: mirror_pickle_params
                          }
-        trajectory_metadata = extract_trajectory_metadata(dlc_metadata, pickle_params)
-        dlc_data = extract_data_from_dlc_output(dlc_output, trajectory_metadata)
+        trajectory_metadata = dlc_utilities.extract_trajectory_metadata(dlc_metadata, pickle_params)
+        dlc_data = dlc_utilities.extract_data_from_dlc_output(dlc_output, trajectory_metadata)
 
         # translate and undistort points
         dlc_data = translate_points_to_full_frame(dlc_data, trajectory_metadata)
@@ -157,7 +157,7 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_par
 
         views = tuple(dlc_data.keys())
         bodyparts = [tuple(dlc_data[view].keys()) for view in views]
-        bp_coords_ud = [collect_bp_data(dlc_data[view], 'coordinates_ud') for view in views]
+        bp_coords_ud = [dlc_utilities.collect_bp_data(dlc_data[view], 'coordinates_ud') for view in views]
 
         traj_data = package_trajectory_data_for_pickle(paw_trajectory, is_estimate, invalid_points, paw_pref,
                                                        reproj_error, high_p_invalid, low_p_valid, cal_data, bp_coords_ud, bodyparts)
@@ -198,8 +198,8 @@ def assess_reconstruction_quality(paw_trajectory, dlc_data, invalid_points, cal_
     num_bodyparts = [len(bp) for bp in bodyparts]
 
     bp_idx = [group_dlc_bodyparts(bp) for bp in bodyparts]
-    bp_coords = [collect_bp_data(dlc_data[view], 'coordinates_ud') for view in view_list]
-    bp_conf = [collect_bp_data(dlc_data[view], 'confidence') for view in view_list]
+    bp_coords = [dlc_utilities.collect_bp_data(dlc_data[view], 'coordinates_ud') for view in view_list]
+    bp_conf = [dlc_utilities.collect_bp_data(dlc_data[view], 'confidence') for view in view_list]
 
     high_p = [np.squeeze(view_conf > p_cutoff) for view_conf in bp_conf]
 
@@ -346,18 +346,6 @@ def calc_3d_dlc_trajectory(dlc_data, invalid_points, cal_data, paw_pref, direct_
     #
     # plt.show()
 
-def collect_bp_data(view_dlc_data, dlc_key):
-
-    bodyparts = tuple(view_dlc_data.keys())
-
-    bp_array_shape = np.shape(view_dlc_data[bodyparts[0]][dlc_key])
-    bp_data = np.zeros((len(bodyparts), bp_array_shape[0], bp_array_shape[1]))
-    for i_bp, bp in enumerate(bodyparts):
-        bp_data[i_bp, :, :] = view_dlc_data[bp][dlc_key]
-
-    return bp_data
-
-
 def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref, frames_to_check, direct_pickle_params, max_dist_from_neighbor=60):
 
     # F[:,:,0] - fundamental matrix between direct and top mirror views
@@ -369,7 +357,7 @@ def estimate_hidden_points(dlc_data, invalid_points, cal_data, im_size, paw_pref
     num_bodyparts = [len(bp) for bp in bodyparts]
 
     bp_idx = [group_dlc_bodyparts(bp) for bp in bodyparts]
-    bp_coords = [collect_bp_data(dlc_data[view], 'coordinates_ud') for view in view_list]
+    bp_coords = [dlc_utilities.collect_bp_data(dlc_data[view], 'coordinates_ud') for view in view_list]
     num_frames = np.shape(bp_coords[0])[1]
     is_estimate = [np.zeros((num_bodyparts[i_view], num_frames), dtype=bool) for i_view, view in enumerate(view_list)]
 
@@ -1112,9 +1100,9 @@ def triangulate_video(video_id, videos_parent, marked_videos_parent, calibration
 
     trajectory_filename = navigation_utilities.create_trajectory_filename(video_metadata)
 
-    trajectory_metadata = extract_trajectory_metadata(dlc_metadata, pickle_name_metadata)
+    trajectory_metadata = dlc_utilities.extract_trajectory_metadata(dlc_metadata, pickle_name_metadata)
 
-    dlc_data = extract_data_from_dlc_output(dlc_output, trajectory_metadata)
+    dlc_data = dlc_utilities.extract_data_from_dlc_output(dlc_output, trajectory_metadata)
     #todo: preprocessing to get rid of "invalid" points
 
     # translate and undistort points
@@ -1142,23 +1130,6 @@ def reconstruct_trajectories(dlc_data_ud, camera_params):
     for bp in bodyparts:
 
         pass
-
-
-def extract_trajectory_metadata(dlc_metadata, name_metadata):
-
-    view_list = dlc_metadata.keys()
-    trajectory_metadata = {view: None for view in view_list}
-
-    for view in view_list:
-        if name_metadata[view] is None:
-            continue
-        trajectory_metadata[view] = {'bodyparts': dlc_metadata[view]['data']['DLC-model-config file']['all_joints_names'],
-                                     'num_frames': dlc_metadata[view]['data']['nframes'],
-                                     'crop_window': name_metadata[view]['crop_window']
-                                     }
-    # todo:check that number of frames and bodyparts are the same in each view
-
-    return trajectory_metadata
 
 
 def translate_points_to_full_frame(dlc_data, trajectory_metadata):
@@ -1200,37 +1171,6 @@ def translate_points_to_full_frame(dlc_data, trajectory_metadata):
                     # a point was found in this frame (coordinate == 0 if no point found)
                     dlc_data[view][bp]['coordinates'][i_frame] += [trajectory_metadata[view]['crop_window'][0], trajectory_metadata[view]['crop_window'][2]]
                     dlc_data[view][bp]['coordinates'][i_frame] -= 1
-
-    return dlc_data
-
-
-def extract_data_from_dlc_output(dlc_output, trajectory_metadata):
-
-    view_list = dlc_output.keys()
-
-    dlc_data = {view: None for view in view_list}
-    for view in view_list:
-        # initialize dictionaries for each bodypart
-        if trajectory_metadata[view] is None:
-            continue
-        num_frames = trajectory_metadata[view]['num_frames']
-        dlc_data[view] = {bp: None for bp in trajectory_metadata[view]['bodyparts']}
-        for i_bp, bp in enumerate(trajectory_metadata[view]['bodyparts']):
-
-            dlc_data[view][bp] = {'coordinates': np.zeros((num_frames, 2)),
-                                  'confidence': np.zeros((num_frames, 1)),
-                                  }
-
-            for i_frame in range(num_frames):
-                frame_key = 'frame{:04d}'.format(i_frame)
-
-                try:
-                    dlc_data[view][bp]['coordinates'][i_frame, :] = dlc_output[view][frame_key]['coordinates'][0][i_bp][0]
-                    dlc_data[view][bp]['confidence'][i_frame] = dlc_output[view][frame_key]['confidence'][i_bp][0][0]
-                except:
-                    # 'coordinates' array and 'confidence' array at this frame are empty - must be a peculiarity of deeplabcut
-                    # just leave the dlc_data arrays as empty
-                    pass
 
     return dlc_data
 

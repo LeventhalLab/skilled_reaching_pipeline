@@ -3,6 +3,7 @@ import skilled_reaching_io
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from datetime import datetime
+import plot_utilities
 import crop_videos
 import os
 import csv
@@ -618,10 +619,165 @@ def compare_calibration_files(calib_folder):
     all_cal_data = []
     for calib_file in calib_files:
         all_cal_data.append(skilled_reaching_io.read_pickle(calib_file))
-    pass
 
 
-def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_intrinsics=50, min_frames_for_intrinsics=10, num_frames_for_stereo=20, min_frames_for_stereo=5):
+def show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undistorted=False):
+
+    # find the videos containing the original calibration videos
+    cal_vids_parent = parent_directories['cal_vids_parent']
+    cal_videos = navigation_utilities.find_calibration_videos_optitrack(cal_metadata, cal_vids_parent)
+
+    cal_vid_folder, _ = os.path.split(cal_videos[0])
+
+    # find the directory containing the calibration data files
+    cal_data_parent = parent_directories['cal_data_parent']
+    cal_data_file = navigation_utilities.find_optitrack_calibration_data_name(cal_data_parent, cal_metadata['datetime'])
+
+    # read in calibration data
+    cal_data = skilled_reaching_io.read_pickle(cal_data_file)
+
+    w = 1280
+    h = 1024
+
+    # loop through stereo pairs
+    vid_objects = [cv2.VideoCapture(cal_vid) for cal_vid in cal_videos]
+    cal_vid_metadata = [navigation_utilities.parse_Burgess_calibration_vid_name(cal_vid) for cal_vid in cal_videos]
+    cam_num = [cal_vid_md['cam_num'] for cal_vid_md in cal_vid_metadata]
+    stereo_imgpoints = cal_data['stereo_imgpoints']
+    for frame_num in cal_data['frames_for_stereo_calibration']:
+
+        fig, axs = create_cal_frame_figure(w, h, ax3d=[(1, 0)], scale=1.0, dpi=200, nrows=2, ncols=2, wspace=0.05, hspace=0.01, lmargin=0.01, rmargin=0.95, botmargin=0.01, topmargin=0.95)
+        img = []
+        cb_pts = []
+        for cal_idx in range(2):
+            _, new_img = vid_objects[cal_idx].read()
+            ax_idx = cam_num[cal_idx] - 1
+
+            mtx = cal_data['mtx'][ax_idx]
+            dist = cal_data['dist'][ax_idx]
+
+            other_mtx = cal_data['mtx'][1-ax_idx]
+            other_dist = cal_data['dist'][1 - ax_idx]
+
+            if cam_num[cal_idx] == 1:
+                new_img = cv2.rotate(new_img, cv2.ROTATE_180)
+
+            current_cbpoints = stereo_imgpoints[ax_idx][frame_num]
+            other_cbpoints = stereo_imgpoints[1-ax_idx][frame_num]
+
+            current_cbpoints_udnorm = cv2.undistortPoints(current_cbpoints, mtx, dist)
+            other_cbpoints_udnorm = cv2.undistortPoints(other_cbpoints, other_mtx, other_dist)
+
+            current_cbpoints_ud = cvb.unnormalize_points(current_cbpoints_udnorm, mtx)
+            current_cbpoints_ud = current_cbpoints_ud.reshape((-1, 1, 2)).astype('float32')
+            other_cbpoints_ud = cvb.unnormalize_points(other_cbpoints_udnorm, other_mtx)
+            other_cbpoints_ud = other_cbpoints_ud.reshape((-1, 1, 2)).astype('float32')
+
+            cb_pts = [np.zeros(np.shape(current_cbpoints)), np.zeros(np.shape(current_cbpoints))]
+            if plot_undistorted:
+                cb_pts[ax_idx] = current_cbpoints_ud
+                cb_pts[1-ax_idx] = other_cbpoints_ud
+            else:
+                cb_pts[ax_idx] = current_cbpoints
+                cb_pts[1-ax_idx] = other_cbpoints
+
+            # cam_num is the camera number for each calibration video. ax_idx is also the index for mtx and dist in the cal_data dictionary for this camera (I think)
+
+            new_img_ud = cv2.undistort(new_img, mtx, dist)
+
+            if plot_undistorted:
+                cb_img = cv2.drawChessboardCorners(new_img_ud, cal_data['cb_size'], current_cbpoints_ud, True)
+                other_cbpoints_for_plot = other_cbpoints_ud
+            else:
+                cb_img = cv2.drawChessboardCorners(new_img, cal_data['cb_size'], current_cbpoints, True)
+                other_cbpoints_for_plot = other_cbpoints
+            img.append(cb_img)
+            ax_idx = cam_num[cal_idx] - 1
+
+            plot_utilities.draw_epipolar_lines(cb_img, cal_data, cam_num[cal_idx], other_cbpoints, [], markertype=['o', '+'], ax=axs[0][ax_idx])
+
+        world_points, reprojected_pts = cvb.triangulate_points(cb_pts, cal_data)
+        for ax_idx in range(2):
+            axs[0][ax_idx].scatter(reprojected_pts[ax_idx][:, 0], reprojected_pts[ax_idx][:, 1], edgecolors='k', s=6, marker='s', facecolor='none')
+
+        pt_colors = [[0., 0., 1.],
+                       [0., 128. / 255., 1.],
+                       [0., 200. / 255., 200. / 255.],
+                       [0., 1., 0],
+                       [200. / 255., 200. / 255., 0.],
+                       [1., 0., 0.],
+                       [1., 0., 1.]]
+        num_pts = np.shape(world_points)[0]
+        for i_pt in range(num_pts):
+            col_idx = int(i_pt / 7.) % 7
+            axs[1][0].scatter(world_points[i_pt, 0], world_points[i_pt, 1], world_points[i_pt, 2], c=pt_colors[col_idx])
+        axs[1][0].view_init(elev=110., azim=90.)
+
+        datestring = navigation_utilities.datetime_to_string_for_fname(cal_metadata['datetime'])
+        if plot_undistorted:
+            jpg_name = '_'.join(('stereotest',
+                                 datestring,
+                                 'frame{:04d}.jpg'.format(frame_num),
+                                 'undistorted'))
+        else:
+            jpg_name = '_'.join(('stereotest',
+                                 datestring,
+                                 'frame{:04d}.jpg'.format(frame_num)))
+        jpg_name = os.path.join(cal_vid_folder, jpg_name)
+
+        plt.show()
+        plt.savefig(jpg_name)
+        plt.close(fig)
+
+
+def create_cal_frame_figure(width, height, ax3d=None, scale=1.0, dpi=100, nrows=1, ncols=1, wspace=0.05, hspace=0.05, lmargin=0.01, rmargin=0.95, botmargin=0.01, topmargin=0.95):
+
+    # create a figure with adjacent axes
+
+    fig_width = (width * scale / dpi) * ncols
+    fig_height = (height * scale / dpi) * nrows
+    fig = plt.figure(
+        frameon=False, figsize=(fig_width, fig_height), dpi=dpi
+    )
+    fig.tight_layout()
+
+    available_panel_w = rmargin - lmargin - ((ncols - 1) * wspace)
+    available_panel_h = topmargin - botmargin - ((nrows - 1) * hspace)
+    panel_width = available_panel_w / ncols
+    panel_height = available_panel_h / nrows
+    axs = []
+    for i_row in range(nrows):
+        ax_row = []
+        bottom = topmargin - i_row * (panel_height + hspace) - panel_height
+        # top = topmargin - i_row * (panel_width + hspace)
+        for i_col in range(ncols):
+            idx = (i_row * ncols) + i_col + 1
+
+            # TEST IF THIS AXES SHOULD BE 3D
+            if (i_row, i_col) in ax3d:
+                ax_row.append(fig.add_subplot(nrows, ncols, idx, projection='3d'))
+                ax_row[i_col].set_xlabel('x')
+                ax_row[i_col].set_ylabel('y')
+                ax_row[i_col].set_zlabel('z')
+                ax_row[i_col].invert_zaxis()
+            else:
+                ax_row.append(fig.add_subplot(nrows, ncols, idx))
+                ax_row[i_col].axis("off")
+                ax_row[i_col].set_xlim(0, width)
+                ax_row[i_col].set_ylim(0, height)
+            ax_row[i_col].invert_yaxis()
+
+            left = lmargin + i_col * (panel_width + wspace)
+            # right = lmargin + i_col * (panel_width + wspace) + panel_width
+
+            ax_row[i_col].set_position([left, bottom, panel_width, panel_height])
+
+        axs.append(ax_row)
+
+    return fig, axs
+
+
+def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_intrinsics=50, min_frames_for_intrinsics=10, num_frames_for_stereo=20, min_frames_for_stereo=5, use_undistorted_pts_for_stereo_cal=True):
     '''
 
     :param calibration_data_name:
@@ -694,6 +850,7 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
                     # rotate the image 180 degrees
                     cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
 
+                # comment in to check that checkerboard points were correctly identified
                 # corners_img = cv2.drawChessboardCorners(cur_img, cal_data['cb_size'], imgpoints_for_intrinsics[i_frame], True)
                 # reproj_img = cv2.drawChessboardCorners(corners_img, cal_data['cb_size'], pp, False)
                 #
@@ -709,14 +866,23 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     # now perform stereo calibration
     # num_frames_for_stereo = 20, min_frames_for_stereo = 5
     stereo_objpoints = cal_data['stereo_objpoints']
-    stereo_imgpoints = cal_data['stereo_imgpoints']
+
+    stereo_imgpoints_ud = undistort_stereo_cbcorners(cal_data['stereo_imgpoints'], cal_data)
+    cal_data['stereo_imgpoints_ud'] = stereo_imgpoints_ud
+    cal_data['use_undistorted_pts_for_stereo_cal'] = use_undistorted_pts_for_stereo_cal
+    if use_undistorted_pts_for_stereo_cal:
+        stereo_imgpoints_for_calibration = cal_data['stereo_imgpoints_ud']
+        dist = [np.zeros(5) for i_cam in range(num_cams)]   # points have already been undistorted, so don't undistort again during calibration
+    else:
+        stereo_imgpoints_for_calibration = cal_data['stereo_imgpoints']
+        dist = cal_data['dist']
     num_stereo_pairs = np.shape(stereo_objpoints)[0]
     num_frames_to_use = min(num_frames_for_stereo, num_stereo_pairs)
-    objpoints, imgpoints, stereo_frame_idx = select_cboards_for_stereo_calibration(stereo_objpoints, stereo_imgpoints, num_frames_to_use)
+    objpoints, imgpoints, stereo_frame_idx = select_cboards_for_stereo_calibration(stereo_objpoints, stereo_imgpoints_for_calibration, num_frames_to_use)
     frames_for_stereo_calibration = [sf_idx for sf_idx in cal_data['stereo_frames']]
 
     mtx = cal_data['mtx']
-    dist = cal_data['dist']
+
     im_size = cal_data['im_size']
     # im_size must be the same for both cameras
     if all([ims == im_size[0] for ims in im_size]) and num_frames_to_use >= min_frames_for_stereo:
@@ -759,6 +925,33 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     #
     #     print('frame number {:d}'.format(frame_num))
     #     worldpoints = triangulate_points(cal_data, projPoints, frame_num)
+
+
+def undistort_stereo_cbcorners(stereo_imgpoints, cal_data):
+
+    # stereo_imgpoints is a num_cams element list of num_valid_frames element lists containing num_points x 1 x 2 arrays
+
+    num_cams = np.shape(stereo_imgpoints)[0]
+    num_valid_frames = np.shape(stereo_imgpoints)[1]
+
+    stereo_imgpoints_ud = [[] for i_cam in range(num_cams)]
+    np.zeros(np.shape(stereo_imgpoints))   # make sure data type is consistent
+
+
+    for i_cam in range(num_cams):
+
+        mtx = cal_data['mtx'][i_cam]
+        dist = cal_data['dist'][i_cam]
+
+        for i_frame in range(num_valid_frames):
+
+            cur_pts = stereo_imgpoints[i_cam][i_frame]
+            cur_pts_udnorm = cv2.undistortPoints(cur_pts, mtx, dist)
+            cur_pts_ud = cvb.unnormalize_points(cur_pts_udnorm, mtx)
+            cur_pts_ud = cur_pts_ud.reshape((-1, 1, 2)).astype('float32')
+            stereo_imgpoints_ud[i_cam].append(cur_pts_ud)
+
+    return stereo_imgpoints_ud
 
 
 def test_reprojection(objpoints, imgpoints, mtx, rvec, tvec, dist):
@@ -915,7 +1108,6 @@ def triangulate_points(cal_data, projPoints, frame_num):
 
 def camera_calibration_from_mirror_vids(calibration_data, calibration_summary_name):
 
-    #todo: working here - perform the camera calibration to get the intrinsics
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST
 
     cb_size = calibration_data['cb_size']

@@ -983,6 +983,31 @@ def find_calibration_video(video_metadata, calibration_parent):
         # sys.exit('No calibration file found for ' + video_metadata['video_name'])
 
 
+def find_calibration_videos_optitrack(cal_metadata, calibration_parent, vid_type='.avi'):
+    """
+
+    :param video_metadata:
+    :param calibration_parent:
+    :return:
+    """
+    cal_vid_folder = find_Burgess_calibration_vid_folder(calibration_parent, cal_metadata['datetime'])
+
+    datetime_string = datetime_to_string_for_fname(cal_metadata['datetime'])
+
+    test_name = 'calibrationvid_{}_cam*{}'.format(datetime_string, vid_type)
+    test_name = os.path.join(cal_vid_folder, test_name)
+
+    cal_vid_list = glob.glob(test_name)
+
+    return cal_vid_list
+
+    # if os.path.exists(test_name):
+    #     return cal_vid_list
+    # else:
+    #     return None
+    #     # sys.exit('No calibration file found for ' + video_metadata['video_name'])
+
+
 def create_trajectory_filename(video_metadata):
 
     trajectory_name = '_'.join((
@@ -1178,7 +1203,7 @@ def find_marked_vids_for_3d_reconstruction(marked_vids_parent, dlc_mat_output_pa
     return metadata_list
 
 
-def find_Burgess_calibration_folder(calibration_parent, session_datetime):
+def find_Burgess_calibration_vid_folder(calibration_parent, session_datetime):
 
     session_year = session_datetime.strftime('%Y')
     session_month = session_datetime.strftime('%m')
@@ -1424,6 +1449,28 @@ def create_optitrack_calibration_data_name(cal_data_parent, session_datetime, ba
     cal_data_name = os.path.join(cal_data_folder, cal_data_name)
 
     return cal_data_name
+
+
+def parse_optitrack_calibration_data_name(optitrack_cal_data_path):
+    '''
+
+    :param optitrack_cal_data_path: parent directory for folders containing pickle files with calibration results. Has structure:
+        cal_data_parent-->calibration_data_YYYY-->calibration_data_YYYYmm
+    :param session_datetime:
+    :return:
+    '''
+
+    _, optitrack_cal_data_name = os.path.split(optitrack_cal_data_path)
+    optitrack_cal_data_name, _ = os.path.splitext(optitrack_cal_data_name)
+
+    name_parts = optitrack_cal_data_name.split('_')
+
+    cal_datetime_string = name_parts[1] + '_' + name_parts[2]
+    cal_datetime = fname_string_to_datetime(cal_datetime_string)
+
+    cal_metadata = {'datetime': cal_datetime}
+
+    return cal_metadata
 
 
 def create_multiview_calibration_data_name(cal_data_parent, box_num, session_datetime, basename='calibrationdata'):

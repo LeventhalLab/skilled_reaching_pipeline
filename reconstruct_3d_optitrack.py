@@ -96,8 +96,8 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
             bp_coords = dlc_utilities.collect_bp_data(dlc_data, 'coordinates')
             mtx = cal_data['mtx'][i_cam]
             dist = cal_data['dist'][i_cam]
-            overlay_pts_in_cropped_img(pickle_metadata[i_cam], bp_coords, dlc_metadata[i_cam], frame_num, mtx, dist,
-                                       parent_directories, reprojected_pts=None, vid_type='.avi')
+            # overlay_pts_in_cropped_img(pickle_metadata[i_cam], bp_coords, dlc_metadata[i_cam], frame_num, mtx, dist,
+            #                            parent_directories, reprojected_pts=None, vid_type='.avi')
 
         # plt.show()
 
@@ -433,8 +433,8 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
     reproj_errors = np.zeros((pts_per_frame, num_cams))
     for i_cam in range(num_cams):
         mtx = cal_data['mtx'][i_cam]
-        dist = cal_data['dist'][i_cam]
-        # dist = np.zeros(5)    # using the points that already have been undistorted against which to compare the reprojections
+        # dist = cal_data['dist'][i_cam]
+        dist = np.zeros(5)    # using the points that already have been undistorted against which to compare the reprojections
         if i_cam == 0:
             rvec = np.zeros((3, 1))
             tvec = np.zeros((3, 1))
@@ -447,19 +447,19 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
         projected_pts.append(ppts)
         reproj_errors[:, i_cam] = calculate_reprojection_errors(ppts, frame_pts[i_cam, :, :])
 
-        overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, parent_directories, reprojected_pts=projected_pts[i_cam],
-                                  rotate_img=pickle_metadata[i_cam]['isrotated'], plot_undistorted=True)
+        # overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, parent_directories, reprojected_pts=projected_pts[i_cam],
+        #                           rotate_img=pickle_metadata[i_cam]['isrotated'], plot_undistorted=True)
         # overlay_pts_in_cropped_img(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist,
         #                            parent_directories, reprojected_pts=None, vid_type='.avi', plot_undistorted=True)
 
-        overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, parent_directories, reprojected_pts=projected_pts[i_cam],
-                                  rotate_img=pickle_metadata[i_cam]['isrotated'], plot_undistorted=False)
+        # overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, parent_directories, reprojected_pts=projected_pts[i_cam],
+        #                           rotate_img=pickle_metadata[i_cam]['isrotated'], plot_undistorted=False)
         # overlay_pts_in_cropped_img(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist,
         #                            parent_directories, reprojected_pts=None, vid_type='.avi', plot_undistorted=False)
 
-    # draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories)
+    draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, plot_undistorted=True)
     #
-    # plt.show()
+    plt.show()
 
     return projected_pts, reproj_errors
 
@@ -745,6 +745,11 @@ def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_f
     # overlay points
     fig, img_ax = overlay_pts_on_image(cur_img, mtx, dist, current_coords, reprojected_pts, bodyparts, ['o', 's'], jpg_name, plot_undistorted=plot_undistorted)
 
+    if plot_undistorted:
+        fig.suptitle('undistorted images and points. o=undistorted pt, square=reprojected pt')
+    else:
+        fig.suptitle('original (distorted) images and points. o=original pt, square=reprojected pt')
+
     # new_img = cur_img
     # for i_pt, pt in enumerate(current_coords):
     #     if len(pt) > 0:
@@ -804,7 +809,7 @@ def overlay_pts_in_cropped_img(pickle_metadata, current_coords, dlc_metadata, i_
 
 def prepare_img_axes(width, height, scale=1.0, dpi=100, nrows=1, ncols=1):
     fig_width = (width * scale / dpi) * ncols
-    fig_height = (width * scale / dpi) * nrows
+    fig_height = (height * scale / dpi) * nrows
     fig = plt.figure(
         frameon=False, figsize=(fig_width, fig_height), dpi=dpi
     )
@@ -879,12 +884,12 @@ def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, marker
                 ax[0][0].plot(to_plot[0], to_plot[1], marker=markertype[1], ms=3, color=bp_color)
 
     # plt.show()
-    fig.savefig(jpg_name)
+    # fig.savefig(jpg_name)
 
     return fig, ax
 
 
-def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_metadata, i_frame, parent_directories, markertype=['o', '+']):
+def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_metadata, i_frame, parent_directories, markertype=['o', '+'], plot_undistorted=True):
 
     dotsize = 3
     reproj_pts = np.squeeze(reproj_pts)
@@ -911,6 +916,7 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
     orig_vid_names = [os.path.join(orig_vid_folder, orig_vid_name_base + '.avi') for orig_vid_name_base in orig_vid_names_base]
 
     #read in images from both camera views
+    img_ud = []
     img = []
     for i_cam, orig_vid_name in enumerate(orig_vid_names):
         video_object = cv2.VideoCapture(orig_vid_name)
@@ -920,18 +926,24 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
 
         if i_cam == 0:
             cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
-        img.append(cv2.undistort(cur_img, cal_data['mtx'][i_cam], cal_data['dist'][i_cam]))
+        img_ud.append(cv2.undistort(cur_img, cal_data['mtx'][i_cam], cal_data['dist'][i_cam]))
+        img.append(cur_img)
 
         video_object.release()
 
-    h, w, _ = np.shape(img[0])
+    h, w, _ = np.shape(img_ud[0])
     im_size = (w, h)
     fig, axs = prepare_img_axes(w, h, scale=1.0, dpi=100, nrows=1, ncols=2)
     # fig, ax = prepare_img_axes(w, h)
 
     for i_cam in range(2):
-        # distorted original image
-        axs[0][i_cam].imshow(img[i_cam])
+
+        if plot_undistorted:
+            # undistorted image
+            axs[0][i_cam].imshow(img_ud[i_cam])
+        else:
+            # distorted original image
+            axs[0][i_cam].imshow(img[i_cam])
 
         mtx = cal_data['mtx'][i_cam]
         dist = cal_data['dist'][i_cam]
@@ -942,7 +954,13 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
         if np.shape(points_in_img)[0] == 1:
             # only one point
             pt_ud = [pt_ud]
-        for i_pt, pt in enumerate(pt_ud):
+
+        if plot_undistorted:
+            to_plot = pt_ud
+        else:
+            to_plot = points_in_img
+
+        for i_pt, pt in enumerate(to_plot):
             if len(pt) > 0:
                 try:
                     x, y = pt[0]
@@ -953,9 +971,9 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
                 bp_color = color_from_bodypart(bodyparts[i_pt])   # undistorted point identified by DLC
 
                 axs[0][i_cam].plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
-                x2 = points_in_img[i_pt, 0]
-                y2 = points_in_img[i_pt, 1]
-                axs[0][i_cam].plot(x2, y2, marker='+', ms=dotsize, color=bp_color)   # point from DLC with original image disortion
+                # x2 = points_in_img[i_pt, 0]
+                # y2 = points_in_img[i_pt, 1]
+                # axs[0][i_cam].plot(x2, y2, marker='+', ms=dotsize, color=bp_color)   # point from DLC with original image disortion
 
                 if reproj_pts[i_cam].ndim == 1:
                     x3 = reproj_pts[i_cam][0]
@@ -965,9 +983,17 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
                     y3 = reproj_pts[i_cam][i_pt, 1]
                 axs[0][i_cam].plot(x3, y3, marker='s', ms=dotsize, color=bp_color)    # reprojected point
 
-        if np.shape(points_in_img)[0] == 1:
-            pt_ud = pt_ud[0].reshape((1, -1, 2))  # needed to get correct array shape for computeCorrespondEpilines in draw_epipolar_lines_on_img
-        draw_epipolar_lines_on_img(pt_ud, i_cam+1, cal_data['F'], im_size, bodyparts, axs[0][1-i_cam])
+        if plot_undistorted:
+            if np.shape(points_in_img)[0] == 1:
+                to_plot = pt_ud[0].reshape((1, -1, 2))  # needed to get correct array shape for computeCorrespondEpilines in draw_epipolar_lines_on_img
+            else:
+                to_plot = pt_ud
+        else:
+            if np.shape(points_in_img)[0] == 1:
+                to_plot = points_in_img[1].reshape((1, -1, 2))
+            else:
+                to_plot = points_in_img
+        draw_epipolar_lines_on_img(to_plot, 1+i_cam, cal_data['F'], im_size, bodyparts, axs[0][1-i_cam])
 
     # plt.show()
     pass
@@ -983,7 +1009,7 @@ def draw_epipolar_lines_on_img(img_pts, whichImage, F, im_size, bodyparts, ax, l
         epiline = np.squeeze(epiline)
         edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
 
-        if not np.all(edge_pts==0):
+        if not np.all(edge_pts == 0):
             ax.plot(edge_pts[:, 0], edge_pts[:, 1], color=bp_color, ls='-', marker='.', lw=lwidth)
 
 

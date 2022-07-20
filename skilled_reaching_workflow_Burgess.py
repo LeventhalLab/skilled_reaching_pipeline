@@ -177,6 +177,10 @@ if __name__ == '__main__':
     # calib_folder = os.path.join(cal_data_parent, 'calibration_data_2022', 'calibration_data_202202')
     # skilled_reaching_calibration.compare_calibration_files(calib_folder)
 
+    # test_cal_file = '/home/levlab/Public/mouse_SR_videos_to_analyze/mouse_SR_calibration_data/calibrationfiles_2022/calibrationfiles_202205/calibrationdata_20220510_10-00-00.pickle'
+    # cal_metadata = navigation_utilities.parse_optitrack_calibration_data_name(test_cal_file)
+    # skilled_reaching_calibration.show_cal_images_with_epilines(cal_metadata, parent_directories)
+    #
     # skilled_reaching_calibration.calibrate_all_Burgess_vids(parent_directories, cb_size=cb_size, checkerboard_square_size=checkerboard_square_size)
 
     # step 2 - crop all videos of mice reaching

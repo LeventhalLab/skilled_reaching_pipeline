@@ -36,6 +36,7 @@ def unnormalize_points(points2d_norm, mtx):
         homogeneous_pts = np.append(points2d_norm, 1.)
         unnorm_pts = np.dot(mtx, homogeneous_pts)
     else:
+        points2d_norm = np.squeeze(points2d_norm)
         num_pts = max(np.shape(points2d_norm))
         try:
             homogeneous_pts = np.hstack((points2d_norm, np.ones((num_pts, 1))))
@@ -578,3 +579,39 @@ def line_convex_hull_intersect(line1, points):
         line_hull_intersect = None
 
     return line_hull_intersect
+
+
+def triangulate_points(pts, cal_data):
+
+    num_cams = len(pts)
+
+    projMatr1 = np.eye(3, 4)
+    projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+
+    # undistort the points from each camera
+    pts_ud = [cv2.undistortPoints(pts[i_cam], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
+
+    points4D = cv2.triangulatePoints(projMatr1, projMatr2, pts_ud[0], pts_ud[1])
+    world_points = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
+
+    # reproject into original views
+    reprojected_pts = []
+    for i_cam in range(num_cams):
+        dist = np.zeros(5)    # using the points that already have been undistorted against which to compare the reprojections
+        if i_cam == 0:
+            rvec = np.zeros((3, 1))
+            tvec = np.zeros((3, 1))
+        else:
+            rvec, _ = cv2.Rodrigues(cal_data['R'])
+            tvec = cal_data['T']
+
+        ppts, _ = cv2.projectPoints(world_points, rvec, tvec, mtx[i_cam], dist[i_cam])
+        ppts = np.squeeze(ppts)
+        reprojected_pts.append(ppts)
+
+    world_points = world_points * cal_data['checkerboard_square_size']
+
+    return world_points, reprojected_pts
+

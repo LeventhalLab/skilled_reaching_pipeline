@@ -147,9 +147,9 @@ if __name__ == '__main__':
     label_videos = True
     checkerboard_square_size = 7   # in mm
 
-    Burgess_DLC_config_path = '/home/levlab/Public/mouse_skilledreaching/mouse_headfixed_skilledreaching-DanL-2021-11-05/config.yaml'
+    Burgess_DLC_config_path = '/home/dleventh/Public/mouse_skilledreaching/mouse_headfixed_skilledreaching-DanL-2021-11-05/config.yaml'
 
-    mouse_reaching_parent = '/home/levlab/Public/mouse_skilledreaching/mouse_SR_videos_to_analyze'   # on lambda machine
+    mouse_reaching_parent = '/home/dleventh/Public/mouse_skilledreaching/mouse_SR_videos_to_analyze'   # on lambda machine
     # mouse_reaching_parent = '/Volumes/Untitled/mouse_3D_troubleshooting'
     video_root_folder = os.path.join(mouse_reaching_parent, 'mouse_SR_videos_tocrop')
     cropped_vids_parent = os.path.join(mouse_reaching_parent, 'cropped_mouse_SR_videos')

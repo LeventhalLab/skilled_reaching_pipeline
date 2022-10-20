@@ -51,7 +51,7 @@ def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, parent_dir
                 # if the file already exists in the marked_vid directory, don't move it
                 _, pickle_name = os.path.split(pickle_file)
                 if not os.path.isfile(os.path.join(new_dir, pickle_name)):
-                    shutil.copy(pickle_file, new_dir)
+                    shutil.move(pickle_file, new_dir)
 
     return scorername
 

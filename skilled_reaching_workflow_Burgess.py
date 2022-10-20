@@ -53,6 +53,20 @@ def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, parent_dir
                 if not os.path.isfile(os.path.join(new_dir, pickle_name)):
                     shutil.move(pickle_file, new_dir)
 
+            csv_list = glob.glob(os.path.join(current_folder, '*.csv'))
+            for csv_file in csv_list:
+                # if the file already exists in the marked_vid directory, don't move it
+                _, csv_name = os.path.split(csv_file)
+                if not os.path.isfile(os.path.join(new_dir, csv_name)):
+                    shutil.move(csv_file, new_dir)
+
+            h5_list = glob.glob(os.path.join(current_folder, '*.h5'))
+            for h5_file in h5_list:
+                # if the file already exists in the marked_vid directory, don't move it
+                _, h5_name = os.path.split(h5_file)
+                if not os.path.isfile(os.path.join(new_dir, h5_name)):
+                    shutil.move(h5_file, new_dir)
+
     return scorername
 
 
@@ -188,13 +202,13 @@ if __name__ == '__main__':
     vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
     crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
     # UNCOMMENT BELOW
-    cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, parent_directories, crop_params_df, cam_list, vidtype='avi')
+    # cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, parent_directories, crop_params_df, cam_list, vidtype='avi')
 
     # step 3 - run DLC on each cropped video
     # UNCOMMENT BELOW
     folders_to_analyze = navigation_utilities.find_optitrack_folders_to_analyze(parent_directories, cam_list=cam_list)
     scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, parent_directories, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
-    scorername = 'DLC_dlcrnetms5_mouse_headfixed_skilledreachingNov5shuffle1_100000'
+    # scorername = 'DLC_dlcrnetms5_mouse_headfixed_skilledreachingNov5shuffle1_100000'
     # UNCOMMENT BELOW
     if label_videos:
         #todo: working here - create labeled videos

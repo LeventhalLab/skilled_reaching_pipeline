@@ -554,6 +554,8 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
 
         # loop through the frames
         frame_list = cam_output.keys()
+
+        # may need to get num_frames based on number of 'framexxxx' keys in cam_output
         num_frames = cam_output['metadata']['nframes']
         num_joints = len(cam_output['metadata']['all_joints_names'])
         pts_wrt_orig_img.append(np.zeros((num_frames, num_joints, 2)))

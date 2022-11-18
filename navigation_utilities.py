@@ -427,6 +427,48 @@ def parse_cropped_optitrack_video_name(cropped_video_name):
     return cropped_vid_metadata
 
 
+def parse_cropped_optitrack_video_folder(cropped_video_folder):
+    """
+    extract metadata information from the video name
+    :param cropped_video_name: video name with expected format mouseID_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
+        where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
+        cropping windows from the original video
+    :return: cropped_vid_metadata: dictionary containing the following keys
+        ratID - rat ID as a string RXXXX
+        boxnum - box number the session was run in. useful for making sure we used the right calibration. If unknown,
+            set to 99
+        triggertime - datetime object with when the trigger event occurred (date and time)
+        video_number - number of the video (ZZZ in the filename). This number is not necessarily unique within a session
+            if it had to be restarted partway through
+        video_type - video type (e.g., '.avi', '.mp4', etc)
+        crop_window - 4-element list [left, right, top, bottom] in pixels
+    """
+
+    cropped_folder_metadata = {
+        'mouseID': '',
+        'session_date': datetime(1,1,1),
+        'cam_num': 0,
+        'cropped_video_folder': ''
+    }
+    try:
+        _, folder_name = os.path.split(cropped_video_folder)
+    except:
+        pass
+    cropped_folder_metadata['cropped_video_folder'] = folder_name
+
+    metadata_list = folder_name.split('_')
+
+    if metadata_list[0][0:4] == 'stim':
+        cropped_folder_metadata['mouseID'] = metadata_list[0][4:]
+    else:
+        cropped_folder_metadata['mouseID'] = metadata_list[0]
+
+    cropped_folder_metadata['session_date'] = datetime.strptime(metadata_list[1], '%Y%m%d')
+
+    cropped_folder_metadata['cam_num'] = int(metadata_list[2][3:])
+
+    return cropped_folder_metadata
+
 def parse_cropped_optitrack_video_name(cropped_video_name):
     """
     extract metadata information from the video name

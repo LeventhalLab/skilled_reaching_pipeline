@@ -30,10 +30,14 @@ def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, parent_dir
 
     cam_list = folders_to_analyze.keys()
     for cam_name in cam_list:
-
         current_cam_folders = folders_to_analyze[cam_name]
 
         for current_folder in current_cam_folders:
+            cropped_folder_metadata = navigation_utilities.parse_cropped_optitrack_video_folder(current_folder)
+            if cropped_folder_metadata['mouseID'] == 'GFP14' and \
+                    cropped_folder_metadata['session_date'] in [datetime(2022,3,9,0,0,0)]:
+                continue
+
             cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
             #todo: skip if analysis already done and stored in the _marked folder
             scorername = deeplabcut.analyze_videos(config_path,
@@ -46,26 +50,26 @@ def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, parent_dir
 
             new_dir = navigation_utilities.create_optitrack_marked_vids_folder(current_folder, cropped_vids_parent,
                                                                                marked_vids_parent)
-            pickle_list = glob.glob(os.path.join(current_folder, '*.pickle'))
-            for pickle_file in pickle_list:
-                # if the file already exists in the marked_vid directory, don't move it
-                _, pickle_name = os.path.split(pickle_file)
-                if not os.path.isfile(os.path.join(new_dir, pickle_name)):
-                    shutil.move(pickle_file, new_dir)
-
-            csv_list = glob.glob(os.path.join(current_folder, '*.csv'))
-            for csv_file in csv_list:
-                # if the file already exists in the marked_vid directory, don't move it
-                _, csv_name = os.path.split(csv_file)
-                if not os.path.isfile(os.path.join(new_dir, csv_name)):
-                    shutil.move(csv_file, new_dir)
-
-            h5_list = glob.glob(os.path.join(current_folder, '*.h5'))
-            for h5_file in h5_list:
-                # if the file already exists in the marked_vid directory, don't move it
-                _, h5_name = os.path.split(h5_file)
-                if not os.path.isfile(os.path.join(new_dir, h5_name)):
-                    shutil.move(h5_file, new_dir)
+            # pickle_list = glob.glob(os.path.join(current_folder, '*.pickle'))
+            # for pickle_file in pickle_list:
+            #     # if the file already exists in the marked_vid directory, don't move it
+            #     _, pickle_name = os.path.split(pickle_file)
+            #     if not os.path.isfile(os.path.join(new_dir, pickle_name)):
+            #         shutil.move(pickle_file, new_dir)
+            #
+            # csv_list = glob.glob(os.path.join(current_folder, '*.csv'))
+            # for csv_file in csv_list:
+            #     # if the file already exists in the marked_vid directory, don't move it
+            #     _, csv_name = os.path.split(csv_file)
+            #     if not os.path.isfile(os.path.join(new_dir, csv_name)):
+            #         shutil.move(csv_file, new_dir)
+            #
+            # h5_list = glob.glob(os.path.join(current_folder, '*.h5'))
+            # for h5_file in h5_list:
+            #     # if the file already exists in the marked_vid directory, don't move it
+            #     _, h5_name = os.path.split(h5_file)
+            #     if not os.path.isfile(os.path.join(new_dir, h5_name)):
+            #         shutil.move(h5_file, new_dir)
 
     return scorername
 
@@ -92,6 +96,8 @@ def create_labeled_optitrack_videos(folders_to_analyze, parent_directories, conf
     cam_list = folders_to_analyze.keys()
     for cam_name in cam_list:
 
+        # do some cam02 vids
+        cam_name = 'cam02'
         current_cam_folders = folders_to_analyze[cam_name]
 
         for current_folder in current_cam_folders:
@@ -123,7 +129,7 @@ def create_labeled_optitrack_videos(folders_to_analyze, parent_directories, conf
                     # if the file already exists in the marked_vid directory, don't move it
                     _, pickle_name = os.path.split(pickle_file)
                     if not os.path.isfile(os.path.join(new_dir, pickle_name)):
-                        shutil.move(pickle_file, new_dir)
+                        shutil.copy(pickle_file, new_dir)
 
 
 def reconstruct_optitrack_3d(parent_directories):
@@ -199,8 +205,8 @@ if __name__ == '__main__':
     # skilled_reaching_calibration.calibrate_all_Burgess_vids(parent_directories, cb_size=cb_size, checkerboard_square_size=checkerboard_square_size)
 
     # step 2 - crop all videos of mice reaching
-    vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
-    crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
+    # vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
+    # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
     # UNCOMMENT BELOW
     # cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, parent_directories, crop_params_df, cam_list, vidtype='avi')
 
@@ -212,15 +218,15 @@ if __name__ == '__main__':
     # UNCOMMENT BELOW
     if label_videos:
         #todo: working here - create labeled videos
-        try:
-            create_labeled_optitrack_videos(folders_to_analyze,
-                                      parent_directories,
-                                      Burgess_DLC_config_path,
-                                      scorername,
-                                      cropped_vid_type=cropped_vid_type
-                                      )
-        except:
-            pass
+        # try:
+        create_labeled_optitrack_videos(folders_to_analyze,
+                                  parent_directories,
+                                  Burgess_DLC_config_path,
+                                  scorername,
+                                  cropped_vid_type=cropped_vid_type
+                                  )
+        # except:
+        #     pass
     # step 4 - reconstruct 3D images
     reconstruct_optitrack_3d(parent_directories)
     #

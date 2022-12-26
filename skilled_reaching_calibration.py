@@ -249,10 +249,6 @@ def multi_view_calibration(calibration_vids, cal_data_parent, cb_size=(10, 7)):
 
                 skilled_reaching_io.write_pickle(cal_data_name, calibration_data)
 
-        #todo: figure out the best way to compute the intrinsic matrices - probably constrain fx and fy to be equal, tangential distortion to be zero, constrain principal point to be at the center
-        pass
-
-
     objpoints = calibration_data['stereo_objpoints']
     imgpoints = calibration_data['stereo_imgpoints']
 

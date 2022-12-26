@@ -1328,7 +1328,8 @@ def find_Burgess_calibration_vids(cal_vid_parent, cam_list=(1, 2), vidtype='.avi
 
 def parse_Burgess_calibration_vid_name(cal_vid_name):
     '''
-    calibration file name of form 'calibrationvid_YYYYmmdd_HH-MM-SS_camZZ.avi' where ZZ is '01' or '02'
+    calibration file name of form 'calibrationvid_YYYYmmdd_HH-MM-SS_camZZ.avi' or
+        'calibrationvid_YYYYmmdd-HH-MM-SS_camZZ.avi' where ZZ is '01' or '02'
     :param cal_vid_name:
     :return:
     '''
@@ -1337,9 +1338,16 @@ def parse_Burgess_calibration_vid_name(cal_vid_name):
 
     name_parts_list = bare_name.split('_')
 
+    if len(name_parts_list[1]) > 8:
+        session_datetime = fname_string_to_datetime(name_parts_list[1][:8] + '_' + name_parts_list[1][9:])
+        cam_num = int(name_parts_list[2][3:])
+    else:
+        session_datetime = fname_string_to_datetime(name_parts_list[1] + '_' + name_parts_list[2])
+        cam_num = int(name_parts_list[3][3:])
+
     calvid_metadata = {
-        'cam_num': int(name_parts_list[3][3:]),
-        'session_datetime': fname_string_to_datetime(name_parts_list[1] + '_' + name_parts_list[2]),
+        'cam_num': cam_num,
+        'session_datetime': session_datetime,
         'calvid_name': cal_vid_name
     }
 

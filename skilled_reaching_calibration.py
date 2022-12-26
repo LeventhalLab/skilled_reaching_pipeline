@@ -479,6 +479,7 @@ def calibrate_all_Burgess_vids(parent_directories, cb_size=(7, 10), checkerboard
 
         cal_data_name = navigation_utilities.create_optitrack_calibration_data_name(cal_data_parent,
                                                                                     calvid_metadata[0]['session_datetime'])
+        # comment back in when done testing
         if not os.path.isfile(cal_data_name):
             # collect the checkerboard points, write to file
             collect_cbpoints_Burgess(sorted_vid_pair, cal_data_parent, cb_size=cb_size, checkerboard_square_size=checkerboard_square_size)

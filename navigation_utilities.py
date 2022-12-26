@@ -1890,12 +1890,20 @@ def fname_string_to_datetime(string_to_convert):
 
 
 def fname_string_to_date(string_to_convert):
-    format_string = '%Y%m%d'
 
-    date_from_fname = datetime.strptime(string_to_convert, format_string)
+    if len(string_to_convert) == 8:
+        format_string = '%Y%m%d'
+    elif len(string_to_convert) == 6:
+        format_string = '%y%m%d'
+    else:
+        format_string = None
+
+    if format_string is None:
+        date_from_name = None
+    else:
+        date_from_fname = datetime.strptime(string_to_convert, format_string)
 
     return date_from_fname
-
 
 def parse_cropped_calibration_video_name(cropped_calibration_vid_name):
     """

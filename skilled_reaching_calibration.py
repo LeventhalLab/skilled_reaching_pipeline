@@ -11,7 +11,26 @@ import numpy as np
 import cv2
 import glob
 import computer_vision_basics as cvb
+import skilled_reaching_io
 from random import randint
+
+
+def refine_calibrations_from_orig_vids(vid_folder_list, parent_directories):
+    cal_data_parent = parent_directories['cal_data_parent']
+
+    for vf in vid_folder_list:
+
+        mouseID, session_date_str = navigation_utilities.parse_session_dir_name(vf)
+        session_date = navigation_utilities.fname_string_to_date(session_date_str)
+        calibration_file = navigation_utilities.find_optitrack_calibration_data_name(cal_data_parent, session_date)
+
+        if calibration_file is None or not os.path.exists(calibration_file):
+            # if there is no calibration file for this session, skip
+            continue
+        cal_data = skilled_reaching_io.read_pickle(calibration_file)
+
+        pass
+    pass
 
 
 def import_fiji_csv(fname):

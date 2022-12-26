@@ -170,8 +170,10 @@ if __name__ == '__main__':
 
     Burgess_DLC_config_path = '/home/dleventh/Public/mouse_skilledreaching/mouse_headfixed_skilledreaching-DanL-2021-11-05/config.yaml'
 
-    mouse_reaching_parent = '/home/dleventh/Public/mouse_skilledreaching/mouse_SR_videos_to_analyze'   # on lambda machine
-    # mouse_reaching_parent = '/Volumes/Untitled/mouse_3D_troubleshooting'
+    # for sharedx on lambda machine
+    # mouse_reaching_parent = '/home/dleventh/Public/mouse_skilledreaching/mouse_SR_videos_to_analyze'
+    # for dropbox on laptop
+    mouse_reaching_parent = 'C:\\Users\\dklev\Dropbox (University of Michigan)\\MED-LeventhalLab\\Burgess_data\\mouse_SR_videos_to_analyze'
     video_root_folder = os.path.join(mouse_reaching_parent, 'mouse_SR_videos_tocrop')
     cropped_vids_parent = os.path.join(mouse_reaching_parent, 'cropped_mouse_SR_videos')
     marked_vids_parent = os.path.join(mouse_reaching_parent, 'marked_mouse_SR_videos')
@@ -204,11 +206,16 @@ if __name__ == '__main__':
     #
     # skilled_reaching_calibration.calibrate_all_Burgess_vids(parent_directories, cb_size=cb_size, checkerboard_square_size=checkerboard_square_size)
 
+    # once all initial calibrations are done, refine for each video pair
+    vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
+    skilled_reaching_calibration.refine_calibrations_from_orig_vids(vid_folder_list, parent_directories)
+
+
     # step 2 - crop all videos of mice reaching
-    # vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
+    vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
     # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
     # UNCOMMENT BELOW
-    # cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, parent_directories, crop_params_df, cam_list, vidtype='avi')
+    cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, parent_directories, crop_params_df, cam_list, vidtype='avi')
 
     # step 3 - run DLC on each cropped video
     # UNCOMMENT BELOW

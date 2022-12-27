@@ -29,6 +29,11 @@ def refine_calibrations_from_orig_vids(vid_folder_list, parent_directories):
             continue
         cal_data = skilled_reaching_io.read_pickle(calibration_file)
 
+        session_nums = navigation_utilities.sessions_in_optitrack_folder(vf)
+        # find a pair of videos from each session
+        for sn in session_nums:
+            vid_pair = navigation_utilities.find_vid_pair_from_session(vf, sn)
+
         pass
     pass
 

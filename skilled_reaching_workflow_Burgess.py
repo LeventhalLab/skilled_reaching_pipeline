@@ -173,7 +173,7 @@ if __name__ == '__main__':
     # for sharedx on lambda machine
     mouse_reaching_parent = '/home/dleventh/SharedX/Neuro-Leventhal/data/Burgess_mouse_SR/mouse_SR_videos_to_analyze'
     # for dropbox on laptop
-    # mouse_reaching_parent = 'C:\\Users\\dklev\Dropbox (University of Michigan)\\MED-LeventhalLab\\Burgess_data\\mouse_SR_videos_to_analyze'
+    mouse_reaching_parent = 'C:\\Users\\dklev\Dropbox (University of Michigan)\\MED-LeventhalLab\\Burgess_data\\mouse_SR_videos_to_analyze'
 
     video_root_folder = os.path.join(mouse_reaching_parent, 'mouse_SR_videos_tocrop')
     cropped_vids_parent = os.path.join(mouse_reaching_parent, 'cropped_mouse_SR_videos')
@@ -205,7 +205,7 @@ if __name__ == '__main__':
     # cal_metadata = navigation_utilities.parse_optitrack_calibration_data_name(test_cal_file)
     # skilled_reaching_calibration.show_cal_images_with_epilines(cal_metadata, parent_directories)
     #
-    skilled_reaching_calibration.calibrate_all_Burgess_vids(parent_directories, cb_size=cb_size, checkerboard_square_size=checkerboard_square_size)
+    # skilled_reaching_calibration.calibrate_all_Burgess_vids(parent_directories, cb_size=cb_size, checkerboard_square_size=checkerboard_square_size)
 
     # once all initial calibrations are done, refine for each video pair
     vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)

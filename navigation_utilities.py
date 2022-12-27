@@ -2,8 +2,38 @@ import os
 import glob
 import sys
 import cv2
+import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
+
+
+def find_vid_pair_from_session(vid_folder, session_num, vid_type='*.avi'):
+
+    test_vid_num = 0
+    vid_metadata = parse_session_dir_name(vid_folder)
+
+    for i_cam in range(2):
+        test_name = '_'.join([vid_metadata[0],
+                              vid_metadata[1],
+                              '*-*-*',
+                              '{:d}'.format(session_num),
+                              '{:03d}'.format(test_vid_num),
+                              'cam{:02d}'.format(i_cam) + vid_type
+                              ])
+
+    pass
+def sessions_in_optitrack_folder(vid_folder, vid_type='*.avi'):
+
+    vid_list = glob.glob(os.path.join(vid_folder, '*' + vid_type))
+
+    session_nums = []
+    for vid in vid_list:
+        vid_metadata = parse_Burgess_vid_name(vid)
+        session_nums.append(vid_metadata['session_num'])
+
+    session_nums = np.unique(np.array(session_nums))
+
+    return session_nums
 
 
 def get_video_folders_to_crop(video_root_folder):
@@ -1827,14 +1857,13 @@ def parse_Burgess_vid_name(full_vid_path):
     datetime_str = vid_name_parts[1] + '_' + vid_name_parts[2]
     vid_metadata['time'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
 
-    vid_metadata['vid_num'] = int(vid_name_parts[3])
-
     if len(vid_name_parts) == 6:
         # name includes session # (numbered from the first session overall or first session of the day?)
-        vid_metadata['session_num'] = int(vid_name_parts[4])
+        vid_metadata['session_num'] = int(vid_name_parts[3])
         vid_metadata['cam_num'] = int(vid_name_parts[5][3:])
+        vid_metadata['vid_num'] = int(vid_name_parts[4])
     else:
-        vid_metadata['cam_num'] = int(vid_name_parts[4][3:])
+        vid_metadata['cam_num'] = int(vid_name_parts[3][3:])
 
     return vid_metadata
 

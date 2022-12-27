@@ -7,21 +7,60 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
-def find_vid_pair_from_session(vid_folder, session_num, vid_type='*.avi'):
+def find_vid_pair_from_session(vid_folder, session_num, vid_type='.avi'):
 
     test_vid_num = 0
     vid_metadata = parse_session_dir_name(vid_folder)
 
+    vid_pair = []
     for i_cam in range(2):
-        test_name = '_'.join([vid_metadata[0],
+        # sometimes, the session number is embedded in the filename as a single digit, sometimes as a 2-digit 0-padded
+        # number
+        test_names = ['_'.join([vid_metadata[0],
                               vid_metadata[1],
                               '*-*-*',
                               '{:d}'.format(session_num),
                               '{:03d}'.format(test_vid_num),
-                              'cam{:02d}'.format(i_cam) + vid_type
-                              ])
+                              'cam{:02d}'.format(i_cam+1) + vid_type
+                              ]),
+                      '_'.join([vid_metadata[0],
+                                vid_metadata[1],
+                                '*-*-*',
+                                '{:02d}'.format(session_num),
+                                '{:03d}'.format(test_vid_num),
+                                'cam{:02d}'.format(i_cam + 1) + vid_type
+                                ])]
+        camvid_lists = [glob.glob(os.path.join(vid_folder, tn)) for tn in test_names]
 
-    pass
+        if not all(camvid_lists):
+            # no files found. maybe this was a stim session?
+            test_names = ['_'.join(['stim' + vid_metadata[0],
+                                    vid_metadata[1],
+                                    '*-*-*',
+                                    '{:d}'.format(session_num),
+                                    '{:03d}'.format(test_vid_num),
+                                    'cam{:02d}'.format(i_cam + 1) + vid_type
+                                    ]),
+                          '_'.join(['stim' + vid_metadata[0],
+                                    vid_metadata[1],
+                                    '*-*-*',
+                                    '{:02d}'.format(session_num),
+                                    '{:03d}'.format(test_vid_num),
+                                    'cam{:02d}'.format(i_cam + 1) + vid_type
+                                    ])]
+        camvid_lists = [glob.glob(os.path.join(vid_folder, tn)) for tn in test_names]
+
+        if not all(camvid_lists):
+            return None
+
+        for cvl in camvid_lists:
+            if len(cvl) == 1:
+                # this must be a valid video name
+                vid_pair.append(cvl[0])
+                break
+    return vid_pair
+
+
 def sessions_in_optitrack_folder(vid_folder, vid_type='*.avi'):
 
     vid_list = glob.glob(os.path.join(vid_folder, '*' + vid_type))

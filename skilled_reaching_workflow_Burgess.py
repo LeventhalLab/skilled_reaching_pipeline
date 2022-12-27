@@ -173,7 +173,7 @@ if __name__ == '__main__':
     # for sharedx on lambda machine
     mouse_reaching_parent = '/home/dleventh/SharedX/Neuro-Leventhal/data/Burgess_mouse_SR/mouse_SR_videos_to_analyze'
     # for dropbox on laptop
-    mouse_reaching_parent = 'C:\\Users\\dklev\Dropbox (University of Michigan)\\MED-LeventhalLab\\Burgess_data\\mouse_SR_videos_to_analyze'
+    # mouse_reaching_parent = 'C:\\Users\\dklev\Dropbox (University of Michigan)\\MED-LeventhalLab\\Burgess_data\\mouse_SR_videos_to_analyze'
 
     video_root_folder = os.path.join(mouse_reaching_parent, 'mouse_SR_videos_tocrop')
     cropped_vids_parent = os.path.join(mouse_reaching_parent, 'cropped_mouse_SR_videos')

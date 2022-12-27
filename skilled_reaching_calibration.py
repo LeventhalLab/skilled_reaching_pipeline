@@ -33,11 +33,17 @@ def refine_calibrations_from_orig_vids(vid_folder_list, parent_directories):
         # find a pair of videos from each session
         for sn in session_nums:
             vid_pair = navigation_utilities.find_vid_pair_from_session(vf, sn)
+            pass
 
         pass
     pass
 
 
+def load_vidpair_frames(vid_pair):
+
+    # assume camera 1 should be rotated 180 degrees
+    img = []
+    for vid in vid_pair:
 def import_fiji_csv(fname):
     """
     read csv file with points marked in fiji

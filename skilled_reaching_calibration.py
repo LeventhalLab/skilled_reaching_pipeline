@@ -751,8 +751,8 @@ def show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undisto
     # read in calibration data
     cal_data = skilled_reaching_io.read_pickle(cal_data_file)
 
-    w = 1280
-    h = 1024
+    w = cal_data['im_size'][0][0]
+    h = cal_data['im_size'][0][1]
 
     # loop through stereo pairs
     vid_objects = [cv2.VideoCapture(cal_vid) for cal_vid in cal_videos]
@@ -832,8 +832,8 @@ def show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undisto
         if plot_undistorted:
             jpg_name = '_'.join(('stereotest',
                                  datestring,
-                                 'frame{:04d}.jpg'.format(frame_num),
-                                 'undistorted'))
+                                 'frame{:04d}'.format(frame_num),
+                                 'undistorted.jpg'))
         else:
             jpg_name = '_'.join(('stereotest',
                                  datestring,
@@ -1107,8 +1107,8 @@ def select_cboards_for_stereo_calibration(objpoints, imgpoints, num_frames_to_ex
     return selected_objpoints, selected_imgpoints, frame_numbers
 
 
-def triangulate_points(cal_data, projPoints, frame_num):
-    cal_data_parent = '/home/levlab/Public/mouse_SR_videos_to_analyze/mouse_SR_calibration_data'
+def triangulate_points(cal_data, projPoints, frame_num, parent_directories):
+    cal_data_parent = parent_directories['cal_data_parent']
 
     # first, create projMatr1 and projMatr2 (3 x 4 projection matrices for each camera) for each camera
     mtx = cal_data['mtx']

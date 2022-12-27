@@ -23,7 +23,8 @@ def extract_data_from_dlc_output(dlc_output, trajectory_metadata):
     #todo: figure out how to deal with dlc_output as a list of output from multiple views, dictionary of output from multiple views, or as a single view
     if type(dlc_output) is dict:
         dlc_output_keys = tuple(dlc_output.keys())
-        if 'frame' in dlc_output_keys[0]:
+        # test if the second key contains 'frame' - the first key is now 'metadata' from dlc output
+        if 'frame' in dlc_output_keys[1]:
             # dlc_output is the output from a single dlc labeling session, assuming trajectory_metadata also only from a single view
             if trajectory_metadata is None:
                 dlc_data = None
@@ -53,7 +54,7 @@ def extract_data_from_dlc_output(dlc_output, trajectory_metadata):
                             pass
 
         else:
-            # dlc_output is a dictionary where each entry is dlc output ("full" pickled file) from a different view whose
+            # dlc_output is a dictionary where each entry is dlc output ("full" pickled file) from a different view
             # whose names are the dictionary keys. Return a dlc_data dictionary containing dlc_data for each view
             view_list = dlc_output_keys
 

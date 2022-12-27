@@ -5,6 +5,7 @@ import glob
 
 import dlc_utilities
 import navigation_utilities
+import skilled_reaching_calibration
 import skilled_reaching_io
 import matplotlib.pyplot as plt
 import computer_vision_basics as cvb
@@ -84,9 +85,6 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
         # is an array (num_frames x num_joints). Zeros are stored where dlc was uncertain (no result for that joint on
         # that frame)
 
-        # WORKING HERE
-        # todo: overlay original dlc output on cropped images to see if problem is with original identification or translating/rotating back into full frame for cam 2 (cam 1 looks good)
-
         frame_num = 0
         frame_str = 'frame{:04d}'.format(frame_num)
         for i_cam in range(2):
@@ -96,9 +94,10 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
             bp_coords = dlc_utilities.collect_bp_data(dlc_data, 'coordinates')
             mtx = cal_data['mtx'][i_cam]
             dist = cal_data['dist'][i_cam]
-            # overlay_pts_in_cropped_img(pickle_metadata[i_cam], bp_coords, dlc_metadata[i_cam], frame_num, mtx, dist,
-            #                            parent_directories, reprojected_pts=None, vid_type='.avi')
-
+            # overlay original dlc output on cropped images to see if problem is with original identification or translating/rotating back into full frame for cam 2 (cam 1 looks good)
+        #     overlay_pts_in_cropped_img(pickle_metadata[i_cam], bp_coords, dlc_metadata[i_cam], frame_num, mtx, dist,
+        #                                parent_directories, reprojected_pts=None, vid_type='.avi')
+        #
         # plt.show()
 
         reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf, pickle_files, dlc_metadata, parent_directories)
@@ -182,6 +181,11 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
         F - fundamental matrix
         frames_for_stereo_calibration
     '''
+
+    # todo: try to refine fundamental matrix to see if we can improve calibration accuracy
+    cal_metadata = navigation_utilities.parse_optitrack_calibration_data_name(calibration_file)
+    skilled_reaching_calibration.show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undistorted=True)
+
     video_root_folder = parent_directories['video_root_folder']
     reconstruct3d_parent = parent_directories['reconstruct3d_parent']
 
@@ -553,7 +557,8 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
         cam_metadata = pickle_metadata[i_cam]
 
         # loop through the frames
-        frame_list = cam_output.keys()
+        frame_list = list(cam_output.keys())
+        frame_list = [fr for fr in frame_list if fr[:5] == 'frame']
 
         # may need to get num_frames based on number of 'framexxxx' keys in cam_output
         num_frames = cam_output['metadata']['nframes']
@@ -893,6 +898,19 @@ def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, marker
 
 def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_metadata, i_frame, parent_directories, markertype=['o', '+'], plot_undistorted=True):
 
+    '''
+
+    :param cal_data:
+    :param frame_pts:
+    :param reproj_pts:
+    :param dlc_metadata:
+    :param pickle_metadata:
+    :param i_frame:
+    :param parent_directories:
+    :param markertype: first element is for point detected by DLC, second is for reprojected point
+    :param plot_undistorted:
+    :return:
+    '''
     dotsize = 3
     reproj_pts = np.squeeze(reproj_pts)
 

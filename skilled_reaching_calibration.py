@@ -13,6 +13,8 @@ import glob
 import computer_vision_basics as cvb
 import skilled_reaching_io
 from random import randint
+import matplotlib
+matplotlib.use('TKAgg')
 
 
 def refine_calibrations_from_orig_vids(vid_folder_list, parent_directories):
@@ -33,9 +35,83 @@ def refine_calibrations_from_orig_vids(vid_folder_list, parent_directories):
         # find a pair of videos from each session
         for sn in session_nums:
             vid_pair = navigation_utilities.find_vid_pair_from_session(vf, sn)
+            matched_frames = load_vidpair_frames(vid_pair)
+            match_points(matched_frames, cal_data)
             pass
 
         pass
+    pass
+
+
+def match_points(frame_pair, cal_data):
+    '''
+
+    :param frame_pair: note that frame_pair should be such that the first image in the list is from camera 1, the second
+        image in the list is from camera 2
+    :param cal_data:
+    :return:
+    '''
+
+    if cal_data['calvid_metadata'][0]['cam_num'] == 1:
+        # the first elements of lists in the cal_data dictionary is for camera 1
+        cam_list = [0, 1]
+    else:
+        # the first elements of lists in the cal_data dictionary is for camera 2
+        cam_list = [1, 0]
+    mtx = []
+    dist = []
+    for i_cam in cam_list:
+        mtx.append(cal_data['mtx'][i_cam])
+        dist.append(cal_data['dist'][i_cam])
+
+    # first, undistort the images, find the keypoints
+    im_ud = []
+    sift = cv2.SIFT_create()
+    kp = []
+    des = []
+    for i_cam, mf in enumerate(frame_pair):
+        im_ud.append(cv2.undistort(mf, mtx[i_cam], dist[i_cam]))
+        a, b = sift.detectAndCompute(im_ud[i_cam], None)
+        kp.append(a)
+        des.append(b)
+
+    # FLANN parameters
+    FLANN_INDEX_KDTREE = 1
+    index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+    search_params = dict(checks=50)  # or pass empty dictionary
+
+    flann = cv2.FlannBasedMatcher(index_params, search_params)
+    matches = flann.knnMatch(des[0], des[1], k=2)
+
+    # Need to draw only good matches, so create a mask
+    matchesMask = [[0, 0] for i in range(len(matches))]
+    # ratio test as per Lowe's paper
+    for i, (m, n) in enumerate(matches):
+        if m.distance < 0.7 * n.distance:
+            matchesMask[i] = [1, 0]
+    draw_params = dict(matchColor=(0, 255, 0),
+                       singlePointColor=(255, 0, 0),
+                       matchesMask=matchesMask,
+                       flags=cv2.DrawMatchesFlags_DEFAULT)
+    # bf = cv2.BFMatcher()
+    # matches = bf.knnMatch(des[0], des[1], k=2)
+
+    # good = []
+    # for m,n in matches:
+    #     if m.distance < 0.75 * n.distance:
+    #         good.append([m])
+
+    # for BF matching
+    # img3 = cv2.drawMatchesKnn(im_ud[0], kp[0], im_ud[1], kp[1], good, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+
+    # for FLANN matching
+    img3 = cv2.drawMatchesKnn(im_ud[0], kp[0], im_ud[1], kp[1], matches, None, **draw_params)
+
+    plt.figure()
+    plt.imshow(img3)
+    plt.show()
+
+
     pass
 
 
@@ -44,6 +120,18 @@ def load_vidpair_frames(vid_pair):
     # assume camera 1 should be rotated 180 degrees
     img = []
     for vid in vid_pair:
+        video_object = cv2.VideoCapture(vid)
+        ret, cur_img = video_object.read()
+
+        if ret:
+            vid_metadata = navigation_utilities.parse_Burgess_vid_name(vid)
+            if vid_metadata['cam_num'] == 1:
+                cur_img = cv2.rotate(cur_img, cv2.ROTATE_180)
+
+            img.append(cv2.cvtColor(cur_img, cv2.COLOR_BGR2GRAY))
+
+    return img
+
 def import_fiji_csv(fname):
     """
     read csv file with points marked in fiji

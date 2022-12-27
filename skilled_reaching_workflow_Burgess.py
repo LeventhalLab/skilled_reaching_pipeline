@@ -208,15 +208,15 @@ if __name__ == '__main__':
     skilled_reaching_calibration.calibrate_all_Burgess_vids(parent_directories, cb_size=cb_size, checkerboard_square_size=checkerboard_square_size)
 
     # once all initial calibrations are done, refine for each video pair
-    vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
-    skilled_reaching_calibration.refine_calibrations_from_orig_vids(vid_folder_list, parent_directories)
+    # vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
+    # skilled_reaching_calibration.refine_calibrations_from_orig_vids(vid_folder_list, parent_directories)
 
 
     # step 2 - crop all videos of mice reaching
     vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
     # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
     # UNCOMMENT BELOW
-    cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, parent_directories, crop_params_df, cam_list, vidtype='avi')
+    # cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, parent_directories, crop_params_df, cam_list, vidtype='avi')
 
     # step 3 - run DLC on each cropped video
     # UNCOMMENT BELOW

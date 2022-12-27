@@ -1958,6 +1958,11 @@ def fname_string_to_datetime(string_to_convert):
     :param string_to_convert:
     :return:
     '''
+
+    if len(string_to_convert) == 15:
+        # most likely, the first 2 digits of the year were left off (should be seventeen characters - 8 for yyyymmdd,
+        # one for the underscore, and 8 for HH-MM-SS
+        string_to_convert = '20' + string_to_convert
     format_string = '%Y%m%d_%H-%M-%S'
 
     datetime_from_fname = datetime.strptime(string_to_convert, format_string)

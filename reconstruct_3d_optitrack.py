@@ -184,7 +184,7 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
 
     # todo: try to refine fundamental matrix to see if we can improve calibration accuracy
     cal_metadata = navigation_utilities.parse_optitrack_calibration_data_name(calibration_file)
-    skilled_reaching_calibration.show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undistorted=True)
+    # skilled_reaching_calibration.show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undistorted=True)
 
     video_root_folder = parent_directories['video_root_folder']
     reconstruct3d_parent = parent_directories['reconstruct3d_parent']
@@ -461,7 +461,7 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
         # overlay_pts_in_cropped_img(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist,
         #                            parent_directories, reprojected_pts=None, vid_type='.avi', plot_undistorted=False)
 
-    draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, plot_undistorted=True)
+    draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=True, plot_undistorted=True)
     #
     plt.show()
 
@@ -896,7 +896,7 @@ def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, marker
     return fig, ax
 
 
-def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_metadata, i_frame, parent_directories, markertype=['o', '+'], plot_undistorted=True):
+def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_metadata, i_frame, parent_directories, use_ffm=True, markertype=['o', '+'], plot_undistorted=True):
 
     '''
 
@@ -1013,7 +1013,11 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
                 to_plot = points_in_img[1].reshape((1, -1, 2))
             else:
                 to_plot = points_in_img
-        draw_epipolar_lines_on_img(to_plot, 1+i_cam, cal_data['F'], im_size, bodyparts, axs[0][1-i_cam])
+        if use_ffm:
+            F = cal_data['F_ffm']
+        else:
+            F = cal_data['F']
+        draw_epipolar_lines_on_img(to_plot, 1+i_cam, F, im_size, bodyparts, axs[0][1-i_cam])
 
     # plt.show()
     pass

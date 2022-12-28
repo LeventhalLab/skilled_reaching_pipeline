@@ -40,7 +40,7 @@ def add_polygon_patch(coords, ax, fc='blue'):
     ax.add_patch(patch)
 
 
-def draw_epipolar_lines(img, cal_data, cam_num, pts, reproj_pts, markertype=['o', '+'], ax=None, lwidth=0.5):
+def draw_epipolar_lines(img, cal_data, cam_num, pts, reproj_pts, use_ffm=True, markertype=['o', '+'], ax=None, lwidth=0.5):
 
     cam_idx = cam_num - 1
 
@@ -66,7 +66,10 @@ def draw_epipolar_lines(img, cal_data, cam_num, pts, reproj_pts, markertype=['o'
     mtx = cal_data['mtx'][cam_idx]
     dist = cal_data['dist'][cam_idx]
 
-    F = cal_data['F']
+    if use_ffm:
+        F = cal_data['F_ffm']
+    else:
+        F = cal_data['F']
 
     whichImage = 3 - cam_num
 

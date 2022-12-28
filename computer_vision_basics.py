@@ -615,3 +615,26 @@ def triangulate_points(pts, cal_data):
 
     return world_points, reprojected_pts
 
+
+def estimate_gamma(img):
+
+    # convert img to gray
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # compute gamma = log(mid*255)/log(mean)
+    mid = 0.5
+    mean = np.mean(gray)
+    gamma = math.log(mid * 255) / math.log(mean)
+
+    return gamma
+
+
+def adjust_blacklevel(image, gamma=1.0):
+    invGamma = 1.0 / gamma
+
+    table = np.array([((i / 255.0) ** invGamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
+    if image.dtype == 'float64':
+        image = image * 255
+        image = image.astype('uint8')
+
+    return cv2.LUT(image, table)

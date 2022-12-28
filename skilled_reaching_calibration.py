@@ -609,7 +609,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10), checker
         # camera calibrations have been performed, now need to do stereo calibration
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
-    # CBOARD_FLAGS = cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE
+    # CBOARD_FLAGS = cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE + cv2.CALIB_CB_FILTER_QUADS
 
     # create video objects for each calibration_video
     vid_obj = []
@@ -660,6 +660,7 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10), checker
                     cur_img[i_vid] = cv2.rotate(cur_img[i_vid], cv2.ROTATE_180)
 
                 cur_img_gray = cv2.cvtColor(cur_img[i_vid], cv2.COLOR_BGR2GRAY)
+                # NOTE, tried using several flag options for finChessboardCorners, but didn't help with detection
                 found_valid_chessboard, corners = cv2.findChessboardCorners(cur_img_gray, cb_size)
                 valid_frames[i_vid][i_frame] = found_valid_chessboard
 
@@ -668,11 +669,11 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10), checker
                     cam_objpoints[i_vid].append(objp)
                     cam_imgpoints[i_vid].append(corners2[i_vid])
 
-                    corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid],
+                    corners_img = cv2.drawChessboardCorners(cur_img_gray, cb_size, corners2[i_vid],
                                                             found_valid_chessboard)
 
                 else:
-                    corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners,
+                    corners_img = cv2.drawChessboardCorners(cur_img_gray, cb_size, corners,
                                                             found_valid_chessboard)
                 # vid_path, vid_name = os.path.split(calibration_vids[i_vid])
                 # vid_name, _ = os.path.splitext(vid_name)
@@ -809,7 +810,7 @@ def show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undisto
             img.append(cb_img)
             ax_idx = cam_num[cal_idx] - 1
 
-            plot_utilities.draw_epipolar_lines(cb_img, cal_data, cam_num[cal_idx], other_cbpoints, [], markertype=['o', '+'], ax=axs[0][ax_idx])
+            plot_utilities.draw_epipolar_lines(cb_img, cal_data, cam_num[cal_idx], other_cbpoints, [], use_ffm=True, markertype=['o', '+'], ax=axs[0][ax_idx])
 
         world_points, reprojected_pts = cvb.triangulate_points(cb_pts, cal_data)
         for ax_idx in range(2):
@@ -1005,6 +1006,11 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
         print('working on stereo calibration for {}'.format(session_date_string))
         im_size = im_size[0]
         ret, mtx1, dist1, mtx2, dist2, R, T, E, F = cv2.stereoCalibrate(objpoints, imgpoints[0], imgpoints[1], mtx[0], dist[0], mtx[1], dist[1], im_size, flags=STEREO_FLAGS)
+
+        # TROUBLESHOOTING
+        # try recalculating using findFundamentalMat
+        imgpts_reshaped = [np.reshape(im_pts, (-1,2)) for im_pts in imgpoints]
+        F_ffm, ffm_mask = cv2.findFundamentalMat(imgpts_reshaped[0], imgpts_reshaped[1], cv2.FM_RANSAC, 3, 0.99)
     else:
         ret = False
         mtx1 = np.zeros((3, 3))
@@ -1015,11 +1021,15 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
         T = np.zeros((3, 1))
         E = np.zeros((3, 3))
         F = np.zeros((3, 3))
+        F_ffm = np.zeros((3, 3))
+        ffm_mask = None
 
     cal_data['R'] = R
     cal_data['T'] = T
     cal_data['E'] = E
     cal_data['F'] = F
+    cal_data['F_ffm'] = F_ffm
+    cal_data['ffm_mask'] = ffm_mask
     cal_data['frames_for_stereo_calibration'] = frames_for_stereo_calibration   # frame numbers in original calibration video used for the stereo calibration
     # if valid_frames[0][i_frame] and valid_frames[1][i_frame]:
     #     # checkerboards were identified in matching frames

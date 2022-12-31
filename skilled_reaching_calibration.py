@@ -1009,7 +1009,7 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
 
         # TROUBLESHOOTING
         # try recalculating using findFundamentalMat
-        imgpts_reshaped = [np.reshape(im_pts, (-1,2)) for im_pts in imgpoints]
+        imgpts_reshaped = [np.reshape(im_pts, (-1, 2)) for im_pts in imgpoints]
         F_ffm, ffm_mask = cv2.findFundamentalMat(imgpts_reshaped[0], imgpts_reshaped[1], cv2.FM_RANSAC, 3, 0.99)
     else:
         ret = False

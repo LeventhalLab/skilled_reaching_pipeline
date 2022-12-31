@@ -34,7 +34,6 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
 
     pickle_metadata = []
     for cam01_file in full_pickles[0]:
-
         dlc_output_pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file)
         reconstruct3d_parent = parent_directories['reconstruct3d_parent']
         reconstruction3d_fname = navigation_utilities.create_3d_reconstruction_pickle_name(
@@ -461,7 +460,7 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
         # overlay_pts_in_cropped_img(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist,
         #                            parent_directories, reprojected_pts=None, vid_type='.avi', plot_undistorted=False)
 
-    draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=True, plot_undistorted=True)
+    draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
     #
     plt.show()
 

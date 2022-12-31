@@ -810,7 +810,7 @@ def show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undisto
             img.append(cb_img)
             ax_idx = cam_num[cal_idx] - 1
 
-            plot_utilities.draw_epipolar_lines(cb_img, cal_data, cam_num[cal_idx], other_cbpoints, [], use_ffm=True, markertype=['o', '+'], ax=axs[0][ax_idx])
+            plot_utilities.draw_epipolar_lines(cb_img, cal_data, cam_num[cal_idx], other_cbpoints, [], use_ffm=False, markertype=['o', '+'], ax=axs[0][ax_idx])
 
         world_points, reprojected_pts = cvb.triangulate_points(cb_pts, cal_data)
         for ax_idx in range(2):

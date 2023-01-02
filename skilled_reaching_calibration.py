@@ -1,4 +1,5 @@
 import navigation_utilities
+import skilled_reaching_calibration
 import skilled_reaching_io
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
@@ -602,13 +603,14 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10), checker
     calvid_metadata = [navigation_utilities.parse_Burgess_calibration_vid_name(vid) for vid in vid_pair]
     cal_data_name = navigation_utilities.create_optitrack_calibration_data_name(cal_data_parent,
                                                                                 calvid_metadata[0]['session_datetime'])
-    if os.path.isfile(cal_data_name):
-        # if file already exists, assume cb points have already been collected
-        return
+    # if os.path.isfile(cal_data_name):
+    #     # if file already exists, assume cb points have already been collected
+    #     return
 
         # camera calibrations have been performed, now need to do stereo calibration
 
     criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+    cb_search_window = (5, 5)
     # CBOARD_FLAGS = cv2.CALIB_CB_ADAPTIVE_THRESH + cv2.CALIB_CB_NORMALIZE_IMAGE + cv2.CALIB_CB_FILTER_QUADS
 
     # create video objects for each calibration_video
@@ -665,15 +667,15 @@ def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10), checker
                 valid_frames[i_vid][i_frame] = found_valid_chessboard
 
                 if found_valid_chessboard:
-                    corners2[i_vid] = cv2.cornerSubPix(cur_img_gray, corners, (11, 11), (-1, -1), criteria)
+                    corners2[i_vid] = cv2.cornerSubPix(cur_img_gray, corners, cb_search_window, (-1, -1), criteria)
                     cam_objpoints[i_vid].append(objp)
                     cam_imgpoints[i_vid].append(corners2[i_vid])
 
-                    corners_img = cv2.drawChessboardCorners(cur_img_gray, cb_size, corners2[i_vid],
+                    corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners2[i_vid],
                                                             found_valid_chessboard)
 
                 else:
-                    corners_img = cv2.drawChessboardCorners(cur_img_gray, cb_size, corners,
+                    corners_img = cv2.drawChessboardCorners(cur_img[i_vid], cb_size, corners,
                                                             found_valid_chessboard)
                 # vid_path, vid_name = os.path.split(calibration_vids[i_vid])
                 # vid_name, _ = os.path.splitext(vid_name)
@@ -760,6 +762,9 @@ def show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undisto
     cal_vid_metadata = [navigation_utilities.parse_Burgess_calibration_vid_name(cal_vid) for cal_vid in cal_videos]
     cam_num = [cal_vid_md['cam_num'] for cal_vid_md in cal_vid_metadata]
     stereo_imgpoints = cal_data['stereo_imgpoints']
+
+    # E_from_norm, msk_norm = skilled_reaching_calibration.recalculate_E_from_stereo_matches(cal_data)
+
     for frame_num in cal_data['frames_for_stereo_calibration']:
 
         fig, axs = create_cal_frame_figure(w, h, ax3d=[(1, 0)], scale=1.0, dpi=200, nrows=2, ncols=2, wspace=0.05, hspace=0.01, lmargin=0.01, rmargin=0.95, botmargin=0.01, topmargin=0.95)
@@ -811,6 +816,9 @@ def show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undisto
             ax_idx = cam_num[cal_idx] - 1
 
             plot_utilities.draw_epipolar_lines(cb_img, cal_data, cam_num[cal_idx], other_cbpoints, [], use_ffm=False, markertype=['o', '+'], ax=axs[0][ax_idx])
+            F_array = np.stack((cal_data['F'], cal_data['F_ffm'], F_from_norm), axis=0)
+            plot_utilities.compare_epipolar_lines(cb_img, cal_data, cam_num[cal_idx], other_cbpoints, [], F_array,
+                                               markertype=['o', '+'], ax=axs[0][ax_idx])
 
         world_points, reprojected_pts = cvb.triangulate_points(cb_pts, cal_data)
         for ax_idx in range(2):
@@ -909,6 +917,7 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     for i_vid, vid_name in enumerate(vid_pair):
         vid_obj.append(cv2.VideoCapture(vid_name))
 
+    FFM_tolerance = 0.1
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO
     STEREO_FLAGS = cv2.CALIB_FIX_INTRINSIC + cv2.CALIB_FIX_PRINCIPAL_POINT
     # initialize camera intrinsics to have an aspect ratio of 1 and assume the center of the 1280 x 1024 field is [639.5, 511.5]
@@ -1010,7 +1019,7 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
         # TROUBLESHOOTING
         # try recalculating using findFundamentalMat
         imgpts_reshaped = [np.reshape(im_pts, (-1, 2)) for im_pts in imgpoints]
-        F_ffm, ffm_mask = cv2.findFundamentalMat(imgpts_reshaped[0], imgpts_reshaped[1], cv2.FM_RANSAC, 3, 0.99)
+        F_ffm, ffm_mask = cv2.findFundamentalMat(imgpts_reshaped[0], imgpts_reshaped[1], cv2.FM_RANSAC, FFM_tolerance, 0.99)
     else:
         ret = False
         mtx1 = np.zeros((3, 3))
@@ -1320,3 +1329,33 @@ def extract_valid_cbs_by_frame(calibration_data):
         # plt.imshow(corners_img)
         # plt.show()
         pass
+
+
+def recalculate_E_and_F_from_stereo_matches(cal_data):
+
+    # THIS APPEARS TO BE UNNECESSARY BECAUSE THE OPENCV ALGORITHM ALREADY NORMALIZES POINTS BEFORE COMPUTING FUNDAMENTAL MATRIX
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+    stereo_im_pts = cal_data['stereo_imgpoints']
+
+    cam_mtx = np.identity(3)
+    stereo_norm = []
+    stereo_ud = []
+    for i_cam in range(2):
+        pts = np.array(stereo_im_pts[i_cam])
+        pts_r = np.reshape(pts, (-1, 2))
+        pts_ud = cv2.undistortPoints(pts_r, mtx[i_cam], dist[i_cam])
+        pts_un = cvb.unnormalize_points(pts_ud, mtx[i_cam])
+        stereo_norm.append(pts_un)
+        stereo_ud.append(pts_ud)
+
+    E_new, E_msk = cv2.findEssentialMat(stereo_norm[0], stereo_norm[1], cam_mtx, cv2.RANSAC, 0.99, 0.1)
+
+    F_new, F_msk = cv2.findFundamentalMat(stereo_ud[0], stereo_ud[1], cv2.FM_RANSAC, 0.1, 0.99)
+    E_new, E_msk = cv2.findEssentialMat(stereo_ud[0], stereo_ud[1], cal_data['mtx'][0], None,
+                                         cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.99, 1)
+
+    F_from_E = np.linalg.inv(mtx[1].T) @ E_new @ np.linalg.inv(mtx[0])
+    E_from_F = mtx[1].T @ F_new @ mtx[0]
+
+    return E_new, E_msk, F_new, F_msk, F_from_E, E_from_F

@@ -126,30 +126,95 @@ def draw_epipolar_lines(img, cal_data, cam_num, pts, reproj_pts, use_ffm=True, m
     #     draw_epipolar_lines_on_img(pt_ud, i_cam+1, cal_data['F'], im_size, bodyparts, axs[0][1-i_cam])
 
 
+def compare_epipolar_lines(img, cal_data, cam_num, pts, reproj_pts, F_array, markertype=['o', '+'], ax=None, lwidth=0.5, plot_colors=('b','r','g')):
 
-def draw_cb_epipolar_lines(img_pts, whichImage, F, im_size, ax, cb_size, lwidth=0.5):
+    cam_idx = cam_num - 1
 
-    epilines = cv2.computeCorrespondEpilines(img_pts, whichImage, F)
+    if ax is None:
+        if len(plt.get_fignums()) == 0:
+            # no figures exist
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        else:
+            ax = plt.gca()
 
-    # copying color map from opencv drawchessboardcorners (github.com/opencv/opencv/blob/master/modules/calib3d/src/calibinit.cpp#L2156
-    line_colors = [[0., 0., 1.],
-                [0., 128. / 255., 1.],
-                [0., 200. / 255., 200. / 255.],
-                [0., 1., 0],
-                [200. / 255., 200. / 255., 0.],
-                [1., 0., 0.],
-                [1., 0., 1.]]
+    dotsize = 3
+    reproj_pts = np.squeeze(reproj_pts)
+    pts = np.squeeze(pts)
 
-    for i_line, epiline in enumerate(epilines):
+    if img.ndim == 2:
+        h, w = np.shape(img)
+    elif img.ndim == 3:
+        h, w, _ = np.shape(img)
 
-        # todo: figure out how to match colors to checkerboard points
-        epiline = np.squeeze(epiline)
-        edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
+    im_size = (w, h)
 
-        if not np.all(edge_pts==0):
-            col_idx = int(i_line / 7.) % 7
+    mtx = cal_data['mtx'][cam_idx]
+    dist = cal_data['dist'][cam_idx]
 
-            try:
-                ax.plot(edge_pts[:, 0], edge_pts[:, 1], color=line_colors[col_idx], ls='-', marker='.', lw=lwidth)
-            except:
-                pass
+    whichImage = 3 - cam_num
+
+    img_ud = cv2.undistort(img, mtx, dist)
+    ax.imshow(img_ud)
+
+    pts_ud_norm = cv2.undistortPoints(pts, mtx, dist)
+    pts_ud_norm = np.squeeze(pts_ud_norm)
+    pts_ud = cvb.unnormalize_points(pts_ud_norm, mtx)
+
+    draw_cb_epipolar_lines(pts_ud, whichImage, F_array, im_size, ax, cal_data['cb_size'], lwidth=lwidth)
+
+    return ax
+
+
+def draw_cb_epipolar_lines(img_pts, whichImage, F, im_size, ax, cb_size, lwidth=0.5, col_list=('b','r','g')):
+
+    if np.ndim(F) == 2:
+        # provided just one fundamental matrix
+        epilines = cv2.computeCorrespondEpilines(img_pts, whichImage, F)
+
+        # copying color map from opencv drawchessboardcorners (github.com/opencv/opencv/blob/master/modules/calib3d/src/calibinit.cpp#L2156
+        line_colors = [[0., 0., 1.],
+                    [0., 128. / 255., 1.],
+                    [0., 200. / 255., 200. / 255.],
+                    [0., 1., 0],
+                    [200. / 255., 200. / 255., 0.],
+                    [1., 0., 0.],
+                    [1., 0., 1.]]
+
+        for i_line, epiline in enumerate(epilines):
+
+            # todo: figure out how to match colors to checkerboard points
+            epiline = np.squeeze(epiline)
+            edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
+
+            if not np.all(edge_pts==0):
+                col_idx = int(i_line / 7.) % 7
+
+                try:
+                    ax.plot(edge_pts[:, 0], edge_pts[:, 1], color=line_colors[col_idx], ls='-', marker='.', lw=lwidth)
+                except:
+                    pass
+
+    else:
+        # provided more than one fundamental matrix
+        num_F = np.shape(F)[2]
+        for i_F in range(num_F):
+            epilines = cv2.computeCorrespondEpilines(img_pts, whichImage, F[i_F, :, :])
+
+            # copying color map from opencv drawchessboardcorners (github.com/opencv/opencv/blob/master/modules/calib3d/src/calibinit.cpp#L2156
+            line_colors = [col_list[i_F]]
+
+            for i_line, epiline in enumerate(epilines):
+
+                # todo: figure out how to match colors to checkerboard points
+                epiline = np.squeeze(epiline)
+                edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
+
+                if not np.all(edge_pts == 0):
+                    col_idx = 0
+
+                    try:
+                        ax.plot(edge_pts[:, 0], edge_pts[:, 1], color=line_colors[col_idx], ls='-', marker='.',
+                                lw=lwidth)
+                    except:
+                        pass

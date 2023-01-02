@@ -445,6 +445,8 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
             rvec, _ = cv2.Rodrigues(cal_data['R'])
             tvec = cal_data['T']
 
+            # estimate projection matrices based on new F and E
+
         ppts, _ = cv2.projectPoints(worldpoints, rvec, tvec, mtx, dist)
         ppts = np.squeeze(ppts)
         projected_pts.append(ppts)
@@ -1014,15 +1016,35 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
                 to_plot = points_in_img
         if use_ffm:
             F = cal_data['F_ffm']
+            linestyle = '--'
         else:
             F = cal_data['F']
-        draw_epipolar_lines_on_img(to_plot, 1+i_cam, F, im_size, bodyparts, axs[0][1-i_cam])
+            linestyle = '-'
+        draw_epipolar_lines_on_img(to_plot, 1+i_cam, cal_data['F'], im_size, bodyparts, axs[0][1-i_cam], linestyle='-')
 
-    # plt.show()
+        imgpts_ud = [cal_data['stereo_imgpoints_ud'][i_cam] for i_cam in range(2)]
+
+        # try recalculating using findFundamentalMat
+        # mtx = cal_data['mtx']
+        # imgpts_reshaped = [np.reshape(im_pts, (-1, 2)) for im_pts in imgpts_ud]
+        # F_new, ffm_mask = cv2.findFundamentalMat(imgpts_reshaped[0], imgpts_reshaped[1], cv2.FM_RANSAC, 0.1, 0.99)
+        # dist = np.array([0.,0.,0.,0.,0.])
+        # E_new, E_mask = cv2.findEssentialMat(imgpts_reshaped[0], imgpts_reshaped[1], cal_data['mtx'][0], dist, cal_data['mtx'][1], dist, cv2.FM_RANSAC, 0.99, 1)
+        #
+        # F_from_E = np.linalg.inv(mtx[1].T) @ E_new @ np.linalg.inv(mtx[0])
+        # E_from_F = mtx[1].T @ F_new @ mtx[0]
+
+        E_new, E_msk, F_new, F_msk, F_from_E, E_from_F = skilled_reaching_calibration.recalculate_E_and_F_from_stereo_matches(cal_data)
+
+        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, F_new, im_size, bodyparts, axs[0][1 - i_cam], linestyle='--')
+
+        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, F_from_E, im_size, bodyparts, axs[0][1 - i_cam], linestyle='dotted')
+
+    plt.show()
     pass
 
 
-def draw_epipolar_lines_on_img(img_pts, whichImage, F, im_size, bodyparts, ax, lwidth=0.5):
+def draw_epipolar_lines_on_img(img_pts, whichImage, F, im_size, bodyparts, ax, lwidth=0.5, linestyle='-'):
 
     epilines = cv2.computeCorrespondEpilines(img_pts, whichImage, F)
 
@@ -1033,7 +1055,7 @@ def draw_epipolar_lines_on_img(img_pts, whichImage, F, im_size, bodyparts, ax, l
         edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
 
         if not np.all(edge_pts == 0):
-            ax.plot(edge_pts[:, 0], edge_pts[:, 1], color=bp_color, ls='-', marker='.', lw=lwidth)
+            ax.plot(edge_pts[:, 0], edge_pts[:, 1], color=bp_color, ls=linestyle, marker='.', lw=lwidth)
 
 
 def overlay_pts(pickle_metadata, current_coords, dlc_metadata, i_frame, rotate_img=False):

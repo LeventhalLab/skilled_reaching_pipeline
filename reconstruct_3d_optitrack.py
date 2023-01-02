@@ -277,12 +277,22 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     projMatr1 = np.eye(3, 4)
     projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
 
+    E, F, R, T = skilled_reaching_calibration.recalculate_E_and_F_from_stereo_matches(cal_data)
+
+    F_projMatr2 = np.hstack((R['R_F'], T['t_F']))
+
     # comment back in to test if frame_pts_ud look correct
     # plot_projpoints(frame_pts_ud, dlc_metadata[0])
 
     points4D = cv2.triangulatePoints(projMatr1, projMatr2, frame_pts_ud[0], frame_pts_ud[1])
+    points4D_newF = cv2.triangulatePoints(projMatr1, F_projMatr2, frame_pts_ud[0], frame_pts_ud[1])
     worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
+    worldpoints_newF = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_newF.T))
 
+    cal_data['F_new'] = F['F_new']
+    new_cal_data = cal_data.copy()
+    new_cal_data['R'] = R['R_F']
+    new_cal_data['T'] = T['t_F']
     # alternative calculation of worldpoints using non-opencv triangulation algorithm
     # points4D_new, _ = cvb.linear_LS_triangulation(projPoints[0], projMatr1, projPoints[1], projMatr2)
     # points4D = cv2.triangulatePoints(projMatr1, projMatr2, frame_pts[0], frame_pts[1])
@@ -292,8 +302,9 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     frame_pts_ud_unnorm = np.zeros(np.shape(frame_pts))
     for i_cam in range(num_cams):
         frame_pts_ud_unnorm[i_cam, :, :] = cvb.unnormalize_points(np.squeeze(frame_pts_ud[i_cam]), mtx[i_cam])
-    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories)
-
+    # reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories)
+    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints_newF, frame_pts, new_cal_data, dlc_metadata,
+                                                           pickle_metadata, frame_num, parent_directories)
     #todo: check reprojected points and reproj_errors, look for mislabeled points
     #also, consider looking across frames for jumps, and checking the dlc confidence values. Finally, need to check if
     #pellet labels swapped between frames
@@ -431,26 +442,15 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
 
     #3d plot of worldpoints if needed to check triangulation
     # plot_worldpoints(worldpoints, dlc_metadata[0], pickle_metadata[0], frame_num, parent_directories=parent_directories)
-    projected_pts = []
+
     pts_per_frame = np.shape(frame_pts)[1]
     reproj_errors = np.zeros((pts_per_frame, num_cams))
+    dist = [np.zeros((1,5)) for ii in range(2)]
+    dist = np.squeeze(dist)
+    projected_pts = reproject_points(worldpoints, cal_data['R'], cal_data['T'], cal_data['mtx'], dist)
+
     for i_cam in range(num_cams):
-        mtx = cal_data['mtx'][i_cam]
-        # dist = cal_data['dist'][i_cam]
-        dist = np.zeros(5)    # using the points that already have been undistorted against which to compare the reprojections
-        if i_cam == 0:
-            rvec = np.zeros((3, 1))
-            tvec = np.zeros((3, 1))
-        else:
-            rvec, _ = cv2.Rodrigues(cal_data['R'])
-            tvec = cal_data['T']
-
-            # estimate projection matrices based on new F and E
-
-        ppts, _ = cv2.projectPoints(worldpoints, rvec, tvec, mtx, dist)
-        ppts = np.squeeze(ppts)
-        projected_pts.append(ppts)
-        reproj_errors[:, i_cam] = calculate_reprojection_errors(ppts, frame_pts[i_cam, :, :])
+        reproj_errors[:, i_cam] = calculate_reprojection_errors(projected_pts[i_cam], frame_pts[i_cam, :, :])
 
         # overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, parent_directories, reprojected_pts=projected_pts[i_cam],
         #                           rotate_img=pickle_metadata[i_cam]['isrotated'], plot_undistorted=True)
@@ -468,6 +468,28 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
 
     return projected_pts, reproj_errors
 
+
+def reproject_points(worldpoints, R, T, mtx, dist):
+    projected_pts = []
+
+    num_cams = np.shape(mtx)[0]
+
+    for i_cam in range(num_cams):
+        cur_mtx = mtx[i_cam]
+        dist = dist[i_cam]
+
+        if i_cam == 0:
+            rvec = np.zeros((3, 1))
+            tvec = np.zeros((3, 1))
+        else:
+            rvec, _ = cv2.Rodrigues(R)
+            tvec = T
+
+        ppts, _ = cv2.projectPoints(worldpoints, rvec, tvec, cur_mtx, dist)
+        ppts = np.squeeze(ppts)
+        projected_pts.append(ppts)
+
+    return projected_pts
 
 def calculate_reprojection_errors(reprojected_pts, measured_pts):
 
@@ -1034,11 +1056,9 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
         # F_from_E = np.linalg.inv(mtx[1].T) @ E_new @ np.linalg.inv(mtx[0])
         # E_from_F = mtx[1].T @ F_new @ mtx[0]
 
-        E_new, E_msk, F_new, F_msk, F_from_E, E_from_F = skilled_reaching_calibration.recalculate_E_and_F_from_stereo_matches(cal_data)
+        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F_new'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='--')
 
-        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, F_new, im_size, bodyparts, axs[0][1 - i_cam], linestyle='--')
-
-        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, F_from_E, im_size, bodyparts, axs[0][1 - i_cam], linestyle='dotted')
+        # draw_epipolar_lines_on_img(to_plot, 1 + i_cam, F_from_E, im_size, bodyparts, axs[0][1 - i_cam], linestyle='dotted')
 
     plt.show()
     pass
@@ -1546,4 +1566,17 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
     # rightmirror_crop = (1650, 2039, 400, 800)
 
     sr_visualization.animate_optitrack_vids_plus3d(r3d_data, cropped_videos)
+    pass
+
+
+def projection_from_E(E, cal_data):
+
+    R1, R2, t = cv2.decomposeEssentialMat(E)
+
+    return R1, R2, t
+
+
+
+def projection_from_F(F, mtx):
+
     pass

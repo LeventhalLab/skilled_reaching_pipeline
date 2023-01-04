@@ -1014,8 +1014,7 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     if all([ims == im_size[0] for ims in im_size]) and num_frames_to_use >= min_frames_for_stereo:
         # all images have the same size
         print('working on stereo calibration for {}'.format(session_date_string))
-        im_size = im_size[0]
-        ret, mtx1, dist1, mtx2, dist2, R, T, E, F = cv2.stereoCalibrate(objpoints, imgpoints[0], imgpoints[1], mtx[0], dist[0], mtx[1], dist[1], im_size, flags=STEREO_FLAGS)
+        ret, mtx1, dist1, mtx2, dist2, R, T, E, F = cv2.stereoCalibrate(objpoints, imgpoints[0], imgpoints[1], mtx[0], dist[0], mtx[1], dist[1], im_size[0], flags=STEREO_FLAGS)
         # hold on to above line for comparison, but may be able to eliminate it if findfundamentalmat works better
 
         # try recalculating using findFundamentalMat
@@ -1026,18 +1025,19 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
         # convert to normalized coordinates for pose recovery
         stereo_ud = []
         for i_cam in range(2):
-            pts = np.array(stereo_im_pts[i_cam])
+            pts = np.array(cal_data['stereo_imgpoints'][i_cam])
             pts_r = np.reshape(pts, (-1, 2))
             pts_ud = cv2.undistortPoints(pts_r, mtx[i_cam], cal_data['dist'][i_cam])
             stereo_ud.append(pts_ud)
-        _, R_ffm, T_ffm, msk = cv2.recoverPose(E_ffm, stereo_ud[0], stereo_ud[1], np.identity(3))
+        _, R_ffm, T_unit_ffm, msk = cv2.recoverPose(E_ffm, stereo_ud[0], stereo_ud[1], np.identity(3))
+        T_ffm = estimate_T_from_ffm(stereo_objpoints, stereo_imgpoints_ud, mtx, im_size, R_ffm)
         # todo: consider using ffm_mask to identify inliers for redoing camera calibration and repeating...
     else:
         ret = False
-        mtx1 = np.zeros((3, 3))
-        mtx2 = np.zeros((3, 3))
-        dist1 = np.zeros((1, 5))
-        dist2 = np.zeros((1, 5))
+        # mtx1 = np.zeros((3, 3))
+        # mtx2 = np.zeros((3, 3))
+        # dist1 = np.zeros((1, 5))
+        # dist2 = np.zeros((1, 5))
         R = np.zeros((3, 3))
         T = np.zeros((3, 1))
         E = np.zeros((3, 3))
@@ -1063,7 +1063,8 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     #     stereo_objpoints.append(objp)
     #     for i_vid, corner_pts in enumerate(corners2):
     #         stereo_imgpoints[i_vid].append(corner_pts)
-
+    # if num_frames_to_use >= min_frames_for_stereo:
+    #     check_Rs(cal_data)
     skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
 
     # check if calibration worked
@@ -1298,6 +1299,92 @@ def camera_calibration_from_mirror_vids(calibration_data, calibration_summary_na
     skilled_reaching_io.write_pickle(calibration_summary_name, calibration_data)
 
     return calibration_data
+
+
+def estimate_T_from_ffm(objpoints, stereo_imgpoints_ud, mtx, im_size, R_ffm):
+    CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_USE_INTRINSIC_GUESS
+    num_cams = np.shape(mtx)[0]
+    pts_per_frame = np.shape(stereo_imgpoints_ud)[2]
+    num_frames = np.shape(stereo_imgpoints_ud)[1]
+    dist = np.zeros((1,5))
+
+    rv = []
+    tv = []
+    for i_cam in range(num_cams):
+        ret, new_mtx, new_dist, rvecs, tvecs = cv2.calibrateCamera(objpoints,
+                                                                   stereo_imgpoints_ud[i_cam],
+                                                                   im_size[i_cam],
+                                                                   mtx[i_cam],
+                                                                   None,
+                                                                   flags=CALIBRATION_FLAGS)
+
+        rv.append(np.squeeze(np.array(rvecs)))
+        tv.append(np.squeeze(np.array(tvecs)))
+
+    # compute T as T2 - R @ T1, where T1 are the translation vectors for each checkerboard for camera 1, and T2 are the
+    # translation vectors for camera 2 for each checkerboard. See opencv stereoCalibrate documntation
+    T1 = tv[0].T
+    T2 = tv[1].T
+
+    T_for_each_frame = T2 - R_ffm @ T1
+
+    T_ffm = np.median(T_for_each_frame, 1)
+
+    return T_ffm
+
+
+def check_Rs(cal_data):
+    CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_USE_INTRINSIC_GUESS
+    stereo_imgpoints = cal_data['stereo_imgpoints']
+    objpoints = cal_data['stereo_objpoints']
+
+    pts_per_frame = np.shape(stereo_imgpoints)[2]
+    num_frames = np.shape(stereo_imgpoints[0])[0]
+
+    rv = []
+    tv = []
+    for i_cam in range(2):
+
+        im_pts_un = []
+        for i_frame in range(num_frames):
+
+            im_pts_ud = cv2.undistortPoints(stereo_imgpoints[i_cam][i_frame], cal_data['mtx'][i_cam], cal_data['dist'][i_cam])
+            un_pts = np.float32(cvb.unnormalize_points(im_pts_ud, cal_data['mtx'][i_cam]))
+            im_pts_un.append(np.reshape(un_pts, (pts_per_frame, 1, 2)))
+        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints,
+                                                       im_pts_un,
+                                                       cal_data['im_size'][i_cam],
+                                                       cal_data['mtx'][i_cam],
+                                                       None,
+                                                       flags=CALIBRATION_FLAGS)
+        rv.append(np.squeeze(np.array(rvecs)))
+        tv.append(np.squeeze(np.array(tvecs)))
+
+    # R2est = []
+    # R2_ffmest = []
+    T_est = np.zeros((num_frames, 3))
+    T_ffmest = np.zeros((num_frames, 3))
+    for i_frame in range(num_frames):
+
+        R1, _ = cv2.Rodrigues(np.squeeze(rv[0][i_frame]))
+        R2, _ = cv2.Rodrigues(np.squeeze(rv[1][i_frame]))
+        R2est = cal_data['R'] @ R1
+        R2_ffmest = cal_data['R_ffm'] @ R1
+
+        T1 = np.squeeze(tv[0][i_frame])
+        T2 = np.squeeze(tv[1][i_frame])
+        T2est = cal_data['R'] @ T1
+        T2_ffmest = cal_data['R_ffm'] @ T1
+        T = cal_data['T']
+
+        T_est_frame = np.squeeze(T2) - cal_data['R'] @ T1
+        T_ffmest_frame = np.squeeze(T2) - cal_data['R_ffm'] @ T1
+
+        T_est[i_frame, :] = T_est_frame
+        T_ffmest[i_frame, :] = T_ffmest_frame
+
+        pass
+    pass
 
 
 def match_cb_points(cb1, cb2):

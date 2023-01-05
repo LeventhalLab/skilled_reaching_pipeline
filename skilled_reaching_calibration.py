@@ -924,23 +924,24 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     init_mtx = np.array([[1100, 0, 639.5],[0, 1100, 511.5],[0, 0, 1]])
     cal_data = skilled_reaching_io.read_pickle(calibration_data_name)
 
-    # get intrinsics and distortion for each camera
     num_cams = len(cal_data['cam_objpoints'])
-    cal_data['mtx'] = []
-    cal_data['dist'] = []
-    cal_data['frame_nums_for_intrinsics'] = []
+    if 'mtx' not in cal_data.keys():
+        # if there isn't already an intrinsic calibration, initialize lists for camera intrinsic matrices (mtx),
+        # distortion coefficients, and number of frames used to calculate intrinsics
+        cal_data['mtx'] = []
+        cal_data['dist'] = []
+        cal_data['frame_nums_for_intrinsics'] = []
     for i_cam in range(num_cams):
-
         current_cam = cal_data['calvid_metadata'][i_cam]['cam_num']
 
         session_date_string = navigation_utilities.datetime_to_string_for_fname(
             cal_data['calvid_metadata'][i_cam]['session_datetime'])
-        # if 'mtx' in cal_data.keys():
-        #     # if intrinsics have already been calculated for this camera, skip
-        #     if i_cam >= len(cal_data['mtx']):
-        #         # this camera number is larger than the number of cameras for which intrinsics have been stored
-        #         print('intrinsics already calculated for {}, camera {:02d}'.format(session_date_string, current_cam))
-        #         continue
+        # if intrinsics have already been calculated for this camera, skip
+        if i_cam < len(cal_data['mtx']):
+            # this camera number is smaller than the number of cameras for which intrinsics have been stored
+            # since this one has already been calculated, skip
+            print('intrinsics already calculated for {}, camera {:02d}'.format(session_date_string, current_cam))
+            continue
 
         print('working on {}, camera {:02d} intrinsics calibration'.format(session_date_string, current_cam))
 
@@ -992,7 +993,6 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     # now perform stereo calibration
     # num_frames_for_stereo = 20, min_frames_for_stereo = 5
     stereo_objpoints = cal_data['stereo_objpoints']
-
     stereo_imgpoints_ud = undistort_stereo_cbcorners(cal_data['stereo_imgpoints'], cal_data)
     cal_data['stereo_imgpoints_ud'] = stereo_imgpoints_ud
     cal_data['use_undistorted_pts_for_stereo_cal'] = use_undistorted_pts_for_stereo_cal
@@ -1089,7 +1089,6 @@ def undistort_stereo_cbcorners(stereo_imgpoints, cal_data):
 
     stereo_imgpoints_ud = [[] for i_cam in range(num_cams)]
     np.zeros(np.shape(stereo_imgpoints))   # make sure data type is consistent
-
 
     for i_cam in range(num_cams):
 

@@ -547,7 +547,7 @@ def multi_mirror_calibration(calibration_data, calibration_summary_name):
     pass
 
 
-def calibrate_all_Burgess_vids(parent_directories, cb_size=(7, 10), checkerboard_square_size=7):
+def calibrate_all_Burgess_vids(parent_directories, cb_size=(7, 10), checkerboard_square_size=7.):
     '''
     perform calibration for all checkerboard videos stored in appropriate directory structure under cal_vid_parent.
     Write results into directory structure under cal_vid_data
@@ -587,7 +587,7 @@ def calibrate_all_Burgess_vids(parent_directories, cb_size=(7, 10), checkerboard
         calibrate_Burgess_session(cal_data_name, sorted_vid_pair)
 
 
-def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10), checkerboard_square_size=7):
+def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10), checkerboard_square_size=7.):
     '''
 
     :param vid_pair:
@@ -1017,7 +1017,7 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     if all([ims == im_size[0] for ims in im_size]) and num_frames_to_use >= min_frames_for_stereo:
         # all images have the same size
         print('working on stereo calibration for {}'.format(session_date_string))
-        ret, mtx1, dist1, mtx2, dist2, R, T, E, F = cv2.stereoCalibrate(objpoints, imgpoints[0], imgpoints[1], mtx[0], dist[0], mtx[1], dist[1], im_size[0], flags=STEREO_FLAGS)
+        # ret, mtx1, dist1, mtx2, dist2, R, T, E, F = cv2.stereoCalibrate(objpoints, imgpoints[0], imgpoints[1], mtx[0], dist[0], mtx[1], dist[1], im_size[0], flags=STEREO_FLAGS)
         # hold on to above line for comparison, but may be able to eliminate it if findfundamentalmat works better
 
         # try recalculating using findFundamentalMat
@@ -1025,8 +1025,10 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
         # imgpts_reshaped = [np.reshape(im_pts, (-1, 2)) for im_pts in imgpoints]
         # F_ffm, ffm_mask = cv2.findFundamentalMat(imgpts_reshaped[0], imgpts_reshaped[1], cv2.FM_RANSAC, FFM_tolerance,
         #                                          0.999)
-        F_ffm, ffm_mask = cv2.findFundamentalMat(all_imgpts_reshaped[0], all_imgpts_reshaped[1], cv2.FM_RANSAC, FFM_tolerance, 0.999)
-        E_ffm = mtx[1].T @ F_ffm @ mtx[0]
+        # F_ffm, ffm_mask = cv2.findFundamentalMat(all_imgpts_reshaped[0], all_imgpts_reshaped[1], cv2.FM_RANSAC, FFM_tolerance, 0.999)
+        E, E_mask = cv2.findEssentialMat(all_imgpts_reshaped[0], all_imgpts_reshaped[1], cal_data['mtx'][0], None, cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
+        # E_ffm = mtx[1].T @ F_ffm @ mtx[0]
+        F = np.linalg.inv(cal_data['mtx'][1].T) @ E @ np.linalg.inv(cal_data['mtx'][0])
 
         # convert to normalized coordinates for pose recovery
         stereo_ud = []
@@ -1038,8 +1040,8 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
         # select 2000 points at random for cheirality check (using all the points takes a really long time)
         num_pts = np.shape(pts_ud)[0]
         pt_idx = np.random.randint(0, num_pts, 2000)
-        _, R_ffm, T_unit_ffm, msk = cv2.recoverPose(E_ffm, stereo_ud[0][pt_idx,:,:], stereo_ud[1][pt_idx,:,:], np.identity(3))
-        T_ffm = estimate_T_from_ffm(stereo_objpoints, stereo_imgpoints_ud, mtx, im_size, R_ffm)
+        _, R, T, ffm_msk = cv2.recoverPose(E, stereo_ud[0][pt_idx,:,:], stereo_ud[1][pt_idx,:,:], np.identity(3))
+        # T_ffm = estimate_T_from_ffm(stereo_objpoints, stereo_imgpoints_ud, mtx, im_size, R_ffm)
         # todo: consider using ffm_mask to identify inliers for redoing camera calibration and repeating...
     else:
         ret = False
@@ -1051,21 +1053,21 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
         T = np.zeros((3, 1))
         E = np.zeros((3, 3))
         F = np.zeros((3, 3))
-        F_ffm = np.zeros((3, 3))
-        E_ffm = np.zeros((3, 3))
-        R_ffm = np.zeros((3, 3))
-        T_ffm = np.zeros((3, 1))
-        ffm_mask = None
+        # F_ffm = np.zeros((3, 3))
+        # E_ffm = np.zeros((3, 3))
+        # R_ffm = np.zeros((3, 3))
+        # T_ffm = np.zeros((3, 1))
+        # ffm_mask = None
 
     cal_data['R'] = R
     cal_data['T'] = T
     cal_data['E'] = E
     cal_data['F'] = F
-    cal_data['F_ffm'] = F_ffm
-    cal_data['E_ffm'] = E_ffm
-    cal_data['ffm_mask'] = ffm_mask
-    cal_data['R_ffm'] = R_ffm
-    cal_data['T_ffm'] = T_ffm
+    # cal_data['F_ffm'] = F_ffm
+    # cal_data['E_ffm'] = E_ffm
+    # cal_data['ffm_mask'] = ffm_mask
+    # cal_data['R_ffm'] = R_ffm
+    # cal_data['T_ffm'] = T_ffm
     cal_data['frames_for_stereo_calibration'] = frames_for_stereo_calibration   # frame numbers in original calibration video used for the stereo calibration
     # if valid_frames[0][i_frame] and valid_frames[1][i_frame]:
     #     # checkerboards were identified in matching frames
@@ -1477,8 +1479,8 @@ def recalculate_E_and_F_from_stereo_matches(cal_data):
     F_from_E = np.linalg.inv(mtx[1].T) @ E_new @ np.linalg.inv(mtx[0])
     E_from_F = mtx[1].T @ F_new @ mtx[0]
 
-    _, R_E, t_E, E_msk = cv2.recoverPose(E_new, stereo_ud[0], stereo_ud[1], np.identity(3))
-    _, R_F, t_F, F_msk = cv2.recoverPose(E_from_F, stereo_ud[0], stereo_ud[1], np.identity(3))
+    _, R_E, t_E, E_msk = cv2.recoverPose(E_new, stereo_unnorm[0], stereo_unnorm[1], np.identity(3))
+    _, R_F, t_F, F_msk = cv2.recoverPose(E_from_F, stereo_unnorm[0], stereo_unnorm[1], np.identity(3))
 
     E = {
         'E_from_F': E_from_F,

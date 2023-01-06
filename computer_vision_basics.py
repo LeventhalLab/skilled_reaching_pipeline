@@ -67,6 +67,24 @@ def normalize_points(points2d, mtx):
     return norm_pts
 
 
+def P_from_RT(R, T):
+    # create camera projection matrix from rotation vector or matrix and translation vector
+
+    # if R only has one dimension or is 3 x 1, convert vector to matrix using cv2.Rodrigues
+    if np.ndim(R) == 1 or (1 in np.shape(R)):
+        # R is a vector
+        Rmat, _ = cv2.Rodrigues(R)
+    else:
+        Rmat = R
+
+    if np.ndim(T) == 1:
+        # T needs to be 3 x 1 for the horizontal concatenation to work
+        T = np.reshape(T, (3,1))
+
+    P = np.hstack((R, T))
+
+    return P
+
 # from Multiple-Quadrotor-SLAM/Work/python_libs/triangulation.py /:
 def linear_eigen_triangulation(u1, P1, u2, P2, max_coordinate_value=1.e16):
     """

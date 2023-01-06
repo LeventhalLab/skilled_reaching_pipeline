@@ -279,20 +279,22 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
 
     E, F, R, T = skilled_reaching_calibration.recalculate_E_and_F_from_stereo_matches(cal_data)
 
-    F_projMatr2 = np.hstack((R['R_F'], T['t_F']))
-
+    # F_projMatr2 = cvb.P_from_RT(cal_data['R_ffm'], cal_data['T_ffm'])
+    F_projMatr2 = cvb.P_from_RT(R['R_E'], T['t_E'])
     # comment back in to test if frame_pts_ud look correct
     # plot_projpoints(frame_pts_ud, dlc_metadata[0])
 
     points4D = cv2.triangulatePoints(projMatr1, projMatr2, frame_pts_ud[0], frame_pts_ud[1])
     points4D_newF = cv2.triangulatePoints(projMatr1, F_projMatr2, frame_pts_ud[0], frame_pts_ud[1])
-    worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
+    worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T)) * cal_data['checkerboard_square_size']
     worldpoints_newF = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_newF.T))
 
-    cal_data['F_new'] = F['F_new']
-    new_cal_data = cal_data.copy()
-    new_cal_data['R'] = R['R_F']
-    new_cal_data['T'] = T['t_F']
+    # cal_data['F_new'] = F['F_from_E']
+    # cal_data['R'] = R['R_E']
+    # cal_data['T'] = T['t_E']
+    # new_cal_data = cal_data.copy()
+    # new_cal_data['R'] = R['R_F']
+    # new_cal_data['T'] = T['t_F']
     # alternative calculation of worldpoints using non-opencv triangulation algorithm
     # points4D_new, _ = cvb.linear_LS_triangulation(projPoints[0], projMatr1, projPoints[1], projMatr2)
     # points4D = cv2.triangulatePoints(projMatr1, projMatr2, frame_pts[0], frame_pts[1])
@@ -303,7 +305,7 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     for i_cam in range(num_cams):
         frame_pts_ud_unnorm[i_cam, :, :] = cvb.unnormalize_points(np.squeeze(frame_pts_ud[i_cam]), mtx[i_cam])
     # reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories)
-    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints_newF, frame_pts, new_cal_data, dlc_metadata,
+    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata,
                                                            pickle_metadata, frame_num, parent_directories)
     #todo: check reprojected points and reproj_errors, look for mislabeled points
     #also, consider looking across frames for jumps, and checking the dlc confidence values. Finally, need to check if
@@ -366,7 +368,7 @@ def plot_projpoints(projPoints, dlc_metadata):
 
     pass
 
-def plot_worldpoints(worldpoints, dlc_metadata, pickle_metadata, i_frame, videos_parent='/home/levlab/Public/mouse_SR_videos_to_analyze'):
+def plot_worldpoints(worldpoints, dlc_metadata, pickle_metadata, i_frame, parent_directories):
 
     bodyparts = dlc_metadata['data']['DLC-model-config file']['all_joints_names']
 
@@ -375,20 +377,20 @@ def plot_worldpoints(worldpoints, dlc_metadata, pickle_metadata, i_frame, videos
 
     dotsize = 3
 
-    video_root_folder = os.path.join(videos_parent, 'mouse_SR_videos_tocrop')
-    cropped_videos_parent = os.path.join(videos_parent, 'cropped_mouse_SR_videos')
+    video_root_folder = parent_directories['video_root_folder']
+    cropped_vids_parent = parent_directories['cropped_vids_parent']
 
     month_dir = pickle_metadata['mouseID'] + '_' + pickle_metadata['trialtime'].strftime('%Y%m')
     day_dir = pickle_metadata['mouseID'] + '_' + pickle_metadata['trialtime'].strftime('%Y%m%d')
     orig_vid_folder = os.path.join(video_root_folder, pickle_metadata['mouseID'], month_dir, day_dir)
 
     cam_dir = day_dir + '_' + 'cam{:02d}'.format(pickle_metadata['cam_num'])
-    cropped_vid_folder = os.path.join(cropped_videos_parent, pickle_metadata['mouseID'], month_dir, day_dir)
+    cropped_vid_folder = os.path.join(cropped_vids_parent, pickle_metadata['mouseID'], month_dir, day_dir)
 
     orig_vid_name_base = '_'.join([pickle_metadata['prefix'] + pickle_metadata['mouseID'],
                               pickle_metadata['trialtime'].strftime('%Y%m%d_%H-%M-%S'),
                               '{:d}'.format(pickle_metadata['session_num']),
-                              '{:03d}'.format(pickle_metadata['video_number']),
+                              '{:03d}'.format(pickle_metadata['vid_num']),
                               'cam{:02d}'.format(pickle_metadata['cam_num'])
                               ])
     orig_vid_name = os.path.join(orig_vid_folder, orig_vid_name_base + '.avi')
@@ -416,8 +418,8 @@ def plot_worldpoints(worldpoints, dlc_metadata, pickle_metadata, i_frame, videos
     jpg_name = orig_vid_name_base + '_{:04d}'.format(i_frame)
     jpg_name = os.path.join(cropped_vid_folder, jpg_name + '.jpg')
 
-    plt.savefig(jpg_name)
-    # plt.show()
+    # plt.savefig(jpg_name)
+    plt.show()
 
     pass
 
@@ -441,13 +443,13 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
     frame_pts = np.squeeze(frame_pts)
 
     #3d plot of worldpoints if needed to check triangulation
-    # plot_worldpoints(worldpoints, dlc_metadata[0], pickle_metadata[0], frame_num, parent_directories=parent_directories)
+    # plot_worldpoints(worldpoints, dlc_metadata[0], pickle_metadata[0], frame_num, parent_directories)
 
     pts_per_frame = np.shape(frame_pts)[1]
     reproj_errors = np.zeros((pts_per_frame, num_cams))
-    dist = [np.zeros((1,5)) for ii in range(2)]
+    dist = [np.zeros((1, 5)) for ii in range(2)]
     dist = np.squeeze(dist)
-    projected_pts = reproject_points(worldpoints, cal_data['R'], cal_data['T'], cal_data['mtx'], dist)
+    projected_pts = reproject_points(worldpoints, cal_data['R'], cal_data['T'], cal_data['mtx'], dist, cal_data['checkerboard_square_size'])
 
     for i_cam in range(num_cams):
         reproj_errors[:, i_cam] = calculate_reprojection_errors(projected_pts[i_cam], frame_pts[i_cam, :, :])
@@ -462,14 +464,24 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
         # overlay_pts_in_cropped_img(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist,
         #                            parent_directories, reprojected_pts=None, vid_type='.avi', plot_undistorted=False)
 
-    draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
-    #
-    plt.show()
+    # draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
+    # #
+    # plt.show()
 
     return projected_pts, reproj_errors
 
 
-def reproject_points(worldpoints, R, T, mtx, dist):
+def reproject_points(worldpoints, R, T, mtx, dist, scale_factor):
+    '''
+
+    :param worldpoints:
+    :param R:
+    :param T:
+    :param mtx:
+    :param dist:
+    :param scale_factor: checkerboard size for calibration
+    :return:
+    '''
     projected_pts = []
 
     num_cams = np.shape(mtx)[0]
@@ -485,6 +497,7 @@ def reproject_points(worldpoints, R, T, mtx, dist):
             rvec, _ = cv2.Rodrigues(R)
             tvec = T
 
+        worldpoints = worldpoints / scale_factor
         ppts, _ = cv2.projectPoints(worldpoints, rvec, tvec, cur_mtx, dist)
         ppts = np.squeeze(ppts)
         projected_pts.append(ppts)
@@ -1042,7 +1055,7 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
         else:
             F = cal_data['F']
             linestyle = '-'
-        draw_epipolar_lines_on_img(to_plot, 1+i_cam, cal_data['F'], im_size, bodyparts, axs[0][1-i_cam], linestyle='-')
+        # draw_epipolar_lines_on_img(to_plot, 1+i_cam, cal_data['F'], im_size, bodyparts, axs[0][1-i_cam], linestyle='-')
 
         imgpts_ud = [cal_data['stereo_imgpoints_ud'][i_cam] for i_cam in range(2)]
 
@@ -1056,7 +1069,7 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
         # F_from_E = np.linalg.inv(mtx[1].T) @ E_new @ np.linalg.inv(mtx[0])
         # E_from_F = mtx[1].T @ F_new @ mtx[0]
 
-        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F_new'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='--')
+        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='--')
 
         # draw_epipolar_lines_on_img(to_plot, 1 + i_cam, F_from_E, im_size, bodyparts, axs[0][1 - i_cam], linestyle='dotted')
 

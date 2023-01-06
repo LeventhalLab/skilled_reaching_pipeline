@@ -990,8 +990,11 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
 
         skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
 
-    # now perform stereo calibration
+    # now perform stereo calibration if not already done
     # num_frames_for_stereo = 20, min_frames_for_stereo = 5
+    # if 'T_ffm' in cal_data.keys():
+    #     print('stereo calibration with findFundamentalMat already calculated for {}'.format(session_date_string))
+    #     return
     stereo_objpoints = cal_data['stereo_objpoints']
     stereo_imgpoints_ud = undistort_stereo_cbcorners(cal_data['stereo_imgpoints'], cal_data)
     cal_data['stereo_imgpoints_ud'] = stereo_imgpoints_ud
@@ -1018,8 +1021,11 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
         # hold on to above line for comparison, but may be able to eliminate it if findfundamentalmat works better
 
         # try recalculating using findFundamentalMat
-        imgpts_reshaped = [np.reshape(im_pts, (-1, 2)) for im_pts in imgpoints]
-        F_ffm, ffm_mask = cv2.findFundamentalMat(imgpts_reshaped[0], imgpts_reshaped[1], cv2.FM_RANSAC, FFM_tolerance, 0.999)
+        all_imgpts_reshaped = [np.reshape(im_pts, (-1, 2)) for im_pts in stereo_imgpoints_for_calibration]
+        # imgpts_reshaped = [np.reshape(im_pts, (-1, 2)) for im_pts in imgpoints]
+        # F_ffm, ffm_mask = cv2.findFundamentalMat(imgpts_reshaped[0], imgpts_reshaped[1], cv2.FM_RANSAC, FFM_tolerance,
+        #                                          0.999)
+        F_ffm, ffm_mask = cv2.findFundamentalMat(all_imgpts_reshaped[0], all_imgpts_reshaped[1], cv2.FM_RANSAC, FFM_tolerance, 0.999)
         E_ffm = mtx[1].T @ F_ffm @ mtx[0]
 
         # convert to normalized coordinates for pose recovery
@@ -1029,7 +1035,10 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
             pts_r = np.reshape(pts, (-1, 2))
             pts_ud = cv2.undistortPoints(pts_r, mtx[i_cam], cal_data['dist'][i_cam])
             stereo_ud.append(pts_ud)
-        _, R_ffm, T_unit_ffm, msk = cv2.recoverPose(E_ffm, stereo_ud[0], stereo_ud[1], np.identity(3))
+        # select 2000 points at random for cheirality check (using all the points takes a really long time)
+        num_pts = np.shape(pts_ud)[0]
+        pt_idx = np.random.randint(0, num_pts, 2000)
+        _, R_ffm, T_unit_ffm, msk = cv2.recoverPose(E_ffm, stereo_ud[0][pt_idx,:,:], stereo_ud[1][pt_idx,:,:], np.identity(3))
         T_ffm = estimate_T_from_ffm(stereo_objpoints, stereo_imgpoints_ud, mtx, im_size, R_ffm)
         # todo: consider using ffm_mask to identify inliers for redoing camera calibration and repeating...
     else:
@@ -1300,18 +1309,24 @@ def camera_calibration_from_mirror_vids(calibration_data, calibration_summary_na
     return calibration_data
 
 
-def estimate_T_from_ffm(objpoints, stereo_imgpoints_ud, mtx, im_size, R_ffm):
+def estimate_T_from_ffm(objpoints, stereo_imgpoints_ud, mtx, im_size, R_ffm, max_frames_to_use=200):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_USE_INTRINSIC_GUESS
     num_cams = np.shape(mtx)[0]
-    pts_per_frame = np.shape(stereo_imgpoints_ud)[2]
+    # pts_per_frame = np.shape(stereo_imgpoints_ud)[2]
     num_frames = np.shape(stereo_imgpoints_ud)[1]
-    dist = np.zeros((1,5))
+    # dist = np.zeros((1, 5))
 
     rv = []
     tv = []
+    if max_frames_to_use >= num_frames:
+        frames_idx = list(range(num_frames))
+    else:
+        frames_idx = np.random.randint(0, num_frames, max_frames_to_use)
     for i_cam in range(num_cams):
-        ret, new_mtx, new_dist, rvecs, tvecs = cv2.calibrateCamera(objpoints,
-                                                                   stereo_imgpoints_ud[i_cam],
+        stereo_ud_for_calibration = [stereo_imgpoints_ud[i_cam][f_idx] for f_idx in frames_idx]
+        objpoints_for_calibration = [objpoints[f_idx] for f_idx in frames_idx]
+        ret, new_mtx, new_dist, rvecs, tvecs = cv2.calibrateCamera(objpoints_for_calibration,
+                                                                   stereo_ud_for_calibration,
                                                                    im_size[i_cam],
                                                                    mtx[i_cam],
                                                                    None,

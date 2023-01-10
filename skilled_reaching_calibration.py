@@ -771,6 +771,7 @@ def show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undisto
         img = []
         cb_pts = []
         for cal_idx in range(2):
+            vid_objects[cal_idx].set(cv2.CAP_PROP_POS_FRAMES, frame_num)
             _, new_img = vid_objects[cal_idx].read()
             ax_idx = cam_num[cal_idx] - 1
 
@@ -816,7 +817,7 @@ def show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undisto
             ax_idx = cam_num[cal_idx] - 1
 
             plot_utilities.draw_epipolar_lines(cb_img, cal_data, cam_num[cal_idx], other_cbpoints, [], use_ffm=False, markertype=['o', '+'], ax=axs[0][ax_idx])
-            F_array = np.stack((cal_data['F'], cal_data['F_ffm'], F_from_norm), axis=0)
+            F_array = np.stack((cal_data['F'], cal_data['F_ffm'], cal_data['F_ffm_norm']), axis=0)
             plot_utilities.compare_epipolar_lines(cb_img, cal_data, cam_num[cal_idx], other_cbpoints, [], F_array,
                                                markertype=['o', '+'], ax=axs[0][ax_idx])
 
@@ -1118,10 +1119,11 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directorie
     #         stereo_imgpoints[i_vid].append(corner_pts)
     # if num_frames_to_use >= min_frames_for_stereo:
     #     check_Rs(cal_data)
+    skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
     if num_frames_to_use >= min_frames_for_stereo:
         cal_metadata = navigation_utilities.parse_optitrack_calibration_data_name(calibration_data_name)
         show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undistorted=True)
-    skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
+
 
     # check if calibration worked
     # num_valid_stereo_pairs = np.shape(cal_data['stereo_imgpoints'])[1]

@@ -604,7 +604,7 @@ def triangulate_points(pts, cal_data):
     num_cams = len(pts)
 
     projMatr1 = np.eye(3, 4)
-    projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
+    projMatr2 = P_from_RT(cal_data['R'], cal_data['T'])
     mtx = cal_data['mtx']
     dist = cal_data['dist']
 

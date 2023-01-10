@@ -817,7 +817,7 @@ def show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undisto
             ax_idx = cam_num[cal_idx] - 1
 
             plot_utilities.draw_epipolar_lines(cb_img, cal_data, cam_num[cal_idx], other_cbpoints, [], use_ffm=False, markertype=['o', '+'], ax=axs[0][ax_idx])
-            F_array = np.stack((cal_data['F'], cal_data['F_ffm'], cal_data['F_ffm_norm']), axis=0)
+            F_array = np.stack((cal_data['F'], cal_data['F_ffm'], cal_data['F_ffm']), axis=0)
             plot_utilities.compare_epipolar_lines(cb_img, cal_data, cam_num[cal_idx], other_cbpoints, [], F_array,
                                                markertype=['o', '+'], ax=axs[0][ax_idx])
 

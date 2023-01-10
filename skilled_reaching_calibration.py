@@ -1120,9 +1120,9 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directorie
     # if num_frames_to_use >= min_frames_for_stereo:
     #     check_Rs(cal_data)
     skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
-    if num_frames_to_use >= min_frames_for_stereo:
-        cal_metadata = navigation_utilities.parse_optitrack_calibration_data_name(calibration_data_name)
-        show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undistorted=True)
+    # if num_frames_to_use >= min_frames_for_stereo:
+    #     cal_metadata = navigation_utilities.parse_optitrack_calibration_data_name(calibration_data_name)
+    #     show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undistorted=True)
 
 
     # check if calibration worked

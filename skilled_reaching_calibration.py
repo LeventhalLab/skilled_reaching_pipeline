@@ -584,7 +584,7 @@ def calibrate_all_Burgess_vids(parent_directories, cb_size=(7, 10), checkerboard
             # collect the checkerboard points, write to file
             collect_cbpoints_Burgess(sorted_vid_pair, cal_data_parent, cb_size=cb_size, checkerboard_square_size=checkerboard_square_size)
 
-        calibrate_Burgess_session(cal_data_name, sorted_vid_pair)
+        calibrate_Burgess_session(cal_data_name, sorted_vid_pair, parent_directories)
 
 
 def collect_cbpoints_Burgess(vid_pair, cal_data_parent, cb_size=(7, 10), checkerboard_square_size=7.):
@@ -901,7 +901,7 @@ def create_cal_frame_figure(width, height, ax3d=None, scale=1.0, dpi=100, nrows=
     return fig, axs
 
 
-def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_intrinsics=50, min_frames_for_intrinsics=10, num_frames_for_stereo=20, min_frames_for_stereo=5, use_undistorted_pts_for_stereo_cal=True):
+def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directories, num_frames_for_intrinsics=50, min_frames_for_intrinsics=10, num_frames_for_stereo=20, min_frames_for_stereo=5, use_undistorted_pts_for_stereo_cal=True):
     '''
 
     :param calibration_data_name:
@@ -992,22 +992,28 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
 
     # now perform stereo calibration if not already done
     # num_frames_for_stereo = 20, min_frames_for_stereo = 5
-    # if 'T_ffm' in cal_data.keys():
+    # if 'T_unit' in cal_data.keys():
     #     print('stereo calibration with findFundamentalMat already calculated for {}'.format(session_date_string))
     #     return
     stereo_objpoints = cal_data['stereo_objpoints']
-    stereo_imgpoints_ud = undistort_stereo_cbcorners(cal_data['stereo_imgpoints'], cal_data)
+    stereo_imgpoints_ud, stereo_imgpoints_ud_norm = undistort_stereo_cbcorners(cal_data['stereo_imgpoints'], cal_data)
+
+    cal_data['stereo_imgpoints_ud_norm'] = stereo_imgpoints_ud_norm
     cal_data['stereo_imgpoints_ud'] = stereo_imgpoints_ud
     cal_data['use_undistorted_pts_for_stereo_cal'] = use_undistorted_pts_for_stereo_cal
     if use_undistorted_pts_for_stereo_cal:
         stereo_imgpoints_for_calibration = cal_data['stereo_imgpoints_ud']
+        stereo_imgpoints_for_calibration_norm = cal_data['stereo_imgpoints_ud_norm']
         dist = [np.zeros(5) for i_cam in range(num_cams)]   # points have already been undistorted, so don't undistort again during calibration
     else:
         stereo_imgpoints_for_calibration = cal_data['stereo_imgpoints']
         dist = cal_data['dist']
     num_stereo_pairs = np.shape(stereo_objpoints)[0]
     num_frames_to_use = min(num_frames_for_stereo, num_stereo_pairs)
-    objpoints, imgpoints, stereo_frame_idx = select_cboards_for_stereo_calibration(stereo_objpoints, stereo_imgpoints_for_calibration, num_frames_to_use)
+    objpoints, imgpoints_ud, stereo_frame_idx = select_cboards_for_stereo_calibration(stereo_objpoints, stereo_imgpoints_for_calibration, num_frames_to_use)
+    objpoints, imgpoints_ud_norm, stereo_frame_idx = select_cboards_for_stereo_calibration(stereo_objpoints,
+                                                                                      stereo_imgpoints_for_calibration_norm,
+                                                                                      num_frames_to_use)
     frames_for_stereo_calibration = [sf_idx for sf_idx in cal_data['stereo_frames']]
 
     mtx = cal_data['mtx']
@@ -1017,31 +1023,56 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     if all([ims == im_size[0] for ims in im_size]) and num_frames_to_use >= min_frames_for_stereo:
         # all images have the same size
         print('working on stereo calibration for {}'.format(session_date_string))
-        # ret, mtx1, dist1, mtx2, dist2, R, T, E, F = cv2.stereoCalibrate(objpoints, imgpoints[0], imgpoints[1], mtx[0], dist[0], mtx[1], dist[1], im_size[0], flags=STEREO_FLAGS)
+        ret, mtx1, dist1, mtx2, dist2, R_st, T_st, E_st, F_st = cv2.stereoCalibrate(objpoints, imgpoints_ud[0], imgpoints_ud[1], mtx[0], dist[0], mtx[1], dist[1], im_size[0], flags=STEREO_FLAGS)
         # hold on to above line for comparison, but may be able to eliminate it if findfundamentalmat works better
 
         # try recalculating using findFundamentalMat
         all_imgpts_reshaped = [np.reshape(im_pts, (-1, 2)) for im_pts in stereo_imgpoints_for_calibration]
+        all_imgpts_norm_reshaped = [np.reshape(im_pts, (-1, 2)) for im_pts in stereo_imgpoints_for_calibration_norm]
         # imgpts_reshaped = [np.reshape(im_pts, (-1, 2)) for im_pts in imgpoints]
         # F_ffm, ffm_mask = cv2.findFundamentalMat(imgpts_reshaped[0], imgpts_reshaped[1], cv2.FM_RANSAC, FFM_tolerance,
         #                                          0.999)
-        # F_ffm, ffm_mask = cv2.findFundamentalMat(all_imgpts_reshaped[0], all_imgpts_reshaped[1], cv2.FM_RANSAC, FFM_tolerance, 0.999)
-        E, E_mask = cv2.findEssentialMat(all_imgpts_reshaped[0], all_imgpts_reshaped[1], cal_data['mtx'][0], None, cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
+        F_ffm, ffm_mask = cv2.findFundamentalMat(all_imgpts_reshaped[0], all_imgpts_reshaped[1], cv2.FM_RANSAC, FFM_tolerance, 0.999)
+        F_ffm_norm, ffm_norm_mask = cv2.findFundamentalMat(all_imgpts_norm_reshaped[0], all_imgpts_norm_reshaped[1], cv2.FM_RANSAC,
+                                                 FFM_tolerance, 0.999)
+        E, E_mask = cv2.findEssentialMat(all_imgpts_reshaped[0], all_imgpts_reshaped[1], cal_data['mtx'][0], None,
+                                         cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
+        E_norm, E_norm_mask = cv2.findEssentialMat(all_imgpts_norm_reshaped[0], all_imgpts_norm_reshaped[1], np.identity(3), None,
+                                         np.identity(3), None, cv2.FM_RANSAC, 0.999, 0.1)
         # E_ffm = mtx[1].T @ F_ffm @ mtx[0]
         F = np.linalg.inv(cal_data['mtx'][1].T) @ E @ np.linalg.inv(cal_data['mtx'][0])
 
         # convert to normalized coordinates for pose recovery
+        stereo_ud_norm = []
         stereo_ud = []
+        stereo_ud_norm_for_T = []
+        stereo_ud_for_T = []
         for i_cam in range(2):
             pts = np.array(cal_data['stereo_imgpoints'][i_cam])
+            framepts_ud_norm = [cv2.undistortPoints(frame_pts, mtx[i_cam], cal_data['dist'][i_cam]) for frame_pts in pts]
+            framepts_ud = [cvb.unnormalize_points(fpts_ud_norm, mtx[i_cam]) for fpts_ud_norm in framepts_ud_norm]
+            num_frames = np.shape(framepts_ud)[0]
+            pts_per_frame = np.shape(framepts_ud)[1]
             pts_r = np.reshape(pts, (-1, 2))
-            pts_ud = cv2.undistortPoints(pts_r, mtx[i_cam], cal_data['dist'][i_cam])
+            pts_ud_norm = cv2.undistortPoints(pts_r, mtx[i_cam], cal_data['dist'][i_cam])
+            pts_ud = cvb.unnormalize_points(pts_ud_norm, mtx[i_cam])
+            stereo_ud_norm.append(pts_ud_norm)
             stereo_ud.append(pts_ud)
+            stereo_ud_norm_for_T.append(framepts_ud_norm)
+
+            for i_frame, fpts in enumerate(framepts_ud):
+                framepts_ud[i_frame] = np.reshape(fpts, (pts_per_frame, 1, 2))
+            stereo_ud_for_T.append(framepts_ud)
         # select 2000 points at random for cheirality check (using all the points takes a really long time)
         num_pts = np.shape(pts_ud)[0]
         pt_idx = np.random.randint(0, num_pts, 2000)
-        _, R, T, ffm_msk = cv2.recoverPose(E, stereo_ud[0][pt_idx,:,:], stereo_ud[1][pt_idx,:,:], np.identity(3))
-        # T_ffm = estimate_T_from_ffm(stereo_objpoints, stereo_imgpoints_ud, mtx, im_size, R_ffm)
+        _, R, T_unit, ffm_msk = cv2.recoverPose(E, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :], cal_data['mtx'][0])
+        _, R_norm, T_norm_unit, ffm_msk = cv2.recoverPose(E_norm, stereo_ud_norm[0][pt_idx, :], stereo_ud_norm[1][pt_idx, :],
+                                                np.identity(3))
+        norm_mtx = [np.identity(3) for i_cam in range(2)]
+        T_norm = estimate_T_from_ffm(stereo_objpoints, stereo_ud_norm_for_T, im_size, norm_mtx, R_norm)
+        T = estimate_T_from_ffm(stereo_objpoints, stereo_ud_for_T, im_size, mtx, R)
+        # WORKING HERE - NEED TO GET UNDISTORTED AND NORMALIZED POINTS IN CORRECT FORMAT FOR CALIBRATION IN estimate_T_from_ffm
         # todo: consider using ffm_mask to identify inliers for redoing camera calibration and repeating...
     else:
         ret = False
@@ -1050,20 +1081,31 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
         # dist1 = np.zeros((1, 5))
         # dist2 = np.zeros((1, 5))
         R = np.zeros((3, 3))
+        R_norm = np.zeros((3, 3))
+        E_norm = np.zeros((3, 3))
         T = np.zeros((3, 1))
+        T_norm = np.zeros((3, 1))
+        T_norm_unit = np.zeros((3, 1))
         E = np.zeros((3, 3))
         F = np.zeros((3, 3))
-        # F_ffm = np.zeros((3, 3))
+        F_ffm = np.zeros((3, 3))
+        F_ffm_norm = np.zeros((3, 3))
         # E_ffm = np.zeros((3, 3))
         # R_ffm = np.zeros((3, 3))
-        # T_ffm = np.zeros((3, 1))
+        T_unit = np.zeros((3, 1))
         # ffm_mask = None
 
     cal_data['R'] = R
     cal_data['T'] = T
+    cal_data['T_norm'] = T_norm
+    cal_data['T_norm_unit'] = T_norm_unit
+    cal_data['T_unit'] = T_unit
     cal_data['E'] = E
     cal_data['F'] = F
-    # cal_data['F_ffm'] = F_ffm
+    cal_data['E_norm'] = E_norm
+    cal_data['R_norm'] = R_norm
+    cal_data['F_ffm'] = F_ffm
+    cal_data['F_ffm_norm'] = F_ffm_norm
     # cal_data['E_ffm'] = E_ffm
     # cal_data['ffm_mask'] = ffm_mask
     # cal_data['R_ffm'] = R_ffm
@@ -1076,6 +1118,9 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, num_frames_for_in
     #         stereo_imgpoints[i_vid].append(corner_pts)
     # if num_frames_to_use >= min_frames_for_stereo:
     #     check_Rs(cal_data)
+    if num_frames_to_use >= min_frames_for_stereo:
+        cal_metadata = navigation_utilities.parse_optitrack_calibration_data_name(calibration_data_name)
+        show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undistorted=True)
     skilled_reaching_io.write_pickle(calibration_data_name, cal_data)
 
     # check if calibration worked
@@ -1099,6 +1144,8 @@ def undistort_stereo_cbcorners(stereo_imgpoints, cal_data):
     num_valid_frames = np.shape(stereo_imgpoints)[1]
 
     stereo_imgpoints_ud = [[] for i_cam in range(num_cams)]
+    stereo_imgpoints_ud_norm = [[] for i_cam in range(num_cams)]
+
     np.zeros(np.shape(stereo_imgpoints))   # make sure data type is consistent
 
     for i_cam in range(num_cams):
@@ -1112,9 +1159,11 @@ def undistort_stereo_cbcorners(stereo_imgpoints, cal_data):
             cur_pts_udnorm = cv2.undistortPoints(cur_pts, mtx, dist)
             cur_pts_ud = cvb.unnormalize_points(cur_pts_udnorm, mtx)
             cur_pts_ud = cur_pts_ud.reshape((-1, 1, 2)).astype('float32')
+
+            stereo_imgpoints_ud_norm[i_cam].append(cur_pts_udnorm)
             stereo_imgpoints_ud[i_cam].append(cur_pts_ud)
 
-    return stereo_imgpoints_ud
+    return stereo_imgpoints_ud, stereo_imgpoints_ud_norm
 
 
 def test_reprojection(objpoints, imgpoints, mtx, rvec, tvec, dist):
@@ -1311,9 +1360,9 @@ def camera_calibration_from_mirror_vids(calibration_data, calibration_summary_na
     return calibration_data
 
 
-def estimate_T_from_ffm(objpoints, stereo_imgpoints_ud, mtx, im_size, R_ffm, max_frames_to_use=200):
+def estimate_T_from_ffm(objpoints, stereo_imgpoints_ud, im_size, mtx, R, max_frames_to_use=200):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_USE_INTRINSIC_GUESS
-    num_cams = np.shape(mtx)[0]
+    num_cams = np.shape(stereo_imgpoints_ud)[0]
     # pts_per_frame = np.shape(stereo_imgpoints_ud)[2]
     num_frames = np.shape(stereo_imgpoints_ud)[1]
     # dist = np.zeros((1, 5))
@@ -1325,7 +1374,7 @@ def estimate_T_from_ffm(objpoints, stereo_imgpoints_ud, mtx, im_size, R_ffm, max
     else:
         frames_idx = np.random.randint(0, num_frames, max_frames_to_use)
     for i_cam in range(num_cams):
-        stereo_ud_for_calibration = [stereo_imgpoints_ud[i_cam][f_idx] for f_idx in frames_idx]
+        stereo_ud_for_calibration = [stereo_imgpoints_ud[i_cam][f_idx].astype('float32') for f_idx in frames_idx]
         objpoints_for_calibration = [objpoints[f_idx] for f_idx in frames_idx]
         ret, new_mtx, new_dist, rvecs, tvecs = cv2.calibrateCamera(objpoints_for_calibration,
                                                                    stereo_ud_for_calibration,
@@ -1342,11 +1391,11 @@ def estimate_T_from_ffm(objpoints, stereo_imgpoints_ud, mtx, im_size, R_ffm, max
     T1 = tv[0].T
     T2 = tv[1].T
 
-    T_for_each_frame = T2 - R_ffm @ T1
+    T_for_each_frame = T2 - R @ T1
 
-    T_ffm = np.median(T_for_each_frame, 1)
+    T = np.median(T_for_each_frame, 1)
 
-    return T_ffm
+    return T
 
 
 def check_Rs(cal_data):

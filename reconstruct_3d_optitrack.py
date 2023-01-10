@@ -275,19 +275,20 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     frame_pts_ud = [cv2.undistortPoints(frame_pts[i_cam, :, :], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
     # frame_pts_ud = [np.squeeze(ppts) for ppts in frame_pts_ud]
     projMatr1 = np.eye(3, 4)
-    projMatr2 = np.hstack((cal_data['R'], cal_data['T']))
+    cal_data['T'] = cal_data['T_unit']
+    projMatr2 = cvb.P_from_RT(cal_data['R'], cal_data['T'])
 
-    E, F, R, T = skilled_reaching_calibration.recalculate_E_and_F_from_stereo_matches(cal_data)
+    # E, F, R, T = skilled_reaching_calibration.recalculate_E_and_F_from_stereo_matches(cal_data)
 
     # F_projMatr2 = cvb.P_from_RT(cal_data['R_ffm'], cal_data['T_ffm'])
-    F_projMatr2 = cvb.P_from_RT(R['R_E'], T['t_E'])
+    # F_projMatr2 = cvb.P_from_RT(R['R_E'], T['t_E'])
     # comment back in to test if frame_pts_ud look correct
     # plot_projpoints(frame_pts_ud, dlc_metadata[0])
 
     points4D = cv2.triangulatePoints(projMatr1, projMatr2, frame_pts_ud[0], frame_pts_ud[1])
-    points4D_newF = cv2.triangulatePoints(projMatr1, F_projMatr2, frame_pts_ud[0], frame_pts_ud[1])
+    # points4D_newF = cv2.triangulatePoints(projMatr1, F_projMatr2, frame_pts_ud[0], frame_pts_ud[1])
     worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T)) * cal_data['checkerboard_square_size']
-    worldpoints_newF = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_newF.T))
+    # worldpoints_newF = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_newF.T))
 
     # cal_data['F_new'] = F['F_from_E']
     # cal_data['R'] = R['R_E']
@@ -412,8 +413,10 @@ def plot_worldpoints(worldpoints, dlc_metadata, pickle_metadata, i_frame, parent
     ax.set_ylabel('y')
     ax.set_zlabel('z')
     # ax.invert_yaxis()
-    ax.set_xlim(0, 10)
-    ax.set_ylim(0, 5)
+    ax.set_xlim(20, 60)
+    ax.set_ylim(20, 60)
+    ax.set_zlim(100, 150)
+    ax.invert_yaxis()
 
     jpg_name = orig_vid_name_base + '_{:04d}'.format(i_frame)
     jpg_name = os.path.join(cropped_vid_folder, jpg_name + '.jpg')
@@ -464,9 +467,8 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
         # overlay_pts_in_cropped_img(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist,
         #                            parent_directories, reprojected_pts=None, vid_type='.avi', plot_undistorted=False)
 
-    # draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
-    # #
-    # plt.show()
+    draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
+    plt.show()
 
     return projected_pts, reproj_errors
 
@@ -488,19 +490,34 @@ def reproject_points(worldpoints, R, T, mtx, dist, scale_factor):
 
     for i_cam in range(num_cams):
         cur_mtx = mtx[i_cam]
-        dist = dist[i_cam]
+        cur_dist = dist[i_cam]
 
         if i_cam == 0:
             rvec = np.zeros((3, 1))
             tvec = np.zeros((3, 1))
+            Rmat = np.identity(3)
         else:
             rvec, _ = cv2.Rodrigues(R)
             tvec = T
+            Rmat = R
 
         worldpoints = worldpoints / scale_factor
-        ppts, _ = cv2.projectPoints(worldpoints, rvec, tvec, cur_mtx, dist)
-        ppts = np.squeeze(ppts)
-        projected_pts.append(ppts)
+
+        C = cvb.P_from_RT(Rmat, tvec)
+        wp = worldpoints.T
+        wp = np.vstack((wp, np.ones((1, 17))))
+
+        ppts_direct_hom = C @ wp
+        ppts_direct = cv2.convertPointsFromHomogeneous(ppts_direct_hom.T)
+        ppts_direct = np.squeeze(ppts_direct)
+        ppts_direct_unnormalized = cvb.unnormalize_points(ppts_direct, cur_mtx)
+        projected_pts.append(ppts_direct_unnormalized)
+
+        # worldpoints = worldpoints / scale_factor
+        # ppts, _ = cv2.projectPoints(worldpoints, rvec, tvec, np.identity(3), cur_dist)
+        # ppts = np.squeeze(ppts)
+        # ppts = cvb.unnormalize_points(ppts, cur_mtx)
+        # projected_pts.append(ppts)
 
     return projected_pts
 

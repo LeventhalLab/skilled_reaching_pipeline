@@ -275,7 +275,7 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     frame_pts_ud = [cv2.undistortPoints(frame_pts[i_cam, :, :], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
     # frame_pts_ud = [np.squeeze(ppts) for ppts in frame_pts_ud]
     projMatr1 = np.eye(3, 4)
-    cal_data['T'] = cal_data['T_unit']
+    # cal_data['T'] = cal_data['T_unit']
     projMatr2 = cvb.P_from_RT(cal_data['R'], cal_data['T'])
 
     # E, F, R, T = skilled_reaching_calibration.recalculate_E_and_F_from_stereo_matches(cal_data)

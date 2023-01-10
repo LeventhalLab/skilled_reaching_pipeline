@@ -765,7 +765,7 @@ def show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undisto
 
     # E_from_norm, msk_norm = skilled_reaching_calibration.recalculate_E_from_stereo_matches(cal_data)
 
-    for frame_num in cal_data['frames_for_stereo_calibration']:
+    for i_frame, frame_num in enumerate(cal_data['frames_for_stereo_calibration']):
 
         fig, axs = create_cal_frame_figure(w, h, ax3d=[(1, 0)], scale=1.0, dpi=200, nrows=2, ncols=2, wspace=0.05, hspace=0.01, lmargin=0.01, rmargin=0.95, botmargin=0.01, topmargin=0.95)
         img = []
@@ -783,8 +783,8 @@ def show_cal_images_with_epilines(cal_metadata, parent_directories, plot_undisto
             if cam_num[cal_idx] == 1:
                 new_img = cv2.rotate(new_img, cv2.ROTATE_180)
 
-            current_cbpoints = stereo_imgpoints[ax_idx][frame_num]
-            other_cbpoints = stereo_imgpoints[1-ax_idx][frame_num]
+            current_cbpoints = stereo_imgpoints[ax_idx][i_frame]
+            other_cbpoints = stereo_imgpoints[1-ax_idx][i_frame]
 
             current_cbpoints_udnorm = cv2.undistortPoints(current_cbpoints, mtx, dist)
             other_cbpoints_udnorm = cv2.undistortPoints(other_cbpoints, other_mtx, other_dist)

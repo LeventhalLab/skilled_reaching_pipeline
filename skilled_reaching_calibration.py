@@ -1095,12 +1095,20 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directorie
         # R_ffm = np.zeros((3, 3))
         T_unit = np.zeros((3, 1))
         # ffm_mask = None
+        T_st = np.zeros((3, 1))
+        R_st = np.zeros((3, 3))
+        F_st = np.zeros((3, 3))
+        E_st = np.zeros((3, 3))
 
     cal_data['R'] = R
     cal_data['T'] = T
     cal_data['T_norm'] = T_norm
     cal_data['T_norm_unit'] = T_norm_unit
     cal_data['T_unit'] = T_unit
+    cal_data['T_st'] = T_st
+    cal_data['R_st'] = R_st
+    cal_data['F_st'] = F_st
+    cal_data['E_st'] = E_st
     cal_data['E'] = E
     cal_data['F'] = F
     cal_data['E_norm'] = E_norm

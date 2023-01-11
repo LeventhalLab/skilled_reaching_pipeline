@@ -273,6 +273,8 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     dist = cal_data['dist']
 
     frame_pts_ud = [cv2.undistortPoints(frame_pts[i_cam, :, :], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
+    # frame_pts_ud = [cvb.unnormalize_points(frame_pts_ud[i_cam], cal_data['mtx'][i_cam]) for i_cam in range(2)]
+    # frame_pts_ud = [np.reshape(fpts_ud, (17,1,2)) for fpts_ud in frame_pts_ud]
     # frame_pts_ud = [np.squeeze(ppts) for ppts in frame_pts_ud]
     projMatr1 = np.eye(3, 4)
     # cal_data['T'] = cal_data['T_unit']
@@ -487,6 +489,9 @@ def reproject_points(worldpoints, R, T, mtx, dist, scale_factor):
     projected_pts = []
 
     num_cams = np.shape(mtx)[0]
+    worldpoints = worldpoints / scale_factor
+    wp = worldpoints.T
+    wp = np.vstack((wp, np.ones((1, 17))))
 
     for i_cam in range(num_cams):
         cur_mtx = mtx[i_cam]
@@ -501,11 +506,7 @@ def reproject_points(worldpoints, R, T, mtx, dist, scale_factor):
             tvec = T
             Rmat = R
 
-        worldpoints = worldpoints / scale_factor
-
         C = cvb.P_from_RT(Rmat, tvec)
-        wp = worldpoints.T
-        wp = np.vstack((wp, np.ones((1, 17))))
 
         ppts_direct_hom = C @ wp
         ppts_direct = cv2.convertPointsFromHomogeneous(ppts_direct_hom.T)
@@ -1088,7 +1089,7 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
 
         draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='--')
 
-        # draw_epipolar_lines_on_img(to_plot, 1 + i_cam, F_from_E, im_size, bodyparts, axs[0][1 - i_cam], linestyle='dotted')
+        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F_ffm'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='dotted')
 
     plt.show()
     pass

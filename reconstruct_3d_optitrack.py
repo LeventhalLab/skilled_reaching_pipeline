@@ -260,48 +260,17 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     :param cal_data: 
     :return:
     '''
-    # verify that coordinates are mapped correctly into full image
-    # pickle_metadata = [navigation_utilities.parse_dlc_output_pickle_name_optitrack(pickle_file) for pickle_file in
-    #                    pickle_files]
-    # overlay_pts_in_orig_image(pickle_meta[0], frame_pts[0], dlc_metadata[0], i_frame,
-    #                           rotate_img=True)
-    # overlay_pts_in_orig_image(pickle_meta[1], frame_pts[1], dlc_metadata[1], i_frame,
-    #                           rotate_img=False)
-
     num_cams = len(frame_pts)
     mtx = cal_data['mtx']
     dist = cal_data['dist']
 
     frame_pts_ud = [cv2.undistortPoints(frame_pts[i_cam, :, :], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
-    # frame_pts_ud = [cvb.unnormalize_points(frame_pts_ud[i_cam], cal_data['mtx'][i_cam]) for i_cam in range(2)]
-    # frame_pts_ud = [np.reshape(fpts_ud, (17,1,2)) for fpts_ud in frame_pts_ud]
-    # frame_pts_ud = [np.squeeze(ppts) for ppts in frame_pts_ud]
+
     projMatr1 = np.eye(3, 4)
-    # cal_data['T'] = cal_data['T_unit']
     projMatr2 = cvb.P_from_RT(cal_data['R'], cal_data['T'])
 
-    # E, F, R, T = skilled_reaching_calibration.recalculate_E_and_F_from_stereo_matches(cal_data)
-
-    # F_projMatr2 = cvb.P_from_RT(cal_data['R_ffm'], cal_data['T_ffm'])
-    # F_projMatr2 = cvb.P_from_RT(R['R_E'], T['t_E'])
-    # comment back in to test if frame_pts_ud look correct
-    # plot_projpoints(frame_pts_ud, dlc_metadata[0])
-
     points4D = cv2.triangulatePoints(projMatr1, projMatr2, frame_pts_ud[0], frame_pts_ud[1])
-    # points4D_newF = cv2.triangulatePoints(projMatr1, F_projMatr2, frame_pts_ud[0], frame_pts_ud[1])
     worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T)) * cal_data['checkerboard_square_size']
-    # worldpoints_newF = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_newF.T))
-
-    # cal_data['F_new'] = F['F_from_E']
-    # cal_data['R'] = R['R_E']
-    # cal_data['T'] = T['t_E']
-    # new_cal_data = cal_data.copy()
-    # new_cal_data['R'] = R['R_F']
-    # new_cal_data['T'] = T['t_F']
-    # alternative calculation of worldpoints using non-opencv triangulation algorithm
-    # points4D_new, _ = cvb.linear_LS_triangulation(projPoints[0], projMatr1, projPoints[1], projMatr2)
-    # points4D = cv2.triangulatePoints(projMatr1, projMatr2, frame_pts[0], frame_pts[1])
-    # worldpoints = points4D_new
 
     #check that there was good reconstruction of individual points (i.e., the matched points were truly well-matched?)
     frame_pts_ud_unnorm = np.zeros(np.shape(frame_pts))

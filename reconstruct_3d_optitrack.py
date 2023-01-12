@@ -38,9 +38,9 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
         reconstruct3d_parent = parent_directories['reconstruct3d_parent']
         reconstruction3d_fname = navigation_utilities.create_3d_reconstruction_pickle_name(
             dlc_output_pickle_metadata, reconstruct3d_parent)
-        if os.path.exists(reconstruction3d_fname):
-            print('{} already calculated'.format(reconstruction3d_fname))
-            continue
+        # if os.path.exists(reconstruction3d_fname):
+        #     print('{} already calculated'.format(reconstruction3d_fname))
+        #     continue
 
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file))
         calibration_file = navigation_utilities.find_optitrack_calibration_data_name(cal_data_parent, pickle_metadata[0]['trialtime'])
@@ -307,8 +307,7 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     frame_pts_ud_unnorm = np.zeros(np.shape(frame_pts))
     for i_cam in range(num_cams):
         frame_pts_ud_unnorm[i_cam, :, :] = cvb.unnormalize_points(np.squeeze(frame_pts_ud[i_cam]), mtx[i_cam])
-    # reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories)
-    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata,
+    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts_ud_unnorm, cal_data, dlc_metadata,
                                                            pickle_metadata, frame_num, parent_directories)
     #todo: check reprojected points and reproj_errors, look for mislabeled points
     #also, consider looking across frames for jumps, and checking the dlc confidence values. Finally, need to check if
@@ -429,35 +428,38 @@ def plot_worldpoints(worldpoints, dlc_metadata, pickle_metadata, i_frame, parent
     pass
 
 
-def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories):
+def check_3d_reprojection(worldpoints, frame_pts_ud, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories):
     '''
     calculate reprojection of worldpoints back into original images, and return the location of those projected points
     (projected onto the distorted image), as well as the euclidean distance in pixels from the originally identified
     points in DLC to the reprojected points (in the distorted image)
     :param worldpoints: num_points x 3 array containing (x,y,z) triangulated points in world coordinates with the
         origin at the camera 1 lens. ADD X,Y,Z POSITIVE DIRECTIONS HERE
-    :param frame_pts: num_cams x num_points x 2 numpy array containing (x,y) pairs of deeplabcut output rotated/
+    :param frame_pts_ud: num_cams x num_points x 2 numpy array containing (x,y) pairs of deeplabcut output rotated/
         translated into the original video frame so that the images are upright (i.e., if camera 1 is rotated 180
-        degrees, the image/coordinates for camera 1 are rotated)
+        degrees, the image/coordinates for camera 1 are rotated). SINCE WE'RE NOW DOING STEREO CALIBRATION AND
+        TRIANGULATING ON UNDISTORTED POINTS, FRAME_PTS FOR CALCULATING REPROJECTION ERROR SHOULD BE UNDISTORTED (AND
+        UNNORMALIZED)
     :param cal_data:
 
     :return projected_pts:
     :return reproj_errors:
     '''
-    num_cams = np.shape(frame_pts)[0]
-    frame_pts = np.squeeze(frame_pts)
+    num_cams = np.shape(frame_pts_ud)[0]
+    frame_pts_ud = np.squeeze(frame_pts_ud)
 
     #3d plot of worldpoints if needed to check triangulation
     # plot_worldpoints(worldpoints, dlc_metadata[0], pickle_metadata[0], frame_num, parent_directories)
 
-    pts_per_frame = np.shape(frame_pts)[1]
+    pts_per_frame = np.shape(frame_pts_ud)[1]
     reproj_errors = np.zeros((pts_per_frame, num_cams))
-    dist = [np.zeros((1, 5)) for ii in range(2)]
+    dist = [np.zeros((1, 5)) for ii in range(2)]   # triangulation was done on undistorted points, so distortion has already been taken care of
     dist = np.squeeze(dist)
     projected_pts = reproject_points(worldpoints, cal_data['R'], cal_data['T'], cal_data['mtx'], dist, cal_data['checkerboard_square_size'])
+    # in current iteration, projected_pts should be in undistorted, unnormalized coordinates
 
     for i_cam in range(num_cams):
-        reproj_errors[:, i_cam] = calculate_reprojection_errors(projected_pts[i_cam], frame_pts[i_cam, :, :])
+        reproj_errors[:, i_cam] = calculate_reprojection_errors(projected_pts[i_cam], frame_pts_ud[i_cam, :, :])
 
         # overlay_pts_in_orig_image(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist, parent_directories, reprojected_pts=projected_pts[i_cam],
         #                           rotate_img=pickle_metadata[i_cam]['isrotated'], plot_undistorted=True)
@@ -469,8 +471,8 @@ def check_3d_reprojection(worldpoints, frame_pts, cal_data, dlc_metadata, pickle
         # overlay_pts_in_cropped_img(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist,
         #                            parent_directories, reprojected_pts=None, vid_type='.avi', plot_undistorted=False)
 
-    draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
-    plt.show()
+    # draw_epipolar_lines(cal_data, frame_pts, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
+    # plt.show()
 
     return projected_pts, reproj_errors
 

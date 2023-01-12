@@ -88,7 +88,7 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
     :param cropped_videos:
     :return:
     '''
-    num_cams = 2
+    num_cams = np.shape(r3d_data['frame_points'])[1]
 
     cv_params = [navigation_utilities.parse_cropped_optitrack_video_name(cv_name) for cv_name in cropped_videos]
     cv_cam_nums = [cvp['cam_num'] for cvp in cv_params]
@@ -141,6 +141,7 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
         cur_wpts = np.squeeze(wpts[i_frame, :, :])
         plot_frame3d(cur_wpts, valid_3dpoints, axs[2])
         plt.show()
+        pass
     pass
 
 

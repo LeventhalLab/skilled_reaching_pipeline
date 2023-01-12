@@ -38,9 +38,9 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
         reconstruct3d_parent = parent_directories['reconstruct3d_parent']
         reconstruction3d_fname = navigation_utilities.create_3d_reconstruction_pickle_name(
             dlc_output_pickle_metadata, reconstruct3d_parent)
-        # if os.path.exists(reconstruction3d_fname):
-        #     print('{} already calculated'.format(reconstruction3d_fname))
-        #     continue
+        if os.path.exists(reconstruction3d_fname):
+            print('{} already calculated'.format(reconstruction3d_fname))
+            continue
 
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file))
         calibration_file = navigation_utilities.find_optitrack_calibration_data_name(cal_data_parent, pickle_metadata[0]['trialtime'])
@@ -71,8 +71,6 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
 
         cam_meta_files = [pickle_file.replace('full.pickle', 'meta.pickle') for pickle_file in pickle_files]
         dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in cam_meta_files]
-        # dlc_metadata.append(skilled_reaching_io.read_pickle(cam01_meta))
-        # dlc_metadata.append(skilled_reaching_io.read_pickle(cam02_meta))
 
         bodyparts = []
         for dlc_md in dlc_metadata:
@@ -89,15 +87,6 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
         for i_cam in range(2):
             trajectory_metadata = dlc_utilities.extract_trajectory_metadata(dlc_metadata[i_cam], pickle_metadata[i_cam])
             dlc_data = dlc_utilities.extract_data_from_dlc_output(dlc_output[i_cam], trajectory_metadata)
-
-            bp_coords = dlc_utilities.collect_bp_data(dlc_data, 'coordinates')
-            mtx = cal_data['mtx'][i_cam]
-            dist = cal_data['dist'][i_cam]
-            # overlay original dlc output on cropped images to see if problem is with original identification or translating/rotating back into full frame for cam 2 (cam 1 looks good)
-        #     overlay_pts_in_cropped_img(pickle_metadata[i_cam], bp_coords, dlc_metadata[i_cam], frame_num, mtx, dist,
-        #                                parent_directories, reprojected_pts=None, vid_type='.avi')
-        #
-        # plt.show()
 
         reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc_conf, pickle_files, dlc_metadata, parent_directories)
 

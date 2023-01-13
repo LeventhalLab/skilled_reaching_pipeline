@@ -2057,3 +2057,32 @@ def fname_time2string(ftime):
     fname_timestring = ftime.strftime('%Y%m%d_%H-%M-%S')
 
     return fname_timestring
+
+
+def fname_date2string(ftime):
+
+    fname_datestring = ftime.strftime('%Y%m%d')
+
+    return fname_datestring
+
+
+def mouse_animation_name(vid_metadata, reconstruct_3d_parent):
+
+    fname = '_'.join((vid_metadata['mouseID'],
+                      fname_time2string(vid_metadata['triggertime']),
+                      str(vid_metadata['session_num']),
+                      '{:03d}'.format(vid_metadata['video_number']),
+                      'animation.mp4'))
+
+    mouse_folder = os.path.join(reconstruct_3d_parent, vid_metadata['mouseID'])
+    month_folder = '_'.join((vid_metadata['mouseID'],
+                             vid_metadata['triggertime'].strftime('%Y%m')))
+    month_folder = os.path.join(mouse_folder, month_folder)
+    date_folder = '_'.join((vid_metadata['mouseID'],
+                             fname_date2string(vid_metadata['triggertime'])))
+    date_folder = os.path.join(month_folder, date_folder)
+
+    fullpath = os.path.join(date_folder, fname)
+
+    return fullpath
+

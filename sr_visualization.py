@@ -81,7 +81,7 @@ def animate_vids_plus3d(traj_data, crop_regions, orig_video_name):
     vid_obj.release()
 
 
-def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos):
+def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories):
     '''
 
     :param r3d_data: dictionary containing the following keys:
@@ -89,10 +89,14 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos):
     :param cropped_videos:
     :return:
     '''
+    reconstruct_3d_parent = parent_directories['reconstruct_3d_parent']
+
+    cv_params = [navigation_utilities.parse_cropped_optitrack_video_name(cv_name) for cv_name in cropped_videos]
+    animation_name = navigation_utilities.mouse_animation_name(cv_params[0], reconstruct_3d_parent)
+
     num_cams = np.shape(r3d_data['frame_points'])[1]
     show_undistorted = r3d_data['cal_data']['use_undistorted_pts_for_stereo_cal']
 
-    cv_params = [navigation_utilities.parse_cropped_optitrack_video_name(cv_name) for cv_name in cropped_videos]
     cv_cam_nums = [cvp['cam_num'] for cvp in cv_params]
     im_size = r3d_data['cal_data']['im_size']
     fullframe_pts = [np.squeeze(r3d_data['frame_points'][:, i_cam, :, :]) for i_cam in range(num_cams)]
@@ -159,9 +163,10 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos):
                                      axs[i_cam], marker='s', s=6)
 
         # make the 3d plot
-
         cur_wpts = np.squeeze(wpts[i_frame, :, :])
-        plot_frame3d(cur_wpts, valid_3dpoints, bodyparts, bpts2connect, axs[2])
+        bpts2connect_3d = mouse_sr_bodyparts2connect_3d()
+        plot_frame3d(cur_wpts, valid_3dpoints, bodyparts, bpts2connect_3d, axs[2])
+
         plt.show()
         pass
     pass
@@ -236,7 +241,7 @@ def identify_valid_3dpts(framepts_forallcams, crop_wins, im_sizes, isrotated):
 
 
 def plot_frame3d(worldpoints, valid_3dpoints, bodyparts, bpts2connect, ax3d, **kwargs):
-    bp_c = mouse_bp_colors()
+    bp_c = mouse_bp_colors_3d()
     kwargs.setdefault('marker', 'o')
     kwargs.setdefault('s', 3)
 
@@ -255,7 +260,7 @@ def plot_frame3d(worldpoints, valid_3dpoints, bodyparts, bpts2connect, ax3d, **k
 
                 ax3d.scatter(x, y, z, **kwargs)
 
-    connect_bodyparts_3d(worldpoints, bodyparts, bpts2connect, valid_3dpoints, ax)
+    connect_bodyparts_3d(worldpoints, bodyparts, bpts2connect, valid_3dpoints, ax3d)
 
     ax3d.set_xlabel('x')
     ax3d.set_ylabel('y')
@@ -353,8 +358,6 @@ def connect_bodyparts_3d(worldpoints, bodyparts, bpts2connect, valid_3dpoints, a
 
         if all(valid_3dpoints[pt_index]):
 
-            if all(frame_pts[pt_index[0], :] == 0) or all(frame_pts[pt_index[1], :] == 0):
-                continue   # one of the points wasn't found
             x = worldpoints[pt_index, 0]
             y = worldpoints[pt_index, 1]
             z = worldpoints[pt_index, 2]
@@ -415,6 +418,28 @@ def mouse_sr_bodyparts2connect():
     bpts2connect.append(['rightpaw', 'rightdigit2'])
     bpts2connect.append(['rightpaw', 'rightdigit3'])
     bpts2connect.append(['rightpaw', 'rightdigit4'])
+
+    return bpts2connect
+
+
+def mouse_sr_bodyparts2connect_3d():
+
+    bpts2connect = []
+
+    bpts2connect.append(['leftpaw', 'leftdigit1'])
+    bpts2connect.append(['leftpaw', 'leftdigit2'])
+    bpts2connect.append(['leftpaw', 'leftdigit3'])
+    bpts2connect.append(['leftpaw', 'leftdigit4'])
+
+    bpts2connect.append(['rightpaw', 'rightdigit1'])
+    bpts2connect.append(['rightpaw', 'rightdigit2'])
+    bpts2connect.append(['rightpaw', 'rightdigit3'])
+    bpts2connect.append(['rightpaw', 'rightdigit4'])
+
+    bpts2connect.append(['leftear', 'lefteye'])
+    bpts2connect.append(['rightear', 'righteye'])
+    bpts2connect.append(['lefteye', 'nose'])
+    bpts2connect.append(['righteye', 'nose'])
 
     return bpts2connect
 
@@ -482,6 +507,34 @@ def mouse_bp_colors():
     bp_c['righteye'] = tuple(np.array(bp_c['lefteye']) * 0.5)
 
     bp_c['nose'] = (1, 1, 1)
+
+    bp_c['rightpaw'] = (0, 0, 1)
+    bp_c['rightdigit1'] = tuple(np.array(bp_c['rightpaw']) * 0.9)
+    bp_c['rightdigit2'] = tuple(np.array(bp_c['rightpaw']) * 0.8)
+    bp_c['rightdigit3'] = tuple(np.array(bp_c['rightpaw']) * 0.7)
+    bp_c['rightdigit4'] = tuple(np.array(bp_c['rightpaw']) * 0.6)
+
+    bp_c['leftpaw'] = (1, 0, 0)
+    bp_c['leftdigit1'] = tuple(np.array(bp_c['leftpaw']) * 0.9)
+    bp_c['leftdigit2'] = tuple(np.array(bp_c['leftpaw']) * 0.8)
+    bp_c['leftdigit3'] = tuple(np.array(bp_c['leftpaw']) * 0.7)
+    bp_c['leftdigit4'] = tuple(np.array(bp_c['leftpaw']) * 0.6)
+
+    bp_c['pellet1'] = (0, 0, 0)
+    bp_c['pellet2'] = (0.1, 0.1, 0.1)
+
+    return bp_c
+
+
+def mouse_bp_colors_3d():
+
+    bp_c = {'leftear':(0, 1, 1)}
+    bp_c['rightear'] = tuple(np.array(bp_c['leftear']) * 0.5)
+
+    bp_c['lefteye'] = (1, 0, 1)
+    bp_c['righteye'] = tuple(np.array(bp_c['lefteye']) * 0.5)
+
+    bp_c['nose'] = (0, 0, 0)
 
     bp_c['rightpaw'] = (0, 0, 1)
     bp_c['rightdigit1'] = tuple(np.array(bp_c['rightpaw']) * 0.9)

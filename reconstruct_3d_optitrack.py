@@ -1525,5 +1525,5 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
     orig_videos = navigation_utilities.find_original_optitrack_videos(video_root_folder, r3d_metadata)
     cropped_videos = navigation_utilities.find_cropped_optitrack_videos(cropped_vids_parent, r3d_metadata)
 
-    sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos)
+    sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories)
     pass

@@ -197,26 +197,38 @@ def undistort2cropped(img, mtx, dist, crop_win, isrotated):
 
 
 def identify_valid_3dpts(framepts_forallcams, crop_wins, im_sizes, isrotated):
+    '''
 
+    :param framepts_forallcams:
+    :param crop_wins: format [left, right, top, bottom]. This is BEFORE ROTATION of the image if this was an upside-down
+        camera
+    :param im_sizes:
+    :param isrotated: list indicating whether this camera was rotated (currently should be [True, False] since camera 1
+        was physically rotated and camera 2 was not
+    :return:
+    '''
     num_bp = np.shape(framepts_forallcams[0])[0]
     num_cams = len(crop_wins)
+    valid_cam_pt = np.zeros((num_bp, 2), dtype=bool)
     valid_3dpts = np.zeros(num_bp, dtype=bool)
 
     for i_cam in range(num_cams):
         if isrotated[i_cam]:
-            crop_edge = cvb.rotate_pts_180(crop_wins[i_cam][:2], im_sizes[i_cam])
+            # if image is rotated, top left corner of cropped image will be bottom right corner of full image
+            crop_edge = cvb.rotate_pts_180([crop_wins[i_cam][1], crop_wins[i_cam][3]], im_sizes[i_cam])
         else:
-            crop_edge = crop_wins[i_cam][:1]
+            # if image is not rotated, top left corner of cropped image will be top left corner of full image
+            crop_edge = np.array([crop_wins[i_cam][0], crop_wins[i_cam][2]])
         for i_bp in range(num_bp):
 
             # check each camera view to see if x = y = 0, indicating that point was not correctly identified in that view
             # frame_pt_test = [all(cam_framepts[i_bp, :] - crop_wins[i_cam][:1] == 0) for i_cam, cam_framepts in enumerate(framepts_forallcams)]
-            frame_pt_test = [all(cam_framepts[i_bp, :] - crop_edge == 0) for i_cam, cam_framepts in
-                             enumerate(framepts_forallcams)]
 
-            if any(frame_pt_test):
-                continue
-            valid_3dpts[i_bp] = True
+            valid_cam_pt[i_bp, i_cam] = any(framepts_forallcams[i_cam][i_bp, :] - crop_edge != 0)
+
+            # if any(frame_pt_test):
+            #     continue
+            # valid_3dpts[i_bp] = True
 
     return valid_3dpts
 

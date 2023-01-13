@@ -153,8 +153,9 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos):
                     cropped_img = cv2.rotate(cropped_img, cv2.ROTATE_180)
 
             # todo: overlay points, check that they match with cropped vids
-            show_crop_frame_with_pts(cropped_img, crop_wins[i_cam], translated_frame_points, bodyparts, bpts2connect, valid_3dpoints, axs[i_cam], marker='o', s=6)
-            show_crop_frame_with_pts(cropped_img, crop_wins[i_cam], translated_reproj_points, bodyparts, [], valid_3dpoints,
+            cw = [0, np.shape(cropped_img)[0], 0, np.shape(cropped_img)[1]]
+            show_crop_frame_with_pts(cropped_img, cw, translated_frame_points, bodyparts, bpts2connect, valid_3dpoints, axs[i_cam], marker='o', s=6)
+            show_crop_frame_with_pts(cropped_img, cw, translated_reproj_points, bodyparts, [], valid_3dpoints,
                                      axs[i_cam], marker='s', s=6)
 
         # make the 3d plot
@@ -240,7 +241,18 @@ def plot_frame3d(worldpoints, valid_3dpoints, ax3d, **kwargs):
     pass
 
 def show_crop_frame_with_pts(img, cw, frame_pts, bodyparts, bpts2conect, valid_3dpoints, ax, **kwargs):
+    '''
 
+    :param img:
+    :param cw: crop window - [left, right, top, bottom]
+    :param frame_pts:
+    :param bodyparts:
+    :param bpts2conect:
+    :param valid_3dpoints:
+    :param ax:
+    :param kwargs:
+    :return:
+    '''
     if img.ndim == 2:
         # 2-d array for grayscale image
         cropped_img = img[cw[2]:cw[3], cw[0]:cw[1]]

@@ -656,3 +656,46 @@ def adjust_blacklevel(image, gamma=1.0):
         image = image.astype('uint8')
 
     return cv2.LUT(image, table)
+
+
+
+
+def rotate_pts_180(pts, im_size):
+    '''
+
+    :param pts:
+    :param im_size: 1 x 2 list (height, width) (or should it be width, height?)
+    :return:
+    '''
+
+    # reflect points around the center
+
+    if not isinstance(pts, np.ndarray):
+        pts = np.array(pts)
+
+    if not isinstance(im_size, np.ndarray):
+        im_size = np.array(im_size)
+
+    reflected_pts = []
+    for i_pt, pt in enumerate(pts):
+        if len(pt) > 0:
+            try:
+                x, y = pt[0]
+            except:
+                # must be a vector instead of an array
+                x, y = pt
+            # possible that im_size is width x height or height x width
+            try:
+                new_x = im_size[0] - x
+                new_y = im_size[1] - y
+            except:
+                pass
+
+            reflected_pts.append([np.array([new_x, new_y])])
+        else:
+            reflected_pts.append(np.array([]))
+
+    reflected_pts = np.array(reflected_pts)
+    reflected_pts = np.squeeze(reflected_pts)
+
+    return reflected_pts

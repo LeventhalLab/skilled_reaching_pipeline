@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 import navigation_utilities
 import reconstruct_3d_optitrack
+import computer_vision_basics as cvb
 
 
 def plot_3d_skeleton(paw_trajectory, bodyparts, ax=None, trail_pts=3):
@@ -80,7 +81,7 @@ def animate_vids_plus3d(traj_data, crop_regions, orig_video_name):
     vid_obj.release()
 
 
-def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
+def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos):
     '''
 
     :param r3d_data: dictionary containing the following keys:
@@ -89,6 +90,7 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
     :return:
     '''
     num_cams = np.shape(r3d_data['frame_points'])[1]
+    show_undistorted = r3d_data['cal_data']['use_undistorted_pts_for_stereo_cal']
 
     cv_params = [navigation_utilities.parse_cropped_optitrack_video_name(cv_name) for cv_name in cropped_videos]
     cv_cam_nums = [cvp['cam_num'] for cvp in cv_params]
@@ -103,38 +105,57 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
 
     # create video capture objects to read frames
     vid_cap_objs = []
-    cropped_im_size = []
+    # cropped_im_size = []
     crop_wins = []
     fig, axs = create_vids_plus_3danimation_figure()    # todo: add in options to size image axes depending on vid size
     bpts2connect = mouse_sr_bodyparts2connect()
+    cropped_vid_metadata = []
+    isrotated = []
+    im_sizes = []
     for i_cam in range(num_cams):
+
+        # todo: pull image from original video, then undistort, then crop images and overlay undistorted and unnormalized points
         # this should find the index of camera number i_cam + 1 (1 or 2) in the cv_cam_nums list to make sure the vid_cap_objs are in the same order as r3d_data
-        vid_cap_objs.append(cv2.VideoCapture(cropped_videos[cv_cam_nums.index(i_cam + 1)]))
+        # vid_cap_objs.append(cv2.VideoCapture(cropped_videos[cv_cam_nums.index(i_cam + 1)]))
+        vid_cap_objs.append(cv2.VideoCapture(orig_videos[cv_cam_nums.index(i_cam + 1)]))
         w = vid_cap_objs[i_cam].get(cv2.CAP_PROP_FRAME_WIDTH)
         h = vid_cap_objs[i_cam].get(cv2.CAP_PROP_FRAME_HEIGHT)
-        cropped_im_size.append((w, h))   # may not need this
-        crop_wins.append(np.array([0, w, 0, h], dtype=int))
+        im_sizes.append((w, h))
+        # cropped_im_size.append((w, h))   # may not need this
+        cropped_vid_metadata.append(navigation_utilities.parse_cropped_optitrack_video_name(cropped_videos[i_cam]))
+        crop_wins.append(cropped_vid_metadata[i_cam]['crop_window'])   # subtract one to line up with python indexing
+        # crop_wins.append(np.array([0, w, 0, h], dtype=int))
+        isrotated.append(cropped_vid_metadata[i_cam]['isrotated'])
 
     for i_frame in range(num_frames):
         fullframe_pts_forthisframe = [fullframe_pts[i_cam][i_frame, :, :] for i_cam in range(num_cams)]
         fullframe_pts_ud_forthisframe = [fullframe_pts_ud[i_cam][i_frame, :, :] for i_cam in range(num_cams)]
-        valid_3dpoints = identify_valid_3dpts(fullframe_pts_forthisframe)
+        valid_3dpoints = identify_valid_3dpts(fullframe_pts_forthisframe, crop_wins, im_sizes, isrotated)
         for i_cam in range(num_cams):
 
             cur_fullframe_reproj_pts = reprojected_pts[i_cam][i_frame, :, :]
             cur_fullframe_pts = fullframe_pts_ud_forthisframe[i_cam]
-            isrotated = cv_params[i_cam]['isrotated']
             crop_params = cv_params[i_cam]['crop_window']
-            translated_frame_points = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(cur_fullframe_pts, crop_params, im_size[i_cam], isrotated)
-            translated_reproj_points = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(cur_fullframe_reproj_pts, crop_params, im_size[i_cam], isrotated)
+            translated_frame_points = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(cur_fullframe_pts, crop_params, im_size[i_cam], isrotated[i_cam])
+            translated_reproj_points = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(cur_fullframe_reproj_pts, crop_params, im_size[i_cam], isrotated[i_cam])
 
             vid_cap_objs[i_cam].set(cv2.CAP_PROP_POS_FRAMES, i_frame)
             ret, img = vid_cap_objs[i_cam].read()
 
+            crop_win = crop_wins[i_cam]
+            if show_undistorted:
+                mtx = r3d_data['cal_data']['mtx'][i_cam]
+                dist = r3d_data['cal_data']['dist'][i_cam]
+                cropped_img = undistort2cropped(img, mtx, dist, crop_win, isrotated[i_cam])
+            else:
+                cropped_img = img[crop_win[2]:crop_win[3], crop_win[0]:crop_win[1], :]
+                if isrotated[i_cam]:
+                    cropped_img = cv2.rotate(cropped_img, cv2.ROTATE_180)
+
             # todo: overlay points, check that they match with cropped vids
-            show_crop_frame_with_pts(img, crop_wins[i_cam], translated_frame_points, bodyparts, bpts2connect, valid_3dpoints, axs[i_cam], s=6)
-            show_crop_frame_with_pts(img, crop_wins[i_cam], translated_reproj_points, bodyparts, [], valid_3dpoints,
-                                     axs[i_cam], marker='+', s=6)
+            show_crop_frame_with_pts(cropped_img, crop_wins[i_cam], translated_frame_points, bodyparts, bpts2connect, valid_3dpoints, axs[i_cam], marker='o', s=6)
+            show_crop_frame_with_pts(cropped_img, crop_wins[i_cam], translated_reproj_points, bodyparts, [], valid_3dpoints,
+                                     axs[i_cam], marker='s', s=6)
 
         # make the 3d plot
 
@@ -145,20 +166,57 @@ def animate_optitrack_vids_plus3d(r3d_data, cropped_videos):
     pass
 
 
-def identify_valid_3dpts(framepts_forallcams):
+def undistort2cropped(img, mtx, dist, crop_win, isrotated):
+    '''
+
+    :param img:
+    :param mtx:
+    :param dist:
+    :param crop_win: should be [left, right, top, bottom]
+    :param isrotated:
+    :return:
+    '''
+
+    if isrotated:
+        # rotate before undistorting
+        img = cv2.rotate(img, cv2.ROTATE_180)
+
+    img_ud = cv2.undistort(img, mtx, dist)
+
+    if isrotated:
+        # rotate back before cropping
+        img_ud = cv2.rotate(img_ud, cv2.ROTATE_180)
+
+    cropped_img = img_ud[crop_win[2]:crop_win[3], crop_win[0]:crop_win[1], :]
+
+    if isrotated:
+        # rotate back before cropping
+        cropped_img = cv2.rotate(cropped_img, cv2.ROTATE_180)
+
+    return cropped_img
+
+
+def identify_valid_3dpts(framepts_forallcams, crop_wins, im_sizes, isrotated):
 
     num_bp = np.shape(framepts_forallcams[0])[0]
-
+    num_cams = len(crop_wins)
     valid_3dpts = np.zeros(num_bp, dtype=bool)
 
-    for i_bp in range(num_bp):
+    for i_cam in range(num_cams):
+        if isrotated[i_cam]:
+            crop_edge = cvb.rotate_pts_180(crop_wins[i_cam][:2], im_sizes[i_cam])
+        else:
+            crop_edge = crop_wins[i_cam][:1]
+        for i_bp in range(num_bp):
 
-        # check each camera view to see if x = y = 0, indicating that point was not correctly identified in that view
-        frame_pt_test = [all(cam_framepts[i_bp, :] == 0) for cam_framepts in framepts_forallcams]
+            # check each camera view to see if x = y = 0, indicating that point was not correctly identified in that view
+            # frame_pt_test = [all(cam_framepts[i_bp, :] - crop_wins[i_cam][:1] == 0) for i_cam, cam_framepts in enumerate(framepts_forallcams)]
+            frame_pt_test = [all(cam_framepts[i_bp, :] - crop_edge == 0) for i_cam, cam_framepts in
+                             enumerate(framepts_forallcams)]
 
-        if any(frame_pt_test):
-            continue
-        valid_3dpts[i_bp] = True
+            if any(frame_pt_test):
+                continue
+            valid_3dpts[i_bp] = True
 
     return valid_3dpts
 

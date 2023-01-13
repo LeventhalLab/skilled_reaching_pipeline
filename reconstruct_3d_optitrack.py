@@ -517,45 +517,17 @@ def triangulate_single_point(cal_data, matched_pts):
     new_cornerpoints = [np.squeeze(newpoints[ii]) for ii in range(2)]
 
 
-def rotate_pts_180(pts, im_size):
-    '''
+def rotate_and_translate_cropped2full(points, crop_win, orig_im_size, is_rotated):
+    crop_win_size = np.array([crop_win[1] - crop_win[0], crop_win[3] - crop_win[2]])
 
-    :param pts:
-    :param im_size: 1 x 2 list (height, width) (or should it be width, height?)
-    :return:
-    '''
+    if is_rotated:
+        reflected_pts = cvb.rotate_pts_180(points, crop_win_size)
+        pts_translated_to_orig = translate_back_to_orig_img(crop_win, reflected_pts)
+        pts_in_calibration_coords = cvb.rotate_pts_180(pts_translated_to_orig, orig_im_size)
+    else:
+        pts_in_calibration_coords = translate_back_to_orig_img(crop_win, points)
 
-    # reflect points around the center
-
-    # if not isinstance(pts, np.array):
-    #     pts = np.array(pts)
-    #
-    # if not isinstance(im_size, np.array):
-    #     im_size = np.array(im_size)
-
-    reflected_pts = []
-    for i_pt, pt in enumerate(pts):
-        if len(pt) > 0:
-            try:
-                x, y = pt[0]
-            except:
-                # must be a vector instead of an array
-                x, y = pt
-            # possible that im_size is width x height or height x width
-            try:
-                new_x = im_size[0] - x
-                new_y = im_size[1] - y
-            except:
-                pass
-
-            reflected_pts.append([np.array([new_x, new_y])])
-        else:
-            reflected_pts.append(np.array([]))
-
-    reflected_pts = np.array(reflected_pts)
-    reflected_pts = np.squeeze(reflected_pts)
-
-    return reflected_pts
+    return pts_in_calibration_coords
 
 
 def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata, orig_im_size=(1280, 1024)):
@@ -594,7 +566,7 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
                 crop_win = cam_metadata['crop_window']
 
                 crop_win_size = np.array([crop_win[1] - crop_win[0], crop_win[3] - crop_win[2]])
-                reflected_pts = rotate_pts_180(current_coords, crop_win_size)
+                reflected_pts = cvb.rotate_pts_180(current_coords, crop_win_size)
 
                 # now have the points back in the upside-down version. Now need to rotate the points within the full image
                 # to get into the same reference frame as the calibration image
@@ -606,7 +578,7 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
                 # overlay_pts(pickle_metadata[i_cam], reflected_pts, dlc_metadata[i_cam], i_frame, rotate_img=True)
                 # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_translated_to_orig, dlc_metadata[i_cam], i_frame, rotate_img=False)
 
-                pts_in_calibration_coords = rotate_pts_180(pts_translated_to_orig, orig_im_size)
+                pts_in_calibration_coords = cvb.rotate_pts_180(pts_translated_to_orig, orig_im_size)
                 # overlay_pts_in_orig_image(pickle_metadata[i_cam], pts_in_calibration_coords, dlc_metadata[i_cam], i_frame,
                 #                           rotate_img=True)
             else:
@@ -643,14 +615,14 @@ def optitrack_fullframe_to_cropped_coords(fullframe_pts, crop_params, im_size, i
     if isrotated:
         # points are translated into the "upright" (already rotated) video. So if video is rotated, need to reflect
         # the points across the middle of the full frame, then rotate them within the cropped region
-        reflected_pts = rotate_pts_180(fullframe_pts, im_size)
+        reflected_pts = cvb.rotate_pts_180(fullframe_pts, im_size)
 
         # points are rotated within the full frame. Now subtract the left and top edges of the crop window
         translated_reflected_pts = reflected_pts - np.array([crop_params[0], crop_params[2]])
 
         # now reflect these points across the center within the cropped frame
         crop_win_size = np.array([crop_params[1] - crop_params[0], crop_params[3] - crop_params[2]])
-        translated_pts = rotate_pts_180(translated_reflected_pts, crop_win_size)
+        translated_pts = cvb.rotate_pts_180(translated_reflected_pts, crop_win_size)
 
     else:
         translated_pts = fullframe_pts - np.array([crop_params[0], crop_params[2]])
@@ -705,7 +677,10 @@ def translate_back_to_orig_img(pickle_metadata, pts):
     :param pts:
     :return:
     '''
-    crop_win = pickle_metadata['crop_window']
+    if type(pickle_metadata) is dict:
+        crop_win = pickle_metadata['crop_window']
+    else:
+        crop_win = pickle_metadata
 
     translated_pts = []
     for i_pt, pt in enumerate(pts):
@@ -1550,24 +1525,5 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
     orig_videos = navigation_utilities.find_original_optitrack_videos(video_root_folder, r3d_metadata)
     cropped_videos = navigation_utilities.find_cropped_optitrack_videos(cropped_vids_parent, r3d_metadata)
 
-    # crop regions is a 2-element list of tuples - first tuple is borders for direct view, second set is for mirror view
-    # each tuple is four elements: left, right, top, bottom
-    # direct_crop = (750, 1250, 500, 900)
-    # leftmirror_crop = (0, 400, 400, 800)
-    # rightmirror_crop = (1650, 2039, 400, 800)
-
-    sr_visualization.animate_optitrack_vids_plus3d(r3d_data, cropped_videos)
-    pass
-
-
-def projection_from_E(E, cal_data):
-
-    R1, R2, t = cv2.decomposeEssentialMat(E)
-
-    return R1, R2, t
-
-
-
-def projection_from_F(F, mtx):
-
+    sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos)
     pass

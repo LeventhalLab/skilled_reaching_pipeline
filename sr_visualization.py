@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import cv2
 import numpy as np
+import os
 import navigation_utilities
 import reconstruct_3d_optitrack
 import computer_vision_basics as cvb
@@ -89,10 +90,15 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
     :param cropped_videos:
     :return:
     '''
-    reconstruct_3d_parent = parent_directories['reconstruct_3d_parent']
+    reconstruct_3d_parent = parent_directories['reconstruct3d_parent']
 
     cv_params = [navigation_utilities.parse_cropped_optitrack_video_name(cv_name) for cv_name in cropped_videos]
     animation_name = navigation_utilities.mouse_animation_name(cv_params[0], reconstruct_3d_parent)
+    animation_folder, _ = os.path.split(animation_name)
+    jpg_folder = os.path.join(animation_folder, 'temp')
+    if os.path.isdir(jpg_folder):
+        shutil.rmtree(jpg_folder)
+    os.mkdir(jpg_folder)
 
     num_cams = np.shape(r3d_data['frame_points'])[1]
     show_undistorted = r3d_data['cal_data']['use_undistorted_pts_for_stereo_cal']
@@ -135,6 +141,8 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
         fullframe_pts_forthisframe = [fullframe_pts[i_cam][i_frame, :, :] for i_cam in range(num_cams)]
         fullframe_pts_ud_forthisframe = [fullframe_pts_ud[i_cam][i_frame, :, :] for i_cam in range(num_cams)]
         valid_3dpoints = identify_valid_3dpts(fullframe_pts_forthisframe, crop_wins, im_sizes, isrotated)
+
+        jpg_name = os.path.join(jpg_folder, 'frame{:04d}'.format(i_frame))
         for i_cam in range(num_cams):
 
             cur_fullframe_reproj_pts = reprojected_pts[i_cam][i_frame, :, :]
@@ -167,7 +175,9 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
         bpts2connect_3d = mouse_sr_bodyparts2connect_3d()
         plot_frame3d(cur_wpts, valid_3dpoints, bodyparts, bpts2connect_3d, axs[2])
 
-        plt.show()
+        fig.savefig(jpg_name)
+
+        # plt.show()
         pass
     pass
 

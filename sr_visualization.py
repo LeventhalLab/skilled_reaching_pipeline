@@ -181,12 +181,12 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
         plot_frame3d(cur_wpts, valid_3dpoints, bodyparts, bpts2connect_3d, axs[2])
 
         fig.savefig(jpg_name)
-        plt.clf()
+        plt.close('all')
         # plt.show()
         pass
 
     # turn the cropped jpegs into a new movie
-    jpg_names = os.path.join(jpg_folder, 'frame%d.jpg')
+    jpg_names = os.path.join(jpg_folder, 'frame%04d.jpg')
     command = (
         f"ffmpeg -i {jpg_names} "
         f"-c:v copy {animation_name}"

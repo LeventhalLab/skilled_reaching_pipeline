@@ -143,7 +143,7 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
         fullframe_pts_ud_forthisframe = [fullframe_pts_ud[i_cam][i_frame, :, :] for i_cam in range(num_cams)]
         valid_3dpoints = identify_valid_3dpts(fullframe_pts_forthisframe, crop_wins, im_sizes, isrotated)
 
-        jpg_name = os.path.join(jpg_folder, 'frame{:04d}'.format(i_frame))
+        jpg_name = os.path.join(jpg_folder, 'frame{:04d}.jpg'.format(i_frame))
         for i_cam in range(num_cams):
 
             cur_fullframe_reproj_pts = reprojected_pts[i_cam][i_frame, :, :]

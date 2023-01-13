@@ -210,7 +210,6 @@ def identify_valid_3dpts(framepts_forallcams, crop_wins, im_sizes, isrotated):
     num_bp = np.shape(framepts_forallcams[0])[0]
     num_cams = len(crop_wins)
     valid_cam_pt = np.zeros((num_bp, 2), dtype=bool)
-    valid_3dpts = np.zeros(num_bp, dtype=bool)
 
     for i_cam in range(num_cams):
         if isrotated[i_cam]:
@@ -229,6 +228,8 @@ def identify_valid_3dpts(framepts_forallcams, crop_wins, im_sizes, isrotated):
             # if any(frame_pt_test):
             #     continue
             # valid_3dpts[i_bp] = True
+
+    valid_3dpts = np.logical_and(valid_cam_pt[:, 0], valid_cam_pt[:, 1])
 
     return valid_3dpts
 

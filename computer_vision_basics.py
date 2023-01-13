@@ -677,6 +677,8 @@ def rotate_pts_180(pts, im_size):
         im_size = np.array(im_size)
 
     reflected_pts = []
+    if np.ndim(pts) == 1:
+        pts = np.reshape(pts, (1, 2))
     for i_pt, pt in enumerate(pts):
         if len(pt) > 0:
             try:

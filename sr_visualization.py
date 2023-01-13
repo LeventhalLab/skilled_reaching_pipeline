@@ -152,8 +152,8 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos):
                 if isrotated[i_cam]:
                     cropped_img = cv2.rotate(cropped_img, cv2.ROTATE_180)
 
-            # todo: overlay points, check that they match with cropped vids
-            cw = [0, np.shape(cropped_img)[0], 0, np.shape(cropped_img)[1]]
+            # overlay points, check that they match with cropped vids
+            cw = [0, np.shape(cropped_img)[1], 0, np.shape(cropped_img)[0]]
             show_crop_frame_with_pts(cropped_img, cw, translated_frame_points, bodyparts, bpts2connect, valid_3dpoints, axs[i_cam], marker='o', s=6)
             show_crop_frame_with_pts(cropped_img, cw, translated_reproj_points, bodyparts, [], valid_3dpoints,
                                      axs[i_cam], marker='s', s=6)
@@ -161,7 +161,7 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos):
         # make the 3d plot
 
         cur_wpts = np.squeeze(wpts[i_frame, :, :])
-        plot_frame3d(cur_wpts, valid_3dpoints, axs[2])
+        plot_frame3d(cur_wpts, valid_3dpoints, bodyparts, bpts2connect, axs[2])
         plt.show()
         pass
     pass
@@ -235,19 +235,45 @@ def identify_valid_3dpts(framepts_forallcams, crop_wins, im_sizes, isrotated):
     return valid_3dpts
 
 
-def plot_frame3d(worldpoints, valid_3dpoints, ax3d, **kwargs):
+def plot_frame3d(worldpoints, valid_3dpoints, bodyparts, bpts2connect, ax3d, **kwargs):
+    bp_c = mouse_bp_colors()
+    kwargs.setdefault('marker', 'o')
+    kwargs.setdefault('s', 3)
+
+    for i_pt, pt in enumerate(worldpoints):
+
+        if valid_3dpoints[i_pt]:
+
+            if len(pt) > 0:
+                try:
+                    x, y, z = pt[0]
+                except:
+                    x, y, z = pt
+                # x = int(round(x))
+                # y = int(round(y))
+                kwargs['c'] = bp_c[bodyparts[i_pt]]
+
+                ax3d.scatter(x, y, z, **kwargs)
+
+    connect_bodyparts_3d(worldpoints, bodyparts, bpts2connect, valid_3dpoints, ax)
+
+    ax3d.set_xlabel('x')
+    ax3d.set_ylabel('y')
+    ax3d.set_zlabel('z')
+    ax3d.set_xlim(20, 60)
+    ax3d.set_ylim(20, 60)
+    ax3d.set_zlim(100, 150)
+    ax3d.invert_yaxis()
 
 
-    pass
-
-def show_crop_frame_with_pts(img, cw, frame_pts, bodyparts, bpts2conect, valid_3dpoints, ax, **kwargs):
+def show_crop_frame_with_pts(img, cw, frame_pts, bodyparts, bpts2connect, valid_3dpoints, ax, **kwargs):
     '''
 
     :param img:
     :param cw: crop window - [left, right, top, bottom]
     :param frame_pts:
     :param bodyparts:
-    :param bpts2conect:
+    :param bpts2connect:
     :param valid_3dpoints:
     :param ax:
     :param kwargs:
@@ -264,7 +290,7 @@ def show_crop_frame_with_pts(img, cw, frame_pts, bodyparts, bpts2conect, valid_3
 
     overlay_pts(frame_pts, bodyparts, valid_3dpoints, ax, **kwargs)
 
-    connect_bodyparts(frame_pts, bodyparts, bpts2conect, valid_3dpoints, ax)
+    connect_bodyparts(frame_pts, bodyparts, bpts2connect, valid_3dpoints, ax)
 
 
 def overlay_pts(pts, bodyparts, valid_3dpoints, ax, **kwargs):
@@ -306,6 +332,33 @@ def connect_bodyparts(frame_pts, bodyparts, bpts2connect, valid_3dpoints, ax, **
             x = frame_pts[pt_index, 0]
             y = frame_pts[pt_index, 1]
             ax.plot(x, y, **kwargs)
+
+
+def connect_bodyparts_3d(worldpoints, bodyparts, bpts2connect, valid_3dpoints, ax3d, **kwargs):
+    '''
+    add lines connecting body parts to video frames showing marked bodypart points
+    :param frame_pts: n x 2 numpy array where n is the number of points in the frame
+    :param bodyparts: n-element list of bodypart names in order corresponding to frame_pts
+    :param bpts2connect: list of 2-element lists containing pairs of body parts to connect with lines (named according to bodyparts)
+    :param ax: axes on which to make the plot
+    :param linecolor: color of connecting lines, default gray
+    :param lwidth: width of connecting lines - default 1.5 (pyplot default)
+    :return:
+    '''
+    kwargs.setdefault('c', (0.5, 0.5, 0.5))
+    kwargs.setdefault('lw', 1.5)
+    for pt2connect in bpts2connect:
+
+        pt_index = [bodyparts.index(bp_name) for bp_name in pt2connect]
+
+        if all(valid_3dpoints[pt_index]):
+
+            if all(frame_pts[pt_index[0], :] == 0) or all(frame_pts[pt_index[1], :] == 0):
+                continue   # one of the points wasn't found
+            x = worldpoints[pt_index, 0]
+            y = worldpoints[pt_index, 1]
+            z = worldpoints[pt_index, 2]
+            ax3d.plot(x, y, z, **kwargs)
 
 
 def rat_sr_bodyparts2connect():

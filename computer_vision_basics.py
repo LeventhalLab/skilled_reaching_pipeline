@@ -233,7 +233,6 @@ def iterative_LS_triangulation(u1, P1, u2, P2, tolerance=3.e-5):
 
         for i in range(10):  # Hartley suggests 10 iterations at most
             # Solve for x vector
-            # x_old = np.array(x[0:3, xi])    # TODO: remove
             cv2.solve(A, b, x[0:3, xi:xi + 1], cv2.DECOMP_SVD)
 
             # Calculate new depths
@@ -241,12 +240,6 @@ def iterative_LS_triangulation(u1, P1, u2, P2, tolerance=3.e-5):
             d2_new = P2[2, :].dot(x[:, xi])
 
             # Convergence criterium
-            # print i, d1_new - d1, d2_new - d2, (d1_new > 0 and d2_new > 0)    # TODO: remove
-            # print i, (d1_new - d1) / d1, (d2_new - d2) / d2, (d1_new > 0 and d2_new > 0)    # TODO: remove
-            # print i, np.sqrt(np.sum((x[0:3, xi] - x_old)**2)), (d1_new > 0 and d2_new > 0)    # TODO: remove
-            ##print i, u1[xi, :] - P1[0:2, :].dot(x[:, xi]) / d1_new, u2[xi, :] - P2[0:2, :].dot(x[:, xi]) / d2_new    # TODO: remove
-            # print bool(i) and ((d1_new - d1) / (d1 - d_old), (d2_new - d2) / (d2 - d1_old), (d1_new > 0 and d2_new > 0))    # TODO: remove
-            ##if abs(d1_new - d1) <= tolerance and abs(d2_new - d2) <= tolerance: print "Orig cond met"    # TODO: remove
             if abs(d1_new - d1) <= tolerance and \
                     abs(d2_new - d2) <= tolerance:
                 # if i and np.sum((x[0:3, xi] - x_old)**2) <= 0.0001**2:
@@ -254,10 +247,6 @@ def iterative_LS_triangulation(u1, P1, u2, P2, tolerance=3.e-5):
                 # abs((d2_new - d2) / d2) <= 3.e-6: #and \
                 # abs(d1_new - d1) <= tolerance and \
                 # abs(d2_new - d2) <= tolerance:
-                # if i and 1 - abs((d1_new - d1) / (d1 - d_old)) <= 1.e-2 and \    # TODO: remove
-                # 1 - abs((d2_new - d2) / (d2 - d1_old)) <= 1.e-2 and \    # TODO: remove
-                # abs(d1_new - d1) <= tolerance and \    # TODO: remove
-                # abs(d2_new - d2) <= tolerance:    # TODO: remove
                 break
 
             # Re-weight A matrix and b vector with the new depths
@@ -267,8 +256,6 @@ def iterative_LS_triangulation(u1, P1, u2, P2, tolerance=3.e-5):
             b[2:4, :] *= 1 / d2_new
 
             # Update depths
-            # d_old = d1    # TODO: remove
-            # d1_old = d2    # TODO: remove
             d1 = d1_new
             d2 = d2_new
 

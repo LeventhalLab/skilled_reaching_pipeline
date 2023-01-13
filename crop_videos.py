@@ -146,7 +146,6 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
     h = y2 - y1 + 1
     vid_root, vid_name = os.path.split(vid_path_out)
 
-    #todo: speed this up by cropping all 3 views from the same jpegs?
     if filtertype == 'mjpeg2jpeg':
         jpg_temp_folder = os.path.join(vid_root, 'temp')
 

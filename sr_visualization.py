@@ -2,10 +2,11 @@ import matplotlib.pyplot as plt
 import cv2
 import numpy as np
 import os
+import shutil
 import navigation_utilities
 import reconstruct_3d_optitrack
 import computer_vision_basics as cvb
-
+import subprocess
 
 def plot_3d_skeleton(paw_trajectory, bodyparts, ax=None, trail_pts=3):
 
@@ -179,6 +180,14 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
 
         # plt.show()
         pass
+
+    # turn the cropped jpegs into a new movie
+    command = (
+        f"ffmpeg -i {jpg_folder} "
+        f"-c:v copy {animation_name}"
+    )
+    subprocess.call(command, shell=True)
+
     pass
 
 

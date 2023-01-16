@@ -1527,5 +1527,44 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
     # on Linux OS, sometimes files aren't ordered alphabetically, which messes up the correspondence later when making the video
     cropped_videos = navigation_utilities.find_cropped_optitrack_videos(cropped_vids_parent, r3d_metadata)
 
+    find_valid_points(r3d_data)
     sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories)
     pass
+
+
+def find_valid_points(r3d_data, reproj_error_limit=10):
+
+    reproj_invalid_pts = invalid_points_from_reprojection_mismatch(r3d_data, reproj_error_limit=reproj_error_limit)
+
+    pass
+
+
+def invalid_points_from_reprojection_mismatch(r3d_data, reproj_error_limit=10):
+
+    num_frames = np.shape(r3d_data['worldpoints'])[0]
+    num_bp = np.shape(r3d_data['worldpoints'])[1]
+    num_cams = np.shape(r3d_data['frame_points_ud'])[1]
+
+    # find reprojection errors greater than reproj_error_limit
+    reproj_invalid_pts = np.zeros((num_frames, num_cams, num_bp), dtype=bool)
+    for i_frame in range(num_frames):
+        # creates 2 x num_pts boolean array with True wherever reprojected point misses originally identified point by
+        # more than reproj_error_limit
+        frame_reproj_invalid = (r3d_data['reprojection_errors'][i_frame] > reproj_error_limit).astype(bool)
+
+        for i_bp in range(num_bp):
+            if any(frame_reproj_invalid[:, i_bp]):
+            # at least one of the reprojections is off, meaning at least one of the points was probably misidentified
+                if i_frame > 0:
+                    # there is a previous frame
+                    prev_frame_pt_ud = r3d_data['frame_points_ud'][i_frame-1, :, i_bp, :]
+                else:
+                    prev_frame_pt_ud = np.zeros((2, 2))
+
+                if i_frame < num_frames-1:
+                    # there is a following frame
+                    next_frame_pt_ud = r3d_data['frame_points_ud'][i_frame+1, :, i_bp, :]
+                else:
+                    next_frame_pt_ud = np.zeros((2, 2))
+
+                pass

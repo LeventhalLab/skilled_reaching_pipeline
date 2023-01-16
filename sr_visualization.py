@@ -210,7 +210,7 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
 
 def undistort2cropped(img, mtx, dist, crop_win, isrotated):
     '''
-
+    undistort frame from original video, then crop
     :param img:
     :param mtx:
     :param dist:

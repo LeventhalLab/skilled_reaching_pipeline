@@ -18,7 +18,12 @@ def overlay_pts_on_video(paw_trajectory, cal_data, bodyparts, orig_vid_name, cro
     pass
 
 def create_vids_plus_3danimation_figure(figsize=(18, 10), dpi=100.):
+    '''
 
+    :param figsize:
+    :param dpi:
+    :return:
+    '''
     fig = plt.figure(figsize=figsize, dpi=dpi)
 
     axs = []
@@ -198,6 +203,9 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
         f"-c:v copy {animation_name}"
     )
     subprocess.call(command, shell=True)
+
+    # delete the temp folder to hold frame jpegs
+    shutil.rmtree(jpg_folder)
 
 
 def undistort2cropped(img, mtx, dist, crop_win, isrotated):

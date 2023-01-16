@@ -238,7 +238,7 @@ if __name__ == '__main__':
         # except:
         #     pass
     # step 4 - reconstruct 3D images
-    reconstruct_optitrack_3d(parent_directories)
+    # reconstruct_optitrack_3d(parent_directories)
     #
     reconstruct_3d_optitrack.test_optitrack_reconstruction(parent_directories)
 

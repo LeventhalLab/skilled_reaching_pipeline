@@ -181,9 +181,9 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
     dlc_output_pickle_metadata = [navigation_utilities.parse_dlc_output_pickle_name_optitrack(pf) for pf in pickle_files]
     reconstruction3d_fname = navigation_utilities.create_3d_reconstruction_pickle_name(dlc_output_pickle_metadata[0], reconstruct3d_parent)
 
-    # if os.path.exists(reconstruction3d_fname):
-    #     print('{} already calculated'.format(reconstruction3d_fname))
-    #     return
+    if os.path.exists(reconstruction3d_fname):
+        print('{} already calculated'.format(reconstruction3d_fname))
+        return
 
     mouseID = dlc_output_pickle_metadata[0]['mouseID']
     session_num = dlc_output_pickle_metadata[0]['session_num']

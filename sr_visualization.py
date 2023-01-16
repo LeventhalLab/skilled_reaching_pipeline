@@ -95,6 +95,12 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
 
     cv_params = [navigation_utilities.parse_cropped_optitrack_video_name(cv_name) for cv_name in cropped_videos]
     animation_name = navigation_utilities.mouse_animation_name(cv_params[0], reconstruct_3d_parent)
+
+    # comment out to overwrite old videos
+    if os.path.exists(animation_name):
+        print('{} already exists'.format(animation_name))
+        return
+
     animation_folder, animation_name_only = os.path.split(animation_name)
     jpg_folder = os.path.join(animation_folder, 'temp')
     if os.path.isdir(jpg_folder):

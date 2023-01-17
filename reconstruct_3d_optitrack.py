@@ -1532,14 +1532,16 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
     pass
 
 
-def find_valid_points(r3d_data, reproj_error_limit=10):
+def find_valid_points(r3d_data, reproj_error_limit=10, max_frame_jump=20, min_valid_conf=0.9):
 
-    reproj_invalid_pts = invalid_points_from_reprojection_mismatch(r3d_data, reproj_error_limit=reproj_error_limit)
+    reproj_invalid_pts = invalid_points_from_reprojection_mismatch(r3d_data, reproj_error_limit=reproj_error_limit,
+                                                                   max_frame_jump=max_frame_jump,
+                                                                   min_valid_conf=min_valid_conf)
 
     pass
 
 
-def invalid_points_from_reprojection_mismatch(r3d_data, reproj_error_limit=10):
+def invalid_points_from_reprojection_mismatch(r3d_data, reproj_error_limit=20, max_frame_jump=20, min_valid_conf=0.9):
 
     num_frames = np.shape(r3d_data['worldpoints'])[0]
     num_bp = np.shape(r3d_data['worldpoints'])[1]
@@ -1554,17 +1556,22 @@ def invalid_points_from_reprojection_mismatch(r3d_data, reproj_error_limit=10):
 
         for i_bp in range(num_bp):
             if any(frame_reproj_invalid[:, i_bp]):
-            # at least one of the reprojections is off, meaning at least one of the points was probably misidentified
+                # at least one of the reprojections is off, meaning at least one of the points was probably misidentified
+                cur_frame_pts_ud = r3d_data['frame_points_ud'][i_frame, :, i_bp, :]
                 if i_frame > 0:
                     # there is a previous frame
-                    prev_frame_pt_ud = r3d_data['frame_points_ud'][i_frame-1, :, i_bp, :]
+                    prev_frame_pts_ud = r3d_data['frame_points_ud'][i_frame-1, :, i_bp, :]
+                    prev_frame_diff = np.linalg.norm(cur_frame_pts_ud - prev_frame_pts_ud, ord=2, axis=1)
                 else:
-                    prev_frame_pt_ud = np.zeros((2, 2))
+                    prev_frame_diff = np.zeros((2, 2))
 
                 if i_frame < num_frames-1:
                     # there is a following frame
-                    next_frame_pt_ud = r3d_data['frame_points_ud'][i_frame+1, :, i_bp, :]
+                    next_frame_pts_ud = r3d_data['frame_points_ud'][i_frame+1, :, i_bp, :]
+                    next_frame_diff = np.linalg.norm(cur_frame_pts_ud - next_frame_pts_ud, ord=2, axis=1)
                 else:
-                    next_frame_pt_ud = np.zeros((2, 2))
+                    next_frame_diff = np.zeros((2, 2))
+
+                pt_conf = r3d_data['frame_confidence'][i_frame, :, i_bp]
 
                 pass

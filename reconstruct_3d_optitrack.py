@@ -268,12 +268,12 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     projMatr2_E = cvb.P_from_RT(cal_data['R_from_E'], cal_data['T_from_E'])
     projMatr2_F = cvb.P_from_RT(cal_data['R_from_F'], cal_data['T_from_F'])
 
-    new_frame_pts_ud_norm = [[], []]
-    fpts_ud_norm = [cvb.unnormalize_points(fpts_ud, mtx[i_cam]) for i_cam, fpts_ud in enumerate(frame_pts_ud)]
-    fpts_ud_norm = [np.reshape(cam_pts_ud_norm, (1, num_bp, 2)) for cam_pts_ud_norm in fpts_ud_norm]
-    new_frame_pts_ud_norm[0], new_frame_pts_ud_norm[1] = cv2.correctMatches(cal_data['F_ffm'], fpts_ud_norm[0], fpts_ud_norm[1])
-    new_frame_pts_ud_norm = [np.squeeze(nfpud_norm) for nfpud_norm in new_frame_pts_ud_norm]
-    new_frame_pts_ud = [cvb.normalize_points(nfpud_norm, mtx[i_cam]) for i_cam, nfpud_norm in enumerate(new_frame_pts_ud_norm)]
+    new_frame_pts_ud_unnorm = [[], []]
+    fpts_ud_unnorm = [cvb.unnormalize_points(fpts_ud, mtx[i_cam]) for i_cam, fpts_ud in enumerate(frame_pts_ud)]
+    fpts_ud_unnorm = [np.reshape(cam_pts_ud_norm, (1, num_bp, 2)) for cam_pts_ud_norm in fpts_ud_unnorm]
+    new_frame_pts_ud_unnorm[0], new_frame_pts_ud_unnorm[1] = cv2.correctMatches(cal_data['F_ffm'], fpts_ud_unnorm[0], fpts_ud_unnorm[1])
+    new_frame_pts_ud_unnorm = [np.squeeze(nfpud_norm) for nfpud_norm in new_frame_pts_ud_unnorm]
+    new_frame_pts_ud = [cvb.normalize_points(nfpud_unnorm, mtx[i_cam]) for i_cam, nfpud_unnorm in enumerate(new_frame_pts_ud_unnorm)]
 
     points4D_E = cv2.triangulatePoints(projMatr1, projMatr2_E, frame_pts_ud[0], frame_pts_ud[1])
     points4D_F = cv2.triangulatePoints(projMatr1, projMatr2_F, frame_pts_ud[0], frame_pts_ud[1])

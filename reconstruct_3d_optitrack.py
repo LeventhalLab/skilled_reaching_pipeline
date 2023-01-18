@@ -272,7 +272,7 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     fpts_ud_norm = [cvb.unnormalize_points(fpts_ud, mtx[i_cam]) for i_cam, fpts_ud in enumerate(frame_pts_ud)]
     fpts_ud_norm = [np.reshape(cam_pts_ud_norm, (1, num_bp, 2)) for cam_pts_ud_norm in fpts_ud_norm]
     new_frame_pts_ud_norm[0], new_frame_pts_ud_norm[1] = cv2.correctMatches(cal_data['F_ffm'], fpts_ud_norm[0], fpts_ud_norm[1])
-    new_frame_pts_ud = [cvb.normalize_points(nfpup_norm, mtx[i_cam]) for i_cam, nfpup_norm in enumerate(new_frame_pts_ud)]
+    new_frame_pts_ud = [cvb.normalize_points(nfpup_norm, mtx[i_cam]) for i_cam, nfpup_norm in enumerate(new_frame_pts_ud_norm)]
 
     points4D_E = cv2.triangulatePoints(projMatr1, projMatr2_E, frame_pts_ud[0], frame_pts_ud[1])
     points4D_F = cv2.triangulatePoints(projMatr1, projMatr2_F, frame_pts_ud[0], frame_pts_ud[1])

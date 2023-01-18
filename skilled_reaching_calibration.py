@@ -993,9 +993,9 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directorie
 
     # now perform stereo calibration if not already done
     # num_frames_for_stereo = 20, min_frames_for_stereo = 5
-    # if 'T_unit' in cal_data.keys():
-    #     print('stereo calibration with findFundamentalMat already calculated for {}'.format(session_date_string))
-    #     return
+    if 'E_from_F' in cal_data.keys():
+        print('stereo calibration with findFundamentalMat already calculated for {}'.format(session_date_string))
+        return
     stereo_objpoints = cal_data['stereo_objpoints']
     stereo_imgpoints_ud, stereo_imgpoints_ud_norm = undistort_stereo_cbcorners(cal_data['stereo_imgpoints'], cal_data)
 
@@ -1041,7 +1041,8 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directorie
         E_norm, E_norm_mask = cv2.findEssentialMat(all_imgpts_norm_reshaped[0], all_imgpts_norm_reshaped[1], np.identity(3), None,
                                          np.identity(3), None, cv2.FM_RANSAC, 0.999, 0.1)
         # E_ffm = mtx[1].T @ F_ffm @ mtx[0]
-        F = np.linalg.inv(cal_data['mtx'][1].T) @ E @ np.linalg.inv(cal_data['mtx'][0])
+        F_from_E = np.linalg.inv(cal_data['mtx'][1].T) @ E @ np.linalg.inv(cal_data['mtx'][0])
+        E_from_F = cal_data['mtx'][1].T @ F_ffm @ cal_data['mtx'][0]
 
         # convert to normalized coordinates for pose recovery
         stereo_ud_norm = []
@@ -1067,12 +1068,15 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directorie
         # select 2000 points at random for cheirality check (using all the points takes a really long time)
         num_pts = np.shape(pts_ud)[0]
         pt_idx = np.random.randint(0, num_pts, 2000)
-        _, R, T_unit, ffm_msk = cv2.recoverPose(E, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :], cal_data['mtx'][0])
+        _, R_from_E, T_Eunit, ffm_msk = cv2.recoverPose(E, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :], cal_data['mtx'][0])
+        _, R_from_F, T_Funit, ffm_msk = cv2.recoverPose(E_from_F, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :],
+                                                       cal_data['mtx'][0])
         _, R_norm, T_norm_unit, ffm_msk = cv2.recoverPose(E_norm, stereo_ud_norm[0][pt_idx, :], stereo_ud_norm[1][pt_idx, :],
                                                 np.identity(3))
         norm_mtx = [np.identity(3) for i_cam in range(2)]
         T_norm = estimate_T_from_ffm(stereo_objpoints, stereo_ud_norm_for_T, im_size, norm_mtx, R_norm)
-        T = estimate_T_from_ffm(stereo_objpoints, stereo_ud_for_T, im_size, mtx, R)
+        T_from_E = estimate_T_from_ffm(stereo_objpoints, stereo_ud_for_T, im_size, mtx, R_from_E)
+        T_from_F = estimate_T_from_ffm(stereo_objpoints, stereo_ud_for_T, im_size, mtx, R_from_F)
         # WORKING HERE - NEED TO GET UNDISTORTED AND NORMALIZED POINTS IN CORRECT FORMAT FOR CALIBRATION IN estimate_T_from_ffm
         # todo: consider using ffm_mask to identify inliers for redoing camera calibration and repeating...
     else:
@@ -1081,10 +1085,13 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directorie
         # mtx2 = np.zeros((3, 3))
         # dist1 = np.zeros((1, 5))
         # dist2 = np.zeros((1, 5))
-        R = np.zeros((3, 3))
+        R_from_E = np.zeros((3, 3))
+        R_from_F = np.zeros((3, 3))
         R_norm = np.zeros((3, 3))
         E_norm = np.zeros((3, 3))
-        T = np.zeros((3, 1))
+        # T = np.zeros((3, 1))
+        T_from_F = np.zeros((3, 1))
+        T_from_E = np.zeros((3, 1))
         T_norm = np.zeros((3, 1))
         T_norm_unit = np.zeros((3, 1))
         E = np.zeros((3, 3))
@@ -1093,28 +1100,36 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directorie
         F_ffm_norm = np.zeros((3, 3))
         # E_ffm = np.zeros((3, 3))
         # R_ffm = np.zeros((3, 3))
-        T_unit = np.zeros((3, 1))
+        T_Eunit = np.zeros((3, 1))
+        T_Funit = np.zeros((3, 1))
         # ffm_mask = None
         T_st = np.zeros((3, 1))
         R_st = np.zeros((3, 3))
         F_st = np.zeros((3, 3))
         E_st = np.zeros((3, 3))
+        F_from_E = np.zeros((3, 3))
+        E_from_F = np.zeros((3, 3))
 
-    cal_data['R'] = R
-    cal_data['T'] = T
+    cal_data['R_from_E'] = R_from_E
+    cal_data['T_Eunit'] = T_Eunit
+    cal_data['T_Funit'] = T_Funit
     cal_data['T_norm'] = T_norm
     cal_data['T_norm_unit'] = T_norm_unit
-    cal_data['T_unit'] = T_unit
+    # cal_data['T_unit'] = T_unit
     cal_data['T_st'] = T_st
     cal_data['R_st'] = R_st
     cal_data['F_st'] = F_st
     cal_data['E_st'] = E_st
     cal_data['E'] = E
-    cal_data['F'] = F
+    cal_data['F_from_E'] = F_from_E
     cal_data['E_norm'] = E_norm
     cal_data['R_norm'] = R_norm
     cal_data['F_ffm'] = F_ffm
     cal_data['F_ffm_norm'] = F_ffm_norm
+    cal_data['E_from_F'] = E_from_F
+    cal_data['R_from_F'] = R_from_F
+    cal_data['T_from_F'] = T_from_F
+    cal_data['T_from_E'] = T_from_E
     # cal_data['E_ffm'] = E_ffm
     # cal_data['ffm_mask'] = ffm_mask
     # cal_data['R_ffm'] = R_ffm
@@ -1232,7 +1247,7 @@ def triangulate_points(cal_data, projPoints, frame_num, parent_directories):
     for ii in range(2):
         projPoints_array.append(np.squeeze(np.array([projPoints[ii]]).T))
         reshaped_pts[ii][0,:,:] = projPoints_array[ii]
-    newpoints[0], newpoints[1] = cv2.correctMatches(cal_data['F'], reshaped_pts[0], reshaped_pts[1])
+    newpoints[0], newpoints[1] = cv2.correctMatches(cal_data['F_ffm'], reshaped_pts[0], reshaped_pts[1])
     newpoints = [np_array.astype('float32') for np_array in newpoints]
 
     new_cornerpoints = [np.squeeze(newpoints[ii]) for ii in range(2)]

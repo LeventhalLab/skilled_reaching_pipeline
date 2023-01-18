@@ -152,6 +152,11 @@ def reconstruct_optitrack_3d(parent_directories):
 
     for i_dir, cam01_dir in enumerate(cam01_folders):
 
+        # for debugging, let's look at the second session in the list
+        # if i_dir < 38:
+        #     continue
+
+
         # check to see if calibration has been performed for this date,then find matching cam02_dir
         cam02_dir = cam01_dir.replace('cam01', 'cam02')
         if cam02_dir not in cam02_folders:
@@ -238,7 +243,7 @@ if __name__ == '__main__':
         # except:
         #     pass
     # step 4 - reconstruct 3D images
-    # reconstruct_optitrack_3d(parent_directories)
+    reconstruct_optitrack_3d(parent_directories)
     #
     reconstruct_3d_optitrack.test_optitrack_reconstruction(parent_directories)
 

@@ -268,21 +268,21 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     projMatr2_E = cvb.P_from_RT(cal_data['R_from_E'], cal_data['T_from_E'])
     projMatr2_F = cvb.P_from_RT(cal_data['R_from_F'], cal_data['T_from_F'])
 
-    new_frame_pts_ud_unnorm = [[], []]
-    fpts_ud_unnorm = [cvb.unnormalize_points(fpts_ud, mtx[i_cam]) for i_cam, fpts_ud in enumerate(frame_pts_ud)]
-    fpts_ud_unnorm = [np.reshape(cam_pts_ud_norm, (1, num_bp, 2)) for cam_pts_ud_norm in fpts_ud_unnorm]
-    new_frame_pts_ud_unnorm[0], new_frame_pts_ud_unnorm[1] = cv2.correctMatches(cal_data['F_ffm'], fpts_ud_unnorm[0], fpts_ud_unnorm[1])
-    new_frame_pts_ud_unnorm = [np.squeeze(nfpud_norm) for nfpud_norm in new_frame_pts_ud_unnorm]
-    new_frame_pts_ud = [cvb.normalize_points(nfpud_unnorm, mtx[i_cam]) for i_cam, nfpud_unnorm in enumerate(new_frame_pts_ud_unnorm)]
+    # new_frame_pts_ud_unnorm = [[], []]
+    # fpts_ud_unnorm = [cvb.unnormalize_points(fpts_ud, mtx[i_cam]) for i_cam, fpts_ud in enumerate(frame_pts_ud)]
+    # fpts_ud_unnorm = [np.reshape(cam_pts_ud_norm, (1, num_bp, 2)) for cam_pts_ud_norm in fpts_ud_unnorm]
+    # new_frame_pts_ud_unnorm[0], new_frame_pts_ud_unnorm[1] = cv2.correctMatches(cal_data['F_ffm'], fpts_ud_unnorm[0], fpts_ud_unnorm[1])
+    # new_frame_pts_ud_unnorm = [np.squeeze(nfpud_norm) for nfpud_norm in new_frame_pts_ud_unnorm]
+    # new_frame_pts_ud = [cvb.normalize_points(nfpud_unnorm, mtx[i_cam]) for i_cam, nfpud_unnorm in enumerate(new_frame_pts_ud_unnorm)]
 
     points4D_E = cv2.triangulatePoints(projMatr1, projMatr2_E, frame_pts_ud[0], frame_pts_ud[1])
     points4D_F = cv2.triangulatePoints(projMatr1, projMatr2_F, frame_pts_ud[0], frame_pts_ud[1])
-    points4D_E_corrected = cv2.triangulatePoints(projMatr1, projMatr2_E, new_frame_pts_ud[0], new_frame_pts_ud[1])
-    points4D_F_corrected = cv2.triangulatePoints(projMatr1, projMatr2_F, new_frame_pts_ud[0], new_frame_pts_ud[1])
+    # points4D_E_corrected = cv2.triangulatePoints(projMatr1, projMatr2_E, new_frame_pts_ud[0], new_frame_pts_ud[1])
+    # points4D_F_corrected = cv2.triangulatePoints(projMatr1, projMatr2_F, new_frame_pts_ud[0], new_frame_pts_ud[1])
     worldpoints_E = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_E.T)) * cal_data['checkerboard_square_size']
     worldpoints_F = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_F.T)) * cal_data['checkerboard_square_size']
-    worldpoints_E_corrected = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_E_corrected.T)) * cal_data['checkerboard_square_size']
-    worldpoints_F_corrected = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_F_corrected.T)) * cal_data['checkerboard_square_size']
+    # worldpoints_E_corrected = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_E_corrected.T)) * cal_data['checkerboard_square_size']
+    # worldpoints_F_corrected = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_F_corrected.T)) * cal_data['checkerboard_square_size']
 
     #check that there was good reconstruction of individual points (i.e., the matched points were truly well-matched?)
     frame_pts_ud_unnorm = np.zeros(np.shape(frame_pts))
@@ -294,12 +294,16 @@ def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_
     cal_data['F'] = cal_data['F_from_E']
     reprojected_pts_E, reproj_errors_E = check_3d_reprojection(worldpoints_E, frame_pts_ud_unnorm, cal_data, dlc_metadata,
                                                            pickle_metadata, frame_num, parent_directories)
+    # reprojected_pts_E_corrected, reproj_errors_E_corrected = check_3d_reprojection(worldpoints_E_corrected, new_frame_pts_ud_unnorm, cal_data, dlc_metadata,
+    #                                                        pickle_metadata, frame_num, parent_directories)
 
     cal_data['R'] = cal_data['R_from_F']
     cal_data['T'] = cal_data['T_from_F']
     cal_data['F'] = cal_data['F_ffm']
     reprojected_pts_F, reproj_errors_F = check_3d_reprojection(worldpoints_F, frame_pts_ud_unnorm, cal_data, dlc_metadata,
                                                            pickle_metadata, frame_num, parent_directories)
+    # reprojected_pts_F_corrected, reproj_errors_F_corrected = check_3d_reprojection(worldpoints_F_corrected, new_frame_pts_ud_unnorm, cal_data, dlc_metadata,
+    #                                                        pickle_metadata, frame_num, parent_directories)
     #todo: check reprojected points and reproj_errors, look for mislabeled points
     #also, consider looking across frames for jumps, and checking the dlc confidence values. Finally, need to check if
     #pellet labels swapped between frames
@@ -462,8 +466,8 @@ def check_3d_reprojection(worldpoints, frame_pts_ud, cal_data, dlc_metadata, pic
         # overlay_pts_in_cropped_img(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist,
         #                            parent_directories, reprojected_pts=None, vid_type='.avi', plot_undistorted=False)
 
-    draw_epipolar_lines(cal_data, frame_pts_ud, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
-    plt.show()
+    # draw_epipolar_lines(cal_data, frame_pts_ud, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
+    # plt.show()
 
     return projected_pts, reproj_errors
 

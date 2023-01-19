@@ -1561,7 +1561,6 @@ def test_singlefolder_optitrack_reconstruction(rd, parent_directories):
 
     for r3d_file in r3d_files:
         test_single_optitrack_trajectory(r3d_file, parent_directories)
-    pass
 
 
 def test_single_optitrack_trajectory(r3d_file, parent_directories):
@@ -1581,7 +1580,6 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
 
     find_valid_points(r3d_data)
     sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories)
-    pass
 
 
 def find_valid_points(r3d_data, reproj_error_limit=10, max_frame_jump=20, min_valid_conf=0.9):
@@ -1595,8 +1593,8 @@ def find_valid_points(r3d_data, reproj_error_limit=10, max_frame_jump=20, min_va
 
 def invalid_points_from_reprojection_mismatch(r3d_data, reproj_error_limit=20, max_frame_jump=20, min_valid_conf=0.9):
 
-    num_frames = np.shape(r3d_data['worldpoints'])[0]
-    num_bp = np.shape(r3d_data['worldpoints'])[1]
+    num_frames = np.shape(r3d_data['worldpoints_E'])[0]
+    num_bp = np.shape(r3d_data['worldpoints_E'])[1]
     num_cams = np.shape(r3d_data['frame_points_ud'])[1]
 
     # find reprojection errors greater than reproj_error_limit
@@ -1604,10 +1602,11 @@ def invalid_points_from_reprojection_mismatch(r3d_data, reproj_error_limit=20, m
     for i_frame in range(num_frames):
         # creates 2 x num_pts boolean array with True wherever reprojected point misses originally identified point by
         # more than reproj_error_limit
-        frame_reproj_invalid = (r3d_data['reprojection_errors'][i_frame] > reproj_error_limit).astype(bool)
+        frame_reproj_invalid_E = (r3d_data['reprojection_errors_E'][i_frame] > reproj_error_limit).astype(bool)
+        # frame_reproj_invalid_F = (r3d_data['reprojection_errors_F'][i_frame] > reproj_error_limit).astype(bool)
 
         for i_bp in range(num_bp):
-            if any(frame_reproj_invalid[:, i_bp]):
+            if any(frame_reproj_invalid_E[:, i_bp]):
                 # at least one of the reprojections is off, meaning at least one of the points was probably misidentified
                 cur_frame_pts_ud = r3d_data['frame_points_ud'][i_frame, :, i_bp, :]
                 if i_frame > 0:

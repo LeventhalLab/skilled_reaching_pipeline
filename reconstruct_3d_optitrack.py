@@ -1589,20 +1589,26 @@ def find_valid_points(r3d_data, reproj_error_limit=15, max_frame_jump=20, min_va
     # see github repository LeventhalLab-->Bova_etal_eNeuro_2021, find_invalid_DLC_points.m
     # start by invalidating any points below a minimum confidence threshold, and accepting points above a certain threshold
 
+    num_frames = np.shape(r3d_data['frame_points'])[0]
     num_cams = np.shape(r3d_data['frame_points'])[1]
     # invalid points based on DLC confidence being too low
     invalid_pts_conf = (r3d_data['frame_confidence'] < min_valid_p).astype(bool)
     certain_pts_conf = (r3d_data['frame_confidence'] > min_certain_p).astype(bool)
 
     bodyparts = r3d_data['bodyparts']
-    diff_per_frame = np.zeros()
+    num_bp = len(bodyparts)
+    diff_per_frame = np.zeros((num_bp, num_frames-1))
+    poss_moved_too_far = np.zeros((num_bp, num_frames-1), dtype=bool)
     for i_cam in range(num_cams):
         for i_bp, bp in enumerate(bodyparts):
             individual_part_loc = np.squeeze(r3d_data['frame_points_ud'][:, i_cam, i_bp, :])  # num_frames x num_bodyparts x 2 (x,y)
             invalid_bp_pts = np.squeeze(invalid_pts_conf[:, i_cam, i_bp])
+            individual_part_loc[invalid_bp_pts, :] = np.NaN
 
             # calculate Euclidean distance between points in adjacent frames
             diff_per_frame[i_bp, :] = np.linalg.norm(np.diff(individual_part_loc, n=1, axis=0), axis=1)
+            poss_moved_too_far[i_bp, :-1] = diff_per_frame[i_bp, :] > max_frame_jump
+            poss_moved_too_far[i_bp, 1:] = np.logical_or(poss_moved_too_far[i_bp, :-1], poss_moved_too_far[i_bp, 1:])
             pass
     # fundamental matrix/R/T were calculated a couple of different ways. using findEssentialMat seems to have been the
     # most accurate, so will use the "_E" versions of each calibration parameter

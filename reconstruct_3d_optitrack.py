@@ -1588,19 +1588,18 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
     r3d_data['diff_per_frame'] = diff_per_frame
 
     skilled_reaching_io.write_pickle(r3d_file, r3d_data)
+    # todo: write code to find invalid points and try to figure out why they're invalid
+    # todo: write analog of script_calculateKinematics
+    # todo: write script_interp_trajectories
 
-    sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories)
+    # sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories)
 
 
-def calculate_kinematics():
-    '''
-    1. clean up data (e.g., ignore unreliable points)
-    2. calculate paw orientation based on digit locations
-    3. figure out when the paw started reaching
-    4. figure out where the pellet was located at the start of the reach (make sure pellet1 is the target)
+def visualize_invalid_points():
 
-    :return:
-    '''
+    pass
+
+
 def find_valid_points(r3d_data, max_neighbor_dist=50, max_frame_jump=20, min_valid_p=0.85, min_certain_p=0.98):
     # see github repository LeventhalLab-->Bova_etal_eNeuro_2021, find_invalid_DLC_points.m
     # start by invalidating any points below a minimum confidence threshold, and accepting points above a certain threshold

@@ -1581,11 +1581,27 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
     # on Linux OS, sometimes files aren't ordered alphabetically, which messes up the correspondence later when making the video
     cropped_videos = navigation_utilities.find_cropped_optitrack_videos(cropped_vids_parent, r3d_metadata)
 
-    valid_pts = find_valid_points(r3d_data)
+    valid_pts, diff_per_frame = find_valid_points(r3d_data, max_neighbor_dist=50, max_frame_jump=20, min_valid_p=0.85, min_certain_p=0.98)
+    # at this point in the rat software, there is an option to have manually invalidated points that can be combined
+    # with valid_pts (valid_pts and not manually_invalidated_pts)
+    r3d_data['valid_pts'] = valid_pts
+    r3d_data['diff_per_frame'] = diff_per_frame
+
+    skilled_reaching_io.write_pickle(r3d_file, r3d_data)
+
     sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories)
 
 
-def find_valid_points(r3d_data, reproj_error_limit=15, max_neighbor_dist = 50, max_frame_jump=20, min_valid_p=0.85, min_certain_p=0.98):
+def calculate_kinematics():
+    '''
+    1. clean up data (e.g., ignore unreliable points)
+    2. calculate paw orientation based on digit locations
+    3. figure out when the paw started reaching
+    4. figure out where the pellet was located at the start of the reach (make sure pellet1 is the target)
+
+    :return:
+    '''
+def find_valid_points(r3d_data, max_neighbor_dist=50, max_frame_jump=20, min_valid_p=0.85, min_certain_p=0.98):
     # see github repository LeventhalLab-->Bova_etal_eNeuro_2021, find_invalid_DLC_points.m
     # start by invalidating any points below a minimum confidence threshold, and accepting points above a certain threshold
 
@@ -1611,9 +1627,9 @@ def find_valid_points(r3d_data, reproj_error_limit=15, max_neighbor_dist = 50, m
     # created lists with where parts for left and right paws appear in bodyparts list. paw_parts[0] is list of paw parts
     # for the left paw, paw_parts[1] for the right paw. Same for paw_parts_idx, which just has the index of the paw part
     # in the bodyparts list
-
+    diff_per_frame = []
     for i_cam in range(num_cams):
-        diff_per_frame = np.zeros((num_bp, num_frames - 1))
+        cam_diff_per_frame = np.zeros((num_bp, num_frames - 1))
         poss_moved_too_far = np.zeros((num_bp, num_frames), dtype=bool)
 
         # throw out any points that jumped too far between frames. Assume points with high certainty that jumped
@@ -1623,8 +1639,8 @@ def find_valid_points(r3d_data, reproj_error_limit=15, max_neighbor_dist = 50, m
             individual_part_loc[invalid_bp_pts, :] = np.NaN
 
             # calculate Euclidean distance between points in adjacent frames
-            diff_per_frame[i_bp, :] = np.linalg.norm(np.diff(individual_part_loc, n=1, axis=0), axis=1)
-            poss_moved_too_far[i_bp, :-1] = (diff_per_frame[i_bp, :] > max_frame_jump)
+            cam_diff_per_frame[i_bp, :] = np.linalg.norm(np.diff(individual_part_loc, n=1, axis=0), axis=1)
+            poss_moved_too_far[i_bp, :-1] = (cam_diff_per_frame[i_bp, :] > max_frame_jump)
             poss_moved_too_far[i_bp, 1:] = np.logical_or(poss_moved_too_far[i_bp, :-1], poss_moved_too_far[i_bp, 1:])
             # logic is that either the point before or point after could be the bad point if there was too big a
             # location jump between frames
@@ -1665,19 +1681,10 @@ def find_valid_points(r3d_data, reproj_error_limit=15, max_neighbor_dist = 50, m
                             invalidate_idx = cur_frame_valid_idx[i_point]
                             # in original rat code, a distinction was made between paw dorsum and other points. I
                             # don't think that is necessary here
+                            invalid_pts[i_cam, paw_parts_idx[i_paw][invalidate_idx], i_frame] = True
+        diff_per_frame.append(cam_diff_per_frame)
 
-                        pass
-                    pass
-                pass
-    # fundamental matrix/R/T were calculated a couple of different ways. using findEssentialMat seems to have been the
-    # most accurate, so will use the "_E" versions of each calibration parameter
-    excessive_reproj_errors = (r3d_data['reprojection_errors_E'] > reproj_error_limit).astype(bool)
-
-    reproj_invalid_pts = invalid_points_from_reprojection_mismatch(r3d_data, invalid_pts_conf, reproj_error_limit=reproj_error_limit,
-                                                                   max_frame_jump=max_frame_jump)
-
-
-    pass
+    return np.logical_not(invalid_pts), diff_per_frame
 
 
 def get_paw_parts(bodyparts, paw_side):

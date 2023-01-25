@@ -40,16 +40,19 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
         reconstruct3d_parent = parent_directories['reconstruct3d_parent']
         reconstruction3d_fname = navigation_utilities.create_3d_reconstruction_pickle_name(
             dlc_output_pickle_metadata, reconstruct3d_parent)
-        # if os.path.exists(reconstruction3d_fname):
-        #     print('{} already calculated'.format(reconstruction3d_fname))
-        #     continue
+        if os.path.exists(reconstruction3d_fname):
+            print('{} already calculated'.format(reconstruction3d_fname))
+            continue
 
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file))
         calibration_file = navigation_utilities.find_optitrack_calibration_data_name(cal_data_parent, pickle_metadata[0]['trialtime'])
         if calibration_file is None or not os.path.exists(calibration_file):
             # if there is no calibration file for this session, skip
             continue
-        cal_data = skilled_reaching_io.read_pickle(calibration_file)
+        try:
+            cal_data = skilled_reaching_io.read_pickle(calibration_file)
+        except:
+            pass
 
         pickle_files = [cam01_file]  # pickle_files[0] is the full pickle file for camera 1 for the current video
 
@@ -1578,24 +1581,30 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
     # on Linux OS, sometimes files aren't ordered alphabetically, which messes up the correspondence later when making the video
     cropped_videos = navigation_utilities.find_cropped_optitrack_videos(cropped_vids_parent, r3d_metadata)
 
-    find_valid_points(r3d_data)
+    valid_pts = find_valid_points(r3d_data)
     sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories)
 
 
-def find_valid_points(r3d_data, reproj_error_limit=10, max_frame_jump=20, min_valid_conf=0.9):
+def find_valid_points(r3d_data, reproj_error_limit=15, max_frame_jump=20, low_conf_cutoff=0.85, high_conf_cutoff=0.98):
 
-    reproj_invalid_pts = invalid_points_from_reprojection_mismatch(r3d_data, reproj_error_limit=reproj_error_limit,
-                                                                   max_frame_jump=max_frame_jump,
-                                                                   min_valid_conf=min_valid_conf)
+    # start by invalidating any points below a minimum confidence threshold
+    invalid_pts_conf = (r3d_data['frame_confidence'] < low_conf_cutoff).astype(bool)
+    excessive_reproj_errors = (r3d_data['reprojection_errors_E'] > reproj_error_limit).astype(bool)
+
+    reproj_invalid_pts = invalid_points_from_reprojection_mismatch(r3d_data, invalid_pts_conf, reproj_error_limit=reproj_error_limit,
+                                                                   max_frame_jump=max_frame_jump)
+
 
     pass
 
 
-def invalid_points_from_reprojection_mismatch(r3d_data, reproj_error_limit=20, max_frame_jump=20, min_valid_conf=0.9):
+def invalid_points_from_reprojection_mismatch(r3d_data, invalid_pts_conf, reproj_error_limit=20, max_frame_jump=20):
 
     num_frames = np.shape(r3d_data['worldpoints_E'])[0]
     num_bp = np.shape(r3d_data['worldpoints_E'])[1]
     num_cams = np.shape(r3d_data['frame_points_ud'])[1]
+
+
 
     # find reprojection errors greater than reproj_error_limit
     reproj_invalid_pts = np.zeros((num_frames, num_cams, num_bp), dtype=bool)
@@ -1623,6 +1632,9 @@ def invalid_points_from_reprojection_mismatch(r3d_data, reproj_error_limit=20, m
                 else:
                     next_frame_diff = np.zeros((2, 2))
 
+                # pt_conf is a 2-element vector with the DLC confidence values from camera 1 and camera 2, respectively
                 pt_conf = r3d_data['frame_confidence'][i_frame, :, i_bp]
+
+                reproj_invalid_pts[i_frame, :, i_bp] = (pt_conf < min_valid_conf)
 
                 pass

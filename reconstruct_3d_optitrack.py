@@ -1590,13 +1590,20 @@ def find_valid_points(r3d_data, reproj_error_limit=15, max_frame_jump=20, min_va
     # start by invalidating any points below a minimum confidence threshold, and accepting points above a certain threshold
 
     num_cams = np.shape(r3d_data['frame_points'])[1]
+    # invalid points based on DLC confidence being too low
     invalid_pts_conf = (r3d_data['frame_confidence'] < min_valid_p).astype(bool)
     certain_pts_conf = (r3d_data['frame_confidence'] > min_certain_p).astype(bool)
 
     bodyparts = r3d_data['bodyparts']
+    diff_per_frame = np.zeros()
+    for i_cam in range(num_cams):
+        for i_bp, bp in enumerate(bodyparts):
+            individual_part_loc = np.squeeze(r3d_data['frame_points_ud'][:, i_cam, i_bp, :])  # num_frames x num_bodyparts x 2 (x,y)
+            invalid_bp_pts = np.squeeze(invalid_pts_conf[:, i_cam, i_bp])
 
-    for i_bp, bp in enumerate(bodyparts):
-        individual_part_loc = np.squeeze(parts_loc(i_bp,:,:));
+            # calculate Euclidean distance between points in adjacent frames
+            diff_per_frame[i_bp, :] = np.linalg.norm(np.diff(individual_part_loc, n=1, axis=0), axis=1)
+            pass
     # fundamental matrix/R/T were calculated a couple of different ways. using findEssentialMat seems to have been the
     # most accurate, so will use the "_E" versions of each calibration parameter
     excessive_reproj_errors = (r3d_data['reprojection_errors_E'] > reproj_error_limit).astype(bool)
@@ -1645,6 +1652,6 @@ def invalid_points_from_reprojection_mismatch(r3d_data, invalid_pts_conf, reproj
                 # pt_conf is a 2-element vector with the DLC confidence values from camera 1 and camera 2, respectively
                 pt_conf = r3d_data['frame_confidence'][i_frame, :, i_bp]
 
-                reproj_invalid_pts[i_frame, :, i_bp] = (pt_conf < min_valid_conf)
+                # reproj_invalid_pts[i_frame, :, i_bp] = (pt_conf < min_valid_conf)
 
                 pass

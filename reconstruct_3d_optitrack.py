@@ -1585,7 +1585,7 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
     sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories)
 
 
-def find_valid_points(r3d_data, reproj_error_limit=15, max_frame_jump=20, min_valid_p=0.85, min_certain_p=0.98):
+def find_valid_points(r3d_data, reproj_error_limit=15, max_neighbor_dist = 50, max_frame_jump=20, min_valid_p=0.85, min_certain_p=0.98):
     # see github repository LeventhalLab-->Bova_etal_eNeuro_2021, find_invalid_DLC_points.m
     # start by invalidating any points below a minimum confidence threshold, and accepting points above a certain threshold
 
@@ -1660,6 +1660,11 @@ def find_valid_points(r3d_data, reproj_error_limit=15, max_frame_jump=20, min_va
                         other_points = valid_paw_coords[np.logical_not(test_idx), :]
 
                         nn_dist, _ = cvb.find_nearest_neighbor(test_point, other_points, num_neighbors=1)
+
+                        if nn_dist > max_neighbor_dist:
+                            invalidate_idx = cur_frame_valid_idx[i_point]
+                            # in original rat code, a distinction was made between paw dorsum and other points. I
+                            # don't think that is necessary here
 
                         pass
                     pass

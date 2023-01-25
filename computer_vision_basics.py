@@ -694,7 +694,7 @@ def rotate_pts_180(pts, im_size):
 def find_nearest_neighbor(test_point, other_points, num_neighbors=1):
     '''
     function to find the point(s) in other_points closest to test_point
-    :param test_point: (x,y) pair
+    :param test_point: (x,y) pair as a 1 x 2 numpy array
     :param other_points:
     :param num_neighbors:
     :return:
@@ -702,3 +702,15 @@ def find_nearest_neighbor(test_point, other_points, num_neighbors=1):
     num_otherpoints = np.shape(other_points)[0]
 
     distances = np.linalg.norm(other_points - test_point, axis=1)
+
+    sorted_dist = np.sort(distances)
+    sorted_idx = np.argsort(distances)
+
+    nndist = sorted_dist[:num_neighbors]
+    nnidx = sorted_idx[:num_neighbors]
+
+    return nndist, nnidx
+
+
+
+    pass

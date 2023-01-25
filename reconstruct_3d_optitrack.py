@@ -1587,10 +1587,16 @@ def test_single_optitrack_trajectory(r3d_file, parent_directories):
 
 def find_valid_points(r3d_data, reproj_error_limit=15, max_frame_jump=20, min_valid_p=0.85, min_certain_p=0.98):
     # see github repository LeventhalLab-->Bova_etal_eNeuro_2021, find_invalid_DLC_points.m
-    # start by invalidating any points below a minimum confidence threshold
-    invalid_pts_conf = (r3d_data['frame_confidence'] < min_valid_p).astype(bool)
-    certain_pts_conf = (r3d_data['frame_confidence'] < min_valid_p).astype(bool)
+    # start by invalidating any points below a minimum confidence threshold, and accepting points above a certain threshold
 
+    num_cams = np.shape(r3d_data['frame_points'])[1]
+    invalid_pts_conf = (r3d_data['frame_confidence'] < min_valid_p).astype(bool)
+    certain_pts_conf = (r3d_data['frame_confidence'] > min_certain_p).astype(bool)
+
+    bodyparts = r3d_data['bodyparts']
+
+    for i_bp, bp in enumerate(bodyparts):
+        individual_part_loc = np.squeeze(parts_loc(i_bp,:,:));
     # fundamental matrix/R/T were calculated a couple of different ways. using findEssentialMat seems to have been the
     # most accurate, so will use the "_E" versions of each calibration parameter
     excessive_reproj_errors = (r3d_data['reprojection_errors_E'] > reproj_error_limit).astype(bool)

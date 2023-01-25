@@ -1593,13 +1593,30 @@ def find_valid_points(r3d_data, reproj_error_limit=15, max_frame_jump=20, min_va
     num_cams = np.shape(r3d_data['frame_points'])[1]
     # invalid points based on DLC confidence being too low
     invalid_pts_conf = (r3d_data['frame_confidence'] < min_valid_p).astype(bool)
+
+    # points that we're pretty sure of based on very high confidence
     certain_pts_conf = (r3d_data['frame_confidence'] > min_certain_p).astype(bool)
 
     bodyparts = r3d_data['bodyparts']
     num_bp = len(bodyparts)
-    diff_per_frame = np.zeros((num_bp, num_frames-1))
-    poss_moved_too_far = np.zeros((num_bp, num_frames-1), dtype=bool)
+    invalid_pts = np.zeros((num_cams, num_bp, num_frames), dtype=bool)
+
+    paw_parts = []
+    paw_parts_idx = []
+    side_list = ['left', 'right']
+    for side_name in side_list:
+        side_paw_parts, side_paw_parts_idx = get_paw_parts(bodyparts, side_name)
+        paw_parts.append(side_paw_parts)
+        paw_parts_idx.append(side_paw_parts_idx)
+    # created lists with where parts for left and right paws appear in bodyparts list. paw_parts[0] is list of paw parts
+    # for the left paw, paw_parts[1] for the right paw. Same for paw_parts_idx, which just has the index of the paw part
+    # in the bodyparts list
+
     for i_cam in range(num_cams):
+        diff_per_frame = np.zeros((num_bp, num_frames - 1))
+        poss_moved_too_far = np.zeros((num_bp, num_frames), dtype=bool)
+
+        # throw out any points that jumped too far between frames. Assume points with high certainty that jumped
         for i_bp, bp in enumerate(bodyparts):
             individual_part_loc = np.squeeze(r3d_data['frame_points_ud'][:, i_cam, i_bp, :])  # num_frames x num_bodyparts x 2 (x,y)
             invalid_bp_pts = np.squeeze(invalid_pts_conf[:, i_cam, i_bp])
@@ -1607,9 +1624,31 @@ def find_valid_points(r3d_data, reproj_error_limit=15, max_frame_jump=20, min_va
 
             # calculate Euclidean distance between points in adjacent frames
             diff_per_frame[i_bp, :] = np.linalg.norm(np.diff(individual_part_loc, n=1, axis=0), axis=1)
-            poss_moved_too_far[i_bp, :-1] = diff_per_frame[i_bp, :] > max_frame_jump
+            poss_moved_too_far[i_bp, :-1] = (diff_per_frame[i_bp, :] > max_frame_jump)
             poss_moved_too_far[i_bp, 1:] = np.logical_or(poss_moved_too_far[i_bp, :-1], poss_moved_too_far[i_bp, 1:])
-            pass
+            # logic is that either the point before or point after could be the bad point if there was too big a
+            # location jump between frames
+
+            # any points that were clearly invalid based on dlc confidence will be included with potentially invalid
+            # points based on too large a jump
+            poss_moved_too_far[i_bp, :] = np.logical_or(poss_moved_too_far[i_bp, :], invalid_pts_conf[:, i_cam, i_bp])
+
+            # any poss_moved_too_far points that have very high certainty should be considered to be
+            # todo: look at the next line - may need something to account for jumping points where BOTH frames have
+            # high confidence. Maybe this is either very rare or taken care of in subsequent steps
+            poss_moved_too_far[i_bp, certain_pts_conf[:, i_cam, i_bp]] = False
+
+            invalid_pts[i_cam, i_bp, :] = np.logical_or(invalid_pts_conf[:, i_cam, i_bp], poss_moved_too_far[i_bp, :])
+
+        # throw out points that are too far from the cluster of points that should be near each other. There may be a
+        # general way to do this based on DLC skeletons, but for now just going to assume that everything belonging to
+        # the right or left paw should be near each other
+        for i_frame in num_frames:
+
+            for i_paw in range(2):   # 0 - left, 1 - right
+                cur_frame_valid_idx = invalid_pts[i_cam, paw_parts_idx[i_paw], i_frame]
+
+                pass
     # fundamental matrix/R/T were calculated a couple of different ways. using findEssentialMat seems to have been the
     # most accurate, so will use the "_E" versions of each calibration parameter
     excessive_reproj_errors = (r3d_data['reprojection_errors_E'] > reproj_error_limit).astype(bool)
@@ -1619,6 +1658,27 @@ def find_valid_points(r3d_data, reproj_error_limit=15, max_frame_jump=20, min_va
 
 
     pass
+
+
+def get_paw_parts(bodyparts, paw_side):
+    '''
+    extract paw parts and their indices from the list of bodyparts
+    :param bodyparts:
+    :param paw_side:
+    :return:
+    '''
+    test_string = paw_side + 'digit'
+    paw_parts = []
+    paw_parts_idx = []
+    for i_bp, bp in enumerate(bodyparts):
+        if test_string in bp:
+            paw_parts.append(bp)
+            paw_parts_idx.append(i_bp)
+        if (paw_side + 'paw') in bp:
+            paw_parts.append(bp)
+            paw_parts_idx.append(i_bp)
+
+    return paw_parts, paw_parts_idx
 
 
 def invalid_points_from_reprojection_mismatch(r3d_data, invalid_pts_conf, reproj_error_limit=20, max_frame_jump=20):

@@ -1643,7 +1643,7 @@ def find_valid_points(r3d_data, reproj_error_limit=15, max_frame_jump=20, min_va
         # throw out points that are too far from the cluster of points that should be near each other. There may be a
         # general way to do this based on DLC skeletons, but for now just going to assume that everything belonging to
         # the right or left paw should be near each other
-        for i_frame in num_frames:
+        for i_frame in range(num_frames):
 
             for i_paw in range(2):   # 0 - left, 1 - right
                 cur_frame_valid_idx = invalid_pts[i_cam, paw_parts_idx[i_paw], i_frame]

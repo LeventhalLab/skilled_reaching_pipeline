@@ -688,3 +688,17 @@ def rotate_pts_180(pts, im_size):
     reflected_pts = np.squeeze(reflected_pts)
 
     return reflected_pts
+
+
+# some simple geometry functions
+def find_nearest_neighbor(test_point, other_points, num_neighbors=1):
+    '''
+    function to find the point(s) in other_points closest to test_point
+    :param test_point: (x,y) pair
+    :param other_points:
+    :param num_neighbors:
+    :return:
+    '''
+    num_otherpoints = np.shape(other_points)[0]
+
+    distances = np.linalg.norm(other_points - test_point, axis=1)

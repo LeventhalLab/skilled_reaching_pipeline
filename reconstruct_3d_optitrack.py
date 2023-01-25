@@ -1646,8 +1646,23 @@ def find_valid_points(r3d_data, reproj_error_limit=15, max_frame_jump=20, min_va
         for i_frame in range(num_frames):
 
             for i_paw in range(2):   # 0 - left, 1 - right
-                cur_frame_valid_idx = invalid_pts[i_cam, paw_parts_idx[i_paw], i_frame]
+                cur_frame_valid_idx = np.logical_not(invalid_pts[i_cam, paw_parts_idx[i_paw], i_frame])
+                num_valid_points = np.sum(cur_frame_valid_idx)
+                if num_valid_points > 3:    # if at least 4 points found, discard any point that is an outlier
 
+                    paw_coords = np.squeeze(r3d_data['frame_points_ud'][i_frame, i_cam, paw_parts_idx[i_paw], :])
+                    valid_paw_coords = paw_coords[cur_frame_valid_idx, :]
+
+                    for i_point in range(num_valid_points):
+                        test_idx = np.zeros(num_valid_points, dtype=bool)
+                        test_idx[i_point] = True
+                        test_point = valid_paw_coords[test_idx, :]
+                        other_points = valid_paw_coords[np.logical_not(test_idx), :]
+
+                        nn_dist, _ = cvb.find_nearest_neighbor(test_point, other_points, num_neighbors=1)
+
+                        pass
+                    pass
                 pass
     # fundamental matrix/R/T were calculated a couple of different ways. using findEssentialMat seems to have been the
     # most accurate, so will use the "_E" versions of each calibration parameter

@@ -180,6 +180,7 @@ if __name__ == '__main__':
     mouse_reaching_parent = '/home/dleventh/SharedX/Neuro-Leventhal/data/Burgess_mouse_SR/mouse_SR_videos_to_analyze'
     # for dropbox on laptop
     # mouse_reaching_parent = 'C:\\Users\\dklev\Dropbox (University of Michigan)\\MED-LeventhalLab\\Burgess_data\\mouse_SR_videos_to_analyze'
+    scoring_csv = 'GFP Video Scoring - GFP8.csv'
 
     video_root_folder = os.path.join(mouse_reaching_parent, 'mouse_SR_videos_tocrop')
     cropped_vids_parent = os.path.join(mouse_reaching_parent, 'cropped_mouse_SR_videos')
@@ -187,6 +188,8 @@ if __name__ == '__main__':
     cal_vids_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_calibration_videos')
     cal_data_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_calibration_data')
     reconstruct_3d_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_3dreconstructions')
+
+    scoring_csv = os.path.join(mouse_reaching_parent, scoring_csv)
 
     parent_directories = {
         'mouse_reaching_parent': mouse_reaching_parent,

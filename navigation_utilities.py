@@ -2087,3 +2087,12 @@ def mouse_animation_name(vid_metadata, reconstruct_3d_parent):
 
     return fullpath
 
+
+def import_scoring_csv(scoring_xls_name):
+
+    mouse_scores = pd.ExcelFile(scoring_xls_name)
+
+    # concatenate into a single table
+    # mouse_data = pd.read_excel(scoring_xls_name)
+
+    pass

@@ -2103,7 +2103,8 @@ def import_scoring_xlsx(scoring_xls_name):
                 pass
         else:
             try:
-                scores.append(pd.read_excel(scoring_xls_name, sheet_name=test_name))
+                new_scores = pd.read_excel(scoring_xls_name, sheet_name=test_name)
+                scores.append(new_scores)
             except:
                 valid_sheet = False
 

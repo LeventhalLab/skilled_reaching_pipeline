@@ -2088,11 +2088,32 @@ def mouse_animation_name(vid_metadata, reconstruct_3d_parent):
     return fullpath
 
 
-def import_scoring_csv(scoring_xls_name):
+def import_scoring_xlsx(scoring_xls_name):
 
-    mouse_scores = pd.ExcelFile(scoring_xls_name)
+    mouse_scores = pd.read_excel(scoring_xls_name, sheet_name='day01')
 
     # concatenate into a single table
     # mouse_data = pd.read_excel(scoring_xls_name)
 
     pass
+
+
+def find_manual_scoring_sheet(parent_directories, mouseID):
+
+    test_string = '_'.join([mouseID,
+                            'scores.xlsx'])
+
+    test_path = os.path.join(parent_directories['manual_scoring_parent'], test_string)
+
+    scoring_file = glob.glob(test_path)
+
+    if len(scoring_file) == 1:
+        scoring_file = scoring_file[0]
+    elif len(scoring_file) > 1:
+        print('more than one scoring file found for {}'.format(mouseID))
+        scoring_file = None
+    elif len(scoring_file) == 0:
+        print('no scoring file found for {}'.format(mouseID))
+        scoring_file = None
+
+    return scoring_file

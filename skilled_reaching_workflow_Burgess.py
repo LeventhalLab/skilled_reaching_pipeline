@@ -222,6 +222,10 @@ if __name__ == '__main__':
     # vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
     # skilled_reaching_calibration.refine_calibrations_from_orig_vids(vid_folder_list, parent_directories)
 
+    mouseID = 'dLight15'
+
+    scoring_file = navigation_utilities.find_manual_scoring_sheet(parent_directories, mouseID)
+    navigation_utilities.import_scoring_xlsx(scoring_file)
 
     # step 2 - crop all videos of mice reaching
     vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)

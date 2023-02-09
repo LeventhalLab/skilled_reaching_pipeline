@@ -2090,7 +2090,22 @@ def mouse_animation_name(vid_metadata, reconstruct_3d_parent):
 
 def import_scoring_xlsx(scoring_xls_name):
 
-    mouse_scores = pd.read_excel(scoring_xls_name, sheet_name='day01')
+    valid_sheet = True
+    day_num = 0
+
+    while valid_sheet:
+        day_num += 1
+        test_name = 'day{:02d}'.format(day_num)
+        if day_num == 1:
+
+            scores = pd.read_excel(scoring_xls_name, sheet_name=test_name)
+
+
+        else:
+            try:
+                scores.append(pd.read_excel(scoring_xls_name, sheet_name=test_name))
+            except:
+                valid_sheet = False
 
     # concatenate into a single table
     # mouse_data = pd.read_excel(scoring_xls_name)

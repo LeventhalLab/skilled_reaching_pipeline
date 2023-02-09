@@ -188,6 +188,7 @@ if __name__ == '__main__':
     cal_vids_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_calibration_videos')
     cal_data_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_calibration_data')
     reconstruct_3d_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_3dreconstructions')
+    manual_scoring_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_manual_scoring')
 
     scoring_csv = os.path.join(mouse_reaching_parent, scoring_csv)
 
@@ -198,7 +199,8 @@ if __name__ == '__main__':
         'marked_vids_parent': marked_vids_parent,
         'cal_vids_parent': cal_vids_parent,
         'cal_data_parent': cal_data_parent,
-        'reconstruct3d_parent': reconstruct_3d_parent
+        'reconstruct3d_parent': reconstruct_3d_parent,
+        'manual_scoring_parent': manual_scoring_parent
     }
 
     crop_params_csv_path = os.path.join(video_root_folder, 'optitrack_SR_video_crop_regions.csv')

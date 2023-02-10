@@ -1577,14 +1577,20 @@ def test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
     video_root_folder = parent_directories['video_root_folder']
     cropped_vids_parent = parent_directories['cropped_vids_parent']
     r3d_metadata = navigation_utilities.parse_3d_reconstruction_pickle_name(r3d_file)
-    r3d_data = skilled_reaching_io.read_pickle(r3d_file)
 
     # todo: create a movie of 3d reconstruction with video of points super-imposed on videos (also show reprojection errors?)
     # also pick out some specific frames
 
     # get the scoring info for this video
-    this_vid_scores = scoring_data.loc[(scoring_data['video_num'] == r3d_metadata['vid_num']) &
+    this_vid_score = scoring_data.loc[(scoring_data['video_num'] == r3d_metadata['vid_num']) &
                                        (scoring_data['session_num'] == r3d_metadata['session_num'])]
+
+    if this_vid_score.iloc[0]['trial_score'] == 0:
+        _, fname = os.path.split(r3d_file)
+        print('no attempt for {}'.format(fname))
+        return
+
+    r3d_data = skilled_reaching_io.read_pickle(r3d_file)
 
     orig_videos = navigation_utilities.find_original_optitrack_videos(video_root_folder, r3d_metadata)
     orig_videos = sorted(orig_videos)

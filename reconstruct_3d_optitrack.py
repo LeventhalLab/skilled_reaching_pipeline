@@ -1582,6 +1582,10 @@ def test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
     # todo: create a movie of 3d reconstruction with video of points super-imposed on videos (also show reprojection errors?)
     # also pick out some specific frames
 
+    # get the scoring info for this video
+    this_vid_scores = scoring_data.loc[(scoring_data['video_num'] == r3d_metadata['vid_num']) &
+                                       (scoring_data['session_num'] == r3d_metadata['session_num'])]
+
     orig_videos = navigation_utilities.find_original_optitrack_videos(video_root_folder, r3d_metadata)
     orig_videos = sorted(orig_videos)
     # on Linux OS, sometimes files aren't ordered alphabetically, which messes up the correspondence later when making the video

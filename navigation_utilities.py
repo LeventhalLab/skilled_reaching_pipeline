@@ -2104,14 +2104,11 @@ def import_scoring_xlsx(scoring_xls_name):
         else:
             try:
                 new_scores = pd.read_excel(scoring_xls_name, sheet_name=test_name)
-                scores.append(new_scores)
+                scores = scores.append(new_scores)
             except:
                 valid_sheet = False
 
-    # concatenate into a single table
-    mouse_data = pd.read_excel(scoring_xls_name)
-
-    pass
+    return scores
 
 
 def find_manual_scoring_sheet(parent_directories, mouseID):

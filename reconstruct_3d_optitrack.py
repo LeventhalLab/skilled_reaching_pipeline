@@ -1561,12 +1561,18 @@ def test_optitrack_reconstruction(parent_directories):
 def test_singlefolder_optitrack_reconstruction(rd, parent_directories):
 
     r3d_files = navigation_utilities.find_optitrack_r3d_files(rd)
+    r3d_metadata = navigation_utilities.parse_3d_reconstruction_pickle_name(r3d_files[0])
+    # load in the manually scored data
+    scoring_file = navigation_utilities.find_manual_scoring_sheet(parent_directories, r3d_metadata['mouseID'])
+    if scoring_file is None:
+        return
+    scoring_data = navigation_utilities.import_scoring_xlsx(scoring_file)
 
     for r3d_file in r3d_files:
-        test_single_optitrack_trajectory(r3d_file, parent_directories)
+        test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
 
 
-def test_single_optitrack_trajectory(r3d_file, parent_directories):
+def test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories):
 
     video_root_folder = parent_directories['video_root_folder']
     cropped_vids_parent = parent_directories['cropped_vids_parent']

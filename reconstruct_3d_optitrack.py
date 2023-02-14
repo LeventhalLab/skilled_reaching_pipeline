@@ -1577,11 +1577,13 @@ def find_reach_end(r3d_data, start_frame):
     pass
 
 def calculate_reach_trajectory(r3d_data, this_vid_score):
-    start_frame = this_vid_score['attempt']
+    start_frame = this_vid_score['attempt'][0]
     if this_vid_score.iloc[0]['trial_score'] == 1:
         end_frame = find_reach_end(r3d_data, start_frame)
     elif this_vid_score.iloc[0]['trial_score'] == 2:
-        end_frame = this_vid_score['grasp']
+        end_frame = this_vid_score['grasp'][0]
+
+    pass
 
 def test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories):
 

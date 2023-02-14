@@ -1572,6 +1572,17 @@ def test_singlefolder_optitrack_reconstruction(rd, parent_directories):
         test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
 
 
+def find_reach_end(r3d_data, start_frame):
+    # todo: write code to find when the paw turns around and heads back after a reach without grasp
+    pass
+
+def calculate_reach_trajectory(r3d_data, this_vid_score):
+    start_frame = this_vid_score['attempt']
+    if this_vid_score.iloc[0]['trial_score'] == 1:
+        end_frame = find_reach_end(r3d_data, start_frame)
+    elif this_vid_score.iloc[0]['trial_score'] == 2:
+        end_frame = this_vid_score['grasp']
+
 def test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories):
 
     video_root_folder = parent_directories['video_root_folder']
@@ -1591,6 +1602,8 @@ def test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
         return
 
     r3d_data = skilled_reaching_io.read_pickle(r3d_file)
+
+    calculate_reach_trajectory(r3d_data, this_vid_score)
 
     orig_videos = navigation_utilities.find_original_optitrack_videos(video_root_folder, r3d_metadata)
     orig_videos = sorted(orig_videos)

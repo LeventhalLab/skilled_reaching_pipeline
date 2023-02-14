@@ -2100,7 +2100,7 @@ def import_scoring_xlsx(scoring_xls_name):
             try:
                 scores = pd.read_excel(scoring_xls_name, sheet_name=test_name)
             except:
-                pass
+                valid_sheet = False
         else:
             try:
                 new_scores = pd.read_excel(scoring_xls_name, sheet_name=test_name)

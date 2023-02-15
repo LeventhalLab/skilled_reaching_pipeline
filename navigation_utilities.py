@@ -147,7 +147,7 @@ def find_original_optitrack_videos(video_root_folder, metadata, vidtype='.avi'):
 
     vid_list = glob.glob(test_vid_name)
 
-    if len(vid_list == 0):
+    if len(vid_list) == 0:
         test_vid_name = '_'.join(['*' + mouseID,
                                   fname_time2string(trialtime),
                                   '{:02d}'.format(metadata['session_num']),

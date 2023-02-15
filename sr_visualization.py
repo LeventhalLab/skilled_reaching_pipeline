@@ -215,7 +215,6 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
         fig_F.savefig(jpg_name_F)
         plt.close('all')
         # plt.show()
-        pass
 
     # turn the cropped jpegs into a new movie
     jpg_names_E = os.path.join(jpg_folder_E, 'frame%04d.jpg')

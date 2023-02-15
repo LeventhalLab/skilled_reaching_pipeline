@@ -1606,10 +1606,10 @@ def test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
     this_vid_score = scoring_data.loc[(scoring_data['video_num'] == r3d_metadata['vid_num']) &
                                        (scoring_data['session_num'] == r3d_metadata['session_num'])]
 
-    if this_vid_score.iloc[0]['trial_score'] == 0:
-        _, fname = os.path.split(r3d_file)
-        print('no attempt for {}'.format(fname))
-        return
+    # if this_vid_score.iloc[0]['trial_score'] == 0:
+    #     _, fname = os.path.split(r3d_file)
+    #     print('no attempt for {}'.format(fname))
+    #     return
 
     r3d_data = skilled_reaching_io.read_pickle(r3d_file)
 

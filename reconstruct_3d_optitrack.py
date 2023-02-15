@@ -40,9 +40,9 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
         reconstruct3d_parent = parent_directories['reconstruct3d_parent']
         reconstruction3d_fname = navigation_utilities.create_3d_reconstruction_pickle_name(
             dlc_output_pickle_metadata, reconstruct3d_parent)
-        if os.path.exists(reconstruction3d_fname):
-            print('{} already calculated'.format(reconstruction3d_fname))
-            continue
+        # if os.path.exists(reconstruction3d_fname):
+        #     print('{} already calculated'.format(reconstruction3d_fname))
+        #     continue
 
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file))
         calibration_file = navigation_utilities.find_optitrack_calibration_data_name(cal_data_parent, pickle_metadata[0]['trialtime'])
@@ -469,8 +469,8 @@ def check_3d_reprojection(worldpoints, frame_pts_ud, cal_data, dlc_metadata, pic
         # overlay_pts_in_cropped_img(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist,
         #                            parent_directories, reprojected_pts=None, vid_type='.avi', plot_undistorted=False)
 
-    # draw_epipolar_lines(cal_data, frame_pts_ud, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
-    # plt.show()
+    draw_epipolar_lines(cal_data, frame_pts_ud, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
+    plt.show()
 
     return projected_pts, reproj_errors
 
@@ -1074,12 +1074,12 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
         # F_from_E = np.linalg.inv(mtx[1].T) @ E_new @ np.linalg.inv(mtx[0])
         # E_from_F = mtx[1].T @ F_new @ mtx[0]
 
-        # draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F_from_E'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='--')
+        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F_from_E'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='--')
         #
-        # draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F_ffm'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='dotted')
+        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F_ffm'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='dotted')
 
-        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F'], im_size, bodyparts, axs[0][1 - i_cam],
-                                   linestyle='-')
+        # draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F'], im_size, bodyparts, axs[0][1 - i_cam],
+        #                            linestyle='-')
 
     # plt.show()
     # pass
@@ -1555,13 +1555,21 @@ def test_optitrack_reconstruction(parent_directories):
     r3d_directories = navigation_utilities.get_optitrack_r3d_folders(reconstruct3d_parent)
 
     for rd in r3d_directories:
+        # check individual rats. Note GFP4 the calibrations look very off
         test_singlefolder_optitrack_reconstruction(rd, parent_directories)
 
 
 def test_singlefolder_optitrack_reconstruction(rd, parent_directories):
 
     r3d_files = navigation_utilities.find_optitrack_r3d_files(rd)
-    r3d_metadata = navigation_utilities.parse_3d_reconstruction_pickle_name(r3d_files[0])
+    try:
+        r3d_metadata = navigation_utilities.parse_3d_reconstruction_pickle_name(r3d_files[0])
+    except:
+        return
+
+    mouseID = 'dLight15'
+    if mouseID != r3d_metadata['mouseID']:
+        return
     # load in the manually scored data
     scoring_file = navigation_utilities.find_manual_scoring_sheet(parent_directories, r3d_metadata['mouseID'])
     if scoring_file is None:
@@ -1605,7 +1613,7 @@ def test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
 
     r3d_data = skilled_reaching_io.read_pickle(r3d_file)
 
-    calculate_reach_trajectory(r3d_data, this_vid_score)
+    # calculate_reach_trajectory(r3d_data, this_vid_score)
 
     orig_videos = navigation_utilities.find_original_optitrack_videos(video_root_folder, r3d_metadata)
     orig_videos = sorted(orig_videos)
@@ -1623,7 +1631,7 @@ def test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
     # todo: write analog of script_calculateKinematics
     # todo: write script_interp_trajectories
 
-    # sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories)
+    sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories)
 
 
 def visualize_invalid_points():

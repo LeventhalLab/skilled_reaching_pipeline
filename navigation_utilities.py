@@ -147,6 +147,17 @@ def find_original_optitrack_videos(video_root_folder, metadata, vidtype='.avi'):
 
     vid_list = glob.glob(test_vid_name)
 
+    if len(vid_list == 0):
+        test_vid_name = '_'.join(['*' + mouseID,
+                                  fname_time2string(trialtime),
+                                  '{:02d}'.format(metadata['session_num']),
+                                  '{:03d}'.format(metadata['vid_num']),
+                                  'cam*' + vidtype
+                                  ])
+        test_vid_name = os.path.join(video_root_folder, mouseID, month_dir, date_dir, test_vid_name)
+
+        vid_list = glob.glob(test_vid_name)
+
     # full_vid_name = os.path.join(video_root_folder, mouseID, month_dir, date_dir, vid_name)
     #
     # if not os.path.exists(full_vid_name):
@@ -168,7 +179,7 @@ def find_cropped_optitrack_videos(cropped_vids_parent, metadata, num_cams=2, vid
 
     test_vid_name = '_'.join(['*' + mouseID,
                              fname_time2string(trialtime),
-                             str(metadata['session_num']),
+                             '{:02d}'.format(metadata['session_num']),
                              '{:03d}'.format(metadata['vid_num']),
                              'cam*' + vidtype
                             ])
@@ -181,6 +192,25 @@ def find_cropped_optitrack_videos(cropped_vids_parent, metadata, num_cams=2, vid
             cropped_vids.append(vid_list[0])
         else:
             cropped_vids.append(None)
+
+    if all([cropped_vid is None for cropped_vid in cropped_vids]):
+        # sometimes the session number is 2 digits (i.e., '05'), and sometimes it's one digit (i.e., '5'). Need to check
+        # both possibilities
+        test_vid_name = '_'.join(['*' + mouseID,
+                                  fname_time2string(trialtime),
+                                  '{:d}'.format(metadata['session_num']),
+                                  '{:03d}'.format(metadata['vid_num']),
+                                  'cam*' + vidtype
+                                  ])
+        test_vid_names = [os.path.join(cropped_vids_parent, mouseID, month_dir, date_dir, cam_dirs[i_cam], test_vid_name) for i_cam in range(num_cams)]
+        cropped_vids = []
+        for i_cam in range(num_cams):
+            vid_list = glob.glob(test_vid_names[i_cam])
+            if len(vid_list) == 1:
+                cropped_vids.append(vid_list[0])
+            else:
+                cropped_vids.append(None)
+
     # vid_list = glob.glob(test_vid_name)
 
     # full_vid_name = os.path.join(video_root_folder, mouseID, month_dir, date_dir, vid_name)
@@ -462,7 +492,7 @@ def parse_cropped_optitrack_video_name(cropped_video_name):
         'mouseID': '',
         'triggertime': datetime(1,1,1),
         'video_number': 0,
-        'view': '',
+        'cam_num': '',
         'video_type': '',
         'crop_window': [],
         'cropped_video_name': ''
@@ -473,21 +503,12 @@ def parse_cropped_optitrack_video_name(cropped_video_name):
 
     metadata_list = vid_name.split('_')
 
-    cropped_vid_metadata['ratID'] = metadata_list[0]
-    num_string = ''.join(filter(lambda i: i.isdigit(), cropped_vid_metadata['ratID']))
-    cropped_vid_metadata['rat_num'] = int(num_string)
+    cropped_vid_metadata['mouseID'] = metadata_list[0]
 
-    # if box number is stored in file name, then extract it
-    if 'box' in metadata_list[1]:
-        cropped_vid_metadata['boxnum'] = int(metadata_list[1][3:])
-        next_metadata_idx = 2
-    else:
-        next_metadata_idx = 1
-
-    datetime_str = metadata_list[next_metadata_idx] + '_' + metadata_list[1+next_metadata_idx]
+    datetime_str = metadata_list[1] + '_' + metadata_list[2]
     cropped_vid_metadata['triggertime'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
 
-    cropped_vid_metadata['video_number'] = int(metadata_list[next_metadata_idx + 2])
+    cropped_vid_metadata['session_num'] = int(metadata_list[3])
     cropped_vid_metadata['video_type'] = vid_type
     cropped_vid_metadata['view'] = metadata_list[next_metadata_idx + 3]
 

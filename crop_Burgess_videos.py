@@ -7,6 +7,8 @@ import pandas as pd
 from datetime import datetime
 import skilled_reaching_calibration
 import navigation_utilities
+import os
+
 
 def crop_optitrack_video(vid_path_in, vid_path_out, crop_params, filtertype='mjpeg2jpeg'):
 

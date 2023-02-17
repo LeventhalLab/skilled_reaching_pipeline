@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import os
 import glob
-
+from datetime import datetime
 import dlc_utilities
 import navigation_utilities
 import skilled_reaching_calibration
@@ -1567,8 +1567,9 @@ def test_singlefolder_optitrack_reconstruction(rd, parent_directories):
     except:
         return
 
-    mouseID = 'dLight15'
-    if mouseID != r3d_metadata['mouseID']:
+    mouseID = 'dLight26'
+    session_date = datetime(2021, 7, 7)
+    if mouseID != r3d_metadata['mouseID'] or session_date.date() != r3d_metadata['trialtime'].date():
         return
     # load in the manually scored data
     scoring_file = navigation_utilities.find_manual_scoring_sheet(parent_directories, r3d_metadata['mouseID'])

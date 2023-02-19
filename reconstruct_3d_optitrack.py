@@ -40,9 +40,9 @@ def reconstruct_optitrack_session(view_directories, parent_directories):
         reconstruct3d_parent = parent_directories['reconstruct3d_parent']
         reconstruction3d_fname = navigation_utilities.create_3d_reconstruction_pickle_name(
             dlc_output_pickle_metadata, reconstruct3d_parent)
-        # if os.path.exists(reconstruction3d_fname):
-        #     print('{} already calculated'.format(reconstruction3d_fname))
-        #     continue
+        if os.path.exists(reconstruction3d_fname):
+            print('{} already calculated'.format(reconstruction3d_fname))
+            continue
 
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_file))
         calibration_file = navigation_utilities.find_optitrack_calibration_data_name(cal_data_parent, pickle_metadata[0]['trialtime'])
@@ -1567,18 +1567,17 @@ def test_singlefolder_optitrack_reconstruction(rd, parent_directories):
     except:
         return
 
-    mouseID = 'dLight26'
-    session_date = datetime(2021, 7, 7)
-    if mouseID != r3d_metadata['mouseID'] or session_date.date() != r3d_metadata['trialtime'].date():
-        return
     # load in the manually scored data
     scoring_file = navigation_utilities.find_manual_scoring_sheet(parent_directories, r3d_metadata['mouseID'])
     if scoring_file is None:
         return
     scoring_data = navigation_utilities.import_scoring_xlsx(scoring_file)
 
-    for r3d_file in r3d_files:
-        test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
+    # for r3d_file in r3d_files:
+        # test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
+    # this is just to get a quick look at each reconstruction to see if it looks reasonable. Delete this line and
+    # uncomment the lines above to loop through everything.
+    test_single_optitrack_trajectory(r3d_files[0], scoring_data, parent_directories)
 
 
 def find_reach_end(r3d_data, start_frame):

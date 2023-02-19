@@ -84,6 +84,8 @@ def crop_Burgess_folders(video_folder_list, cropped_vid_parent, crop_params, cam
     :return:
     """
 
+    mice_to_exclude = ['dLight26','dLight28','dLight31','dLight42','dLight49','dLight50']
+
     box_num = 1    # for now, only one mouse skilled reaching box
     cropped_video_directories = navigation_utilities.create_Burgess_cropped_video_destination_list(cropped_vid_parent, video_folder_list, cam_list)
     # create_Burgess_cropped_video_destination_list returns a list of num_cam-element lists, where each list contains
@@ -95,6 +97,10 @@ def crop_Burgess_folders(video_folder_list, cropped_vid_parent, crop_params, cam
     for i_path, vids_path in enumerate(video_folder_list):
         # find files with extension vidtype
         vids_list = glob.glob(os.path.join(vids_path, '*' + vidtype))
+        _, vid_folder_name = os.path.split(vids_path)
+        vid_folder_parts = vid_folder_name.split('_')
+        if vid_folder_parts[0] == 'BT32':
+            pass
         if not bool(vids_list):
             # vids_list is empty
             continue
@@ -104,6 +110,9 @@ def crop_Burgess_folders(video_folder_list, cropped_vid_parent, crop_params, cam
             # pick an .avi file in this folder
             test_vid = vids_list[0]
             vid_metadata = navigation_utilities.parse_Burgess_vid_name(test_vid)
+
+            if vid_metadata['mouseID'] in mice_to_exclude:
+                continue
             session_date = vid_metadata['time'].date()
             crop_params_dict = crop_params_optitrack_dict_from_df(crop_params, session_date, box_num, cam_list)
 

@@ -1504,7 +1504,25 @@ def find_optitrack_calibration_data_name(cal_data_parent, session_datetime, max_
                 cal_data_datetimes.append(fname_string_to_datetime(cal_data_datestring))
 
     if not bool(cal_data_datetimes):
-        # still haven't found any calibration data
+        # still haven't found any calibration data; try looking forward in time
+        while not bool(cal_data_datetimes) and session_datetime + cur_datetime <= session_datetime + timedelta(max_days_to_look_back):
+            # look back max_days_to_look_back days before giving up
+            cur_datetime = cur_datetime - timedelta(1)
+
+            cal_data_folder = create_optitrack_calibration_data_folder(cal_data_parent, cur_datetime)
+            test_name = '_'.join((basename, date_to_string_for_fname(cur_datetime) + '_*.pickle'))
+
+            cal_data_files = glob.glob(os.path.join(cal_data_folder, test_name))
+            cal_data_datetimes = []
+            for cal_data_file in cal_data_files:
+                _, cal_data_root = os.path.split(cal_data_file)
+                cal_data_root, _ = os.path.splitext(cal_data_root)
+                fparts = cal_data_root.split('_')
+                cal_data_datestring = '_'.join(fparts[1:3])
+
+                cal_data_datetimes.append(fname_string_to_datetime(cal_data_datestring))
+
+    if not bool(cal_data_datetimes):
         return None
 
     # find datetime of calibration data file closest to session_datetime

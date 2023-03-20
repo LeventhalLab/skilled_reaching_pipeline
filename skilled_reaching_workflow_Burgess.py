@@ -21,6 +21,9 @@ def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, parent_dir
         deeplabcut.analyze_videos
     '''
 
+    mice_to_skip = ['BT32','BT33',
+                    'dLight24', 'dLight26', 'dLight28', 'dLight31', 'dLight36', 'dLight42', 'dLight49', 'dLight50', 'dLight53', 'dLight54',
+                    'GFP3', 'GFP4', 'GFP5', 'GFP14']
     if cropped_vid_type[0]=='.':
         pass
     else:
@@ -36,6 +39,9 @@ def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, parent_dir
             cropped_folder_metadata = navigation_utilities.parse_cropped_optitrack_video_folder(current_folder)
             if cropped_folder_metadata['mouseID'] == 'GFP14' and \
                     cropped_folder_metadata['session_date'] in [datetime(2022,3,9,0,0,0)]:
+                continue
+
+            if cropped_folder_metadata['mouseID'] in mice_to_skip:
                 continue
 
             cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
@@ -232,12 +238,12 @@ if __name__ == '__main__':
     vid_folder_list = navigation_utilities.get_Burgess_video_folders_to_crop(video_root_folder)
     crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
     # UNCOMMENT BELOW
-    cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, parent_directories, crop_params_df, cam_list, vidtype='avi')
+    # cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, parent_directories, crop_params_df, cam_list, vidtype='avi')
 
     # step 3 - run DLC on each cropped video
     # UNCOMMENT BELOW
     folders_to_analyze = navigation_utilities.find_optitrack_folders_to_analyze(parent_directories, cam_list=cam_list)
-    scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, parent_directories, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
+    # scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, parent_directories, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
     scorername = 'DLC_dlcrnetms5_mouse_headfixed_skilledreachingNov5shuffle1_100000'
 
     # UNCOMMENT BELOW
@@ -253,7 +259,7 @@ if __name__ == '__main__':
         # except:
         #     pass
     # step 4 - reconstruct 3D images
-    reconstruct_optitrack_3d(parent_directories)
+    # reconstruct_optitrack_3d(parent_directories)
     #
     reconstruct_3d_optitrack.test_optitrack_reconstruction(parent_directories)
 

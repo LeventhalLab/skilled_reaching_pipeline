@@ -84,7 +84,7 @@ def crop_Burgess_folders(video_folder_list, cropped_vid_parent, crop_params, cam
     :return:
     """
 
-    mice_to_exclude = ['dLight26','dLight28','dLight31','dLight42','dLight49','dLight50']
+    mice_to_exclude = ['dLight24','dLight26','dLight28','dLight31','dLight36','dLight42','dLight49','dLight50']
 
     box_num = 1    # for now, only one mouse skilled reaching box
     cropped_video_directories = navigation_utilities.create_Burgess_cropped_video_destination_list(cropped_vid_parent, video_folder_list, cam_list)

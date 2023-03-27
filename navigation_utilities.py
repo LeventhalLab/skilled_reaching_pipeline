@@ -8,6 +8,35 @@ import shutil
 from datetime import datetime, timedelta
 
 
+def find_cropped_session_folder(session_metadata, parent_directories):
+    '''
+
+    :param session_metadata:
+    :param parent_directories:
+    :return:
+    '''
+    cropped_vids_parent = parent_directories['cropped_vids_parent']
+    mouseID = session_metadata['mouseID']
+    mouse_folder = os.path.join(cropped_vids_parent, mouseID)
+
+    metadata_keys = session_metadata.keys()
+    test_datetime_keys = ['trialtime', 'date', 'time']
+    for test_key in test_datetime_keys:
+        if test_key in metadata_keys:
+            session_date = session_metadata[test_key]
+
+    date_dir = os.path.join(mouse_folder, mouseID + '_' + session_date.strftime('%Y%m%d'))
+
+    potential_cam_folders = glob.glob(os.path.join(date_dir, '*_cam*'))
+    cam_folders = [pcf for pcf in potential_cam_folders if os.path.isdir(pcf)]
+
+    # make sure the cam_folders are in order of camera number
+    cam_nums_from_folders = [int(cf[-2:]) for cf in cam_folders]
+    sorted_cam_folders = [scf for (_, scf) in sorted(zip(cam_nums_from_folders, cam_folders), key=lambda x: x[0])]
+
+    return date_dir, sorted_cam_folders
+
+
 def find_vid_pair_from_session(vid_folder, session_num, vid_type='.avi'):
 
     test_vid_num = 0
@@ -143,7 +172,7 @@ def find_original_optitrack_videos(video_root_folder, metadata, vidtype='.avi'):
                              '{:03d}'.format(metadata['vid_num']),
                              'cam*' + vidtype
                             ])
-    test_vid_name = os.path.join(video_root_folder, mouseID, month_dir, date_dir, test_vid_name)
+    test_vid_name = os.path.join(video_root_folder, mouseID, date_dir, test_vid_name)
 
     vid_list = glob.glob(test_vid_name)
 
@@ -154,7 +183,7 @@ def find_original_optitrack_videos(video_root_folder, metadata, vidtype='.avi'):
                                   '{:03d}'.format(metadata['vid_num']),
                                   'cam*' + vidtype
                                   ])
-        test_vid_name = os.path.join(video_root_folder, mouseID, month_dir, date_dir, test_vid_name)
+        test_vid_name = os.path.join(video_root_folder, mouseID, date_dir, test_vid_name)
 
         vid_list = glob.glob(test_vid_name)
 
@@ -183,7 +212,7 @@ def find_cropped_optitrack_videos(cropped_vids_parent, metadata, num_cams=2, vid
                              '{:03d}'.format(metadata['vid_num']),
                              'cam*' + vidtype
                             ])
-    test_vid_names = [os.path.join(cropped_vids_parent, mouseID, month_dir, date_dir, cam_dirs[i_cam], test_vid_name) for i_cam in range(num_cams)]
+    test_vid_names = [os.path.join(cropped_vids_parent, mouseID, date_dir, cam_dirs[i_cam], test_vid_name) for i_cam in range(num_cams)]
 
     cropped_vids = []
     for i_cam in range(num_cams):
@@ -202,7 +231,7 @@ def find_cropped_optitrack_videos(cropped_vids_parent, metadata, num_cams=2, vid
                                   '{:03d}'.format(metadata['vid_num']),
                                   'cam*' + vidtype
                                   ])
-        test_vid_names = [os.path.join(cropped_vids_parent, mouseID, month_dir, date_dir, cam_dirs[i_cam], test_vid_name) for i_cam in range(num_cams)]
+        test_vid_names = [os.path.join(cropped_vids_parent, mouseID, date_dir, cam_dirs[i_cam], test_vid_name) for i_cam in range(num_cams)]
         cropped_vids = []
         for i_cam in range(num_cams):
             vid_list = glob.glob(test_vid_names[i_cam])
@@ -395,20 +424,20 @@ def find_optitrack_folders_to_analyze(parent_directories, cam_list=(1, 2)):
         if os.path.isdir(mouse_folder):
             # assume the rat_folder directory name is the same as ratID (i.e., form of RXXXX)
             _, mouseID = os.path.split(mouse_folder)
-            monthfolder_name = mouseID + '_*'
-            month_dir_list = glob.glob(os.path.join(mouse_folder, monthfolder_name))
-            # make sure we only include directories (just in case there are some stray files with the right names)
-            month_dir_list = [month_dir for month_dir in month_dir_list if os.path.isdir(month_dir)]
-            for month_dir in month_dir_list:
-                _, cur_month_dir_name = os.path.split(month_dir)
-                sessionfolder_name = cur_month_dir_name + '*'
-                session_dir_list = glob.glob(os.path.join(month_dir, sessionfolder_name))
-                for session_dir in session_dir_list:
-                    _, cur_session = os.path.split(session_dir)
-                    for cam_name in cam_name_list:
-                        cam_folder = os.path.join(session_dir, cur_session + '_' + cam_name)
-                        if os.path.isdir(cam_folder):
-                            folders_to_analyze[cam_name].extend([cam_folder])
+            # monthfolder_name = mouseID + '_*'
+            # month_dir_list = glob.glob(os.path.join(mouse_folder, monthfolder_name))
+            # # make sure we only include directories (just in case there are some stray files with the right names)
+            # month_dir_list = [month_dir for month_dir in month_dir_list if os.path.isdir(month_dir)]
+            # for month_dir in month_dir_list:
+            #     _, cur_month_dir_name = os.path.split(month_dir)
+            sessionfolder_name = mouseID + '*'
+            session_dir_list = glob.glob(os.path.join(mouse_folder, sessionfolder_name))
+            for session_dir in session_dir_list:
+                _, cur_session = os.path.split(session_dir)
+                for cam_name in cam_name_list:
+                    cam_folder = os.path.join(session_dir, cur_session + '_' + cam_name)
+                    if os.path.isdir(cam_folder):
+                        folders_to_analyze[cam_name].extend([cam_folder])
 
     return folders_to_analyze
 
@@ -1582,16 +1611,16 @@ def get_optitrack_r3d_folders(reconstruct3d_parent):
     for md in mouse_directories:
         _, mouseID = os.path.split(md)
         test_string = os.path.join(md, mouseID + '_*')
-        poss_month_directories = glob.glob(test_string)
-        poss_month_directories = [pmd for pmd in poss_month_directories if os.path.isdir(pmd)]
+        # poss_month_directories = glob.glob(test_string)
+        # poss_month_directories = [pmd for pmd in poss_month_directories if os.path.isdir(pmd)]
+        #
+        # for month_dir in poss_month_directories:
+        test_string = os.path.join(md, mouseID + '_*')
+        poss_day_directories = glob.glob(test_string)
+        day_directories = [pdd for pdd in poss_day_directories if os.path.isdir(pdd)]
 
-        for month_dir in poss_month_directories:
-            test_string = os.path.join(month_dir, mouseID + '_*')
-            poss_day_directories = glob.glob(test_string)
-            day_directories = [pdd for pdd in poss_day_directories if os.path.isdir(pdd)]
-
-            if bool(day_directories):
-                r3d_directories.extend(day_directories)
+        if bool(day_directories):
+            r3d_directories.extend(day_directories)
 
     return r3d_directories
 
@@ -1835,7 +1864,7 @@ def find_dlc_pickles_from_r3d_filename(r3d_file, parent_directories):
                                 'cam{:02d}'.format(i_cam + 1)
                                 ])
 
-        cam_dir = os.path.join(mouse_folder, month_dirname, day_dirname, cam_dirname)
+        cam_dir = os.path.join(mouse_folder, day_dirname, cam_dirname)
         test_name = '_'.join([r3d_metadata['mouseID'],
                               datestring,
                               '{:d}'.format(r3d_metadata['session_num']),

@@ -18,7 +18,72 @@ import matplotlib
 matplotlib.use('TKAgg')
 
 
+def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories):
+
+    # find the folder containing cropped videos and dlc pickle files for this session
+    session_folder, cam_folders = navigation_utilities.find_cropped_session_folder(session_metadata, parent_directories)
+    cal_data_parent = parent_directories['cal_data_parent']
+
+    # find the nearest calibration file based on chessboard calibration
+    # find the closest calibration data file
+    metadata_keys = session_metadata.keys()
+    test_datetime_keys = ['trialtime', 'date', 'time']
+    for test_key in test_datetime_keys:
+        if test_key in metadata_keys:
+            session_datetime = session_metadata[test_key]
+    cal_file = navigation_utilities.find_optitrack_calibration_data_name(cal_data_parent, session_datetime, max_days_to_look_back=5, basename='calibrationdata')
+    cal_data = skilled_reaching_io.read_pickle(cal_file)
+
+    # collect matched dlc points
+    _, session_foldername = os.path.split(session_folder)
+    test_name = session_foldername + '_*_full.pickle'
+    cam_pickles = [glob.glob(os.path.join(cf, test_name)) for cf in cam_folders]
+
+    matched_points = collect_matched_dlc_points(cam_pickles)
+
+    F_new, F_msk = cv2.findFundamentalMat(stereo_unnorm[0], stereo_unnorm[1], cv2.FM_RANSAC, 0.1, 0.999)
+    E_new, E_msk = cv2.findEssentialMat(stereo_unnorm[0], stereo_unnorm[1], cal_data['mtx'][0], None,
+                                         cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 1)
+
+    F_from_E = np.linalg.inv(mtx[1].T) @ E_new @ np.linalg.inv(mtx[0])
+    E_from_F = mtx[1].T @ F_new @ mtx[0]
+
+    pass
+
+
+def collect_matched_dlc_points(cam_pickles):
+
+    num_cams = len(cam_pickles)
+
+    matched_points = []
+    cam_pickle_files = []
+    for cam01_pickle in cam_pickles[0]:
+        # find corresponding pickle file for camera 2
+        cam01_folder, cam01_pickle_name = os.path.split(cam01_pickle)
+        session_folder, _ = os.path.split(cam01_folder)
+        cam01_pickle_stem = cam01_pickle_name[:cam01_pickle_name.find('cam01') + 5]
+        cam02_pickle_stem = cam01_pickle_stem.replace('cam01', 'cam02')
+
+        cam02_pickle = [c02_pickle for c02_pickle in cam_pickles[1] if cam02_pickle_stem in c02_pickle]
+
+        # cam02_file_list = glob.glob(os.path.join(view_directories[1], cam02_pickle_stem + '*full.pickle'))
+        if len(cam02_pickle) == 1:
+            cam02_pickle = cam02_pickle[0]
+            cam_pickle_files.append(cam01_pickle)
+            cam_pickle_files.append(cam02_pickle)
+        else:
+            print('no matching camera 2 file for {}'.format(cam01_file))
+            continue
+
+        # read in pickle data from both files
+        single_trial_dlc = []
+        for i_cam, pickle_name in enumerate(cam_pickle_files):
+            single_trial_dlc.append(skilled_reaching_io.read_pickle(pickle_name))
+        pass
+        # pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam02_file))
+
 def refine_calibrations_from_orig_vids(vid_folder_list, parent_directories):
+    # this doesn't seem to be working so well. Perhaps better to refine from matched points identified by DLC
     cal_data_parent = parent_directories['cal_data_parent']
 
     for vf in vid_folder_list:

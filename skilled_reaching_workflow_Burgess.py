@@ -188,17 +188,17 @@ if __name__ == '__main__':
 
     Burgess_DLC_config_path = '/home/dleventh/Public/mouse_skilledreaching/mouse_headfixed_skilledreaching-DanL-2021-11-05/config.yaml'
 
-    # mouse_reaching_parent = '/home/dleventh/SharedX/Neuro-Leventhal/data/Burgess_mouse_SR/mouse_SR_videos_to_analyze'   # on lambda
-    mouse_reaching_parent = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\Burgess_mouse_SR\mouse_SR_videos_to_analyze'  # on office desktop
-    # mouse_reaching_parent = 'C:\\Users\\dklev\Dropbox (University of Michigan)\\MED-LeventhalLab\\Burgess_data\\mouse_SR_videos_to_analyze'   # dropbox on laptop
+    # mouse_reaching_parent = '/home/dleventh/SharedX/Neuro-Leventhal/data/hf_mouse/'   # on lambda
+    mouse_reaching_parent = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\hf_mouse'  # on office desktop
+    # mouse_reaching_parent = 'C:\\Users\\dklev\Dropbox (University of Michigan)\\MED-LeventhalLab\\Burgess_data\\hf_mouse'   # dropbox on laptop
     scoring_csv = 'GFP Video Scoring - GFP8.csv'
 
     video_root_folder = os.path.join(mouse_reaching_parent, 'mouse_SR_videos_tocrop')
-    cropped_vids_parent = os.path.join(mouse_reaching_parent, 'cropped_mouse_SR_videos')
-    marked_vids_parent = os.path.join(mouse_reaching_parent, 'marked_mouse_SR_videos')
+    cropped_vids_parent = os.path.join(mouse_reaching_parent, 'cropped')
+    marked_vids_parent = os.path.join(mouse_reaching_parent, 'marked')
     cal_vids_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_calibration_videos')
     cal_data_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_calibration_data')
-    reconstruct_3d_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_3dreconstructions')
+    reconstruct_3d_parent = os.path.join(mouse_reaching_parent, 'recon3d')
     manual_scoring_parent = os.path.join(mouse_reaching_parent, 'mouse_SR_manual_scoring')
 
     scoring_csv = os.path.join(mouse_reaching_parent, scoring_csv)
@@ -213,6 +213,9 @@ if __name__ == '__main__':
         'reconstruct3d_parent': reconstruct_3d_parent,
         'manual_scoring_parent': manual_scoring_parent
     }
+    test_metadata = {'mouseID': 'dLight15',
+                     'date': datetime.strptime('20210713', '%Y%m%d')}
+    skilled_reaching_calibration.refine_optitrack_calibration_from_dlc(test_metadata, parent_directories)
 
     crop_params_csv_path = os.path.join(video_root_folder, 'optitrack_SR_video_crop_regions.csv')
 

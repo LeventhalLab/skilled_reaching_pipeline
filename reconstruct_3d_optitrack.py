@@ -1241,7 +1241,10 @@ def correct_pellet_locations(r3d_data, r3d_file, parent_directories, pt_euc_diff
     for full_pickle in full_pickles:
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(full_pickle))
 
-    month_dir = pickle_metadata[0]['mouseID'] + '_' + pickle_metadata[0]['trialtime'].strftime('%Y%m')
+    try:
+        month_dir = pickle_metadata[0]['mouseID'] + '_' + pickle_metadata[0]['trialtime'].strftime('%Y%m')
+    except:
+        pass
     day_dir = pickle_metadata[0]['mouseID'] + '_' + pickle_metadata[0]['trialtime'].strftime('%Y%m%d')
     orig_vid_folder = os.path.join(video_root_folder, pickle_metadata[0]['mouseID'], month_dir, day_dir)
 
@@ -1517,7 +1520,9 @@ def identify_valid_points_in_frames(r3d_data, max_reproj_error=20, min_conf=0.9)
     :return: frame_valid_points: num_frames x num_cams x num_points boolean array containing True for each frame-
         camera-view-point that is valid based on reprojection error and dlc confidence
     '''
-    reproj_errors = r3d_data['reprojection_errors']
+
+    reproj_errors = r3d_data['reprojection_errors_E']
+
     dlc_conf = r3d_data['frame_confidence']
 
     num_frames = np.shape(reproj_errors)[0]
@@ -1573,11 +1578,13 @@ def test_singlefolder_optitrack_reconstruction(rd, parent_directories):
         return
     scoring_data = navigation_utilities.import_scoring_xlsx(scoring_file)
 
-    # for r3d_file in r3d_files:
-        # test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
+    for r3d_file in r3d_files:
+        skip_folder = test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
+        if skip_folder == True:
+            break
     # this is just to get a quick look at each reconstruction to see if it looks reasonable. Delete this line and
     # uncomment the lines above to loop through everything.
-    test_single_optitrack_trajectory(r3d_files[0], scoring_data, parent_directories)
+    # test_single_optitrack_trajectory(r3d_files[0], scoring_data, parent_directories)
 
 
 def find_reach_end(r3d_data, start_frame):
@@ -1631,7 +1638,9 @@ def test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
     # todo: write analog of script_calculateKinematics
     # todo: write script_interp_trajectories
 
-    sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories)
+    skip_folder = sr_visualization.animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_directories)
+
+    return skip_folder
 
 
 def visualize_invalid_points():

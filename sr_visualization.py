@@ -108,7 +108,7 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
     # comment out to overwrite old videos
     if os.path.exists(animation_name_E) and os.path.exists(animation_name_F):
         print('{} already exists'.format(an_name))
-        return
+        return True   # for now, only make one animation per folder just to get a look at if reconstruction looks good
 
     jpg_folder_E = os.path.join(animation_folder, 'temp_E')
     jpg_folder_F = os.path.join(animation_folder, 'temp_F')
@@ -237,6 +237,8 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
 
     # delete the temp folder to hold frame jpegs
     shutil.rmtree(jpg_folder_F)
+
+    return True
 
 
 def undistort2cropped(img, mtx, dist, crop_win, isrotated):

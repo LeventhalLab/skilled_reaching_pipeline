@@ -592,7 +592,10 @@ def parse_cropped_optitrack_video_name(cropped_video_name):
         _, vid_name = os.path.split(cropped_video_name)
     except:
         pass
-    cropped_vid_metadata['cropped_video_name'] = vid_name
+    try:
+        cropped_vid_metadata['cropped_video_name'] = vid_name
+    except:
+        pass
     vid_name, vid_type = os.path.splitext(vid_name)
 
     metadata_list = vid_name.split('_')
@@ -1810,19 +1813,31 @@ def find_dlc_pickles_from_r3d_filename(r3d_file, parent_directories):
     r3d_metadata = parse_3d_reconstruction_pickle_name(r3d_file)
 
     mouse_folder = os.path.join(cropped_vids_parent, r3d_metadata['mouseID'])
-    month_dirname = r3d_metadata['mouseID'] + '_' + r3d_metadata['time'].strftime('%Y%m')
-    day_dirname = r3d_metadata['mouseID'] + '_' + r3d_metadata['time'].strftime('%Y%m%d')
+    try:
+        month_dirname = r3d_metadata['mouseID'] + '_' + r3d_metadata['time'].strftime('%Y%m')
+        day_dirname = r3d_metadata['mouseID'] + '_' + r3d_metadata['time'].strftime('%Y%m%d')
+    except:
+        month_dirname = r3d_metadata['mouseID'] + '_' + r3d_metadata['trialtime'].strftime('%Y%m')
+        day_dirname = r3d_metadata['mouseID'] + '_' + r3d_metadata['trialtime'].strftime('%Y%m%d')
+
 
     full_pickles = []
     meta_pickles = []
     for i_cam in range(2):
+        if 'time' in r3d_metadata.keys():
+            datestring = date_to_string_for_fname(r3d_metadata['time'])
+        elif 'trialtime' in r3d_metadata.keys():
+            datestring = date_to_string_for_fname(r3d_metadata['trialtime'])
+        else:
+            datestring = None
         cam_dirname = '_'.join([r3d_metadata['mouseID'],
-                                date_to_string_for_fname(r3d_metadata['time']),
+                                datestring,
                                 'cam{:02d}'.format(i_cam + 1)
                                 ])
+
         cam_dir = os.path.join(mouse_folder, month_dirname, day_dirname, cam_dirname)
         test_name = '_'.join([r3d_metadata['mouseID'],
-                              datetime_to_string_for_fname(r3d_metadata['time']),
+                              datestring,
                               '{:d}'.format(r3d_metadata['session_num']),
                               '{:03d}'.format(r3d_metadata['vid_num']),
                               'cam{:02d}'.format(i_cam + 1),
@@ -1839,7 +1854,7 @@ def find_dlc_pickles_from_r3d_filename(r3d_file, parent_directories):
             print('no camera {:02d} full pickle files found for {}'.format(i_cam + 1, r3d_file))
 
         test_name = '_'.join([r3d_metadata['mouseID'],
-                              datetime_to_string_for_fname(r3d_metadata['time']),
+                              datestring,
                               '{:d}'.format(r3d_metadata['session_num']),
                               '{:03d}'.format(r3d_metadata['vid_num']),
                               'cam{:02d}'.format(i_cam + 1),
@@ -1856,8 +1871,6 @@ def find_dlc_pickles_from_r3d_filename(r3d_file, parent_directories):
             print('no camera {:02d} full pickle files found for {}'.format(i_cam + 1, r3d_file))
 
     return full_pickles, meta_pickles
-
-
 
 
 def find_orig_movies_from_r3d_filename(r3d_file, parent_directories):
@@ -2108,18 +2121,23 @@ def fname_date2string(ftime):
 
 def mouse_animation_name(vid_metadata, reconstruct_3d_parent):
 
-    fname = '_'.join((vid_metadata['mouseID'],
+    if 'poststim' in vid_metadata['mouseID']:
+        mouseID = vid_metadata['mouseID'][8:]
+    else:
+        mouseID = vid_metadata['mouseID']
+
+    fname = '_'.join((mouseID,
                       fname_time2string(vid_metadata['triggertime']),
                       str(vid_metadata['session_num']),
                       '{:03d}'.format(vid_metadata['video_number']),
                       'animation.mp4'))
 
-    mouse_folder = os.path.join(reconstruct_3d_parent, vid_metadata['mouseID'])
-    month_folder = '_'.join((vid_metadata['mouseID'],
+    mouse_folder = os.path.join(reconstruct_3d_parent, mouseID)
+    month_folder = '_'.join((mouseID,
                              vid_metadata['triggertime'].strftime('%Y%m')))
     month_folder = os.path.join(mouse_folder, month_folder)
-    date_folder = '_'.join((vid_metadata['mouseID'],
-                             fname_date2string(vid_metadata['triggertime'])))
+    date_folder = '_'.join((mouseID,
+                            fname_date2string(vid_metadata['triggertime'])))
     date_folder = os.path.join(month_folder, date_folder)
 
     fullpath = os.path.join(date_folder, fname)

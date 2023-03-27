@@ -175,17 +175,16 @@ def reconstruct_optitrack_3d(parent_directories):
 if __name__ == '__main__':
 
     cropped_vid_type = 'avi'
-    gputouse = 2
+    gputouse = 0
     cam_list = (1, 2)
     label_videos = True
     checkerboard_square_size = 7   # in mm
 
     Burgess_DLC_config_path = '/home/dleventh/Public/mouse_skilledreaching/mouse_headfixed_skilledreaching-DanL-2021-11-05/config.yaml'
 
-    # for sharedx on lambda machine
-    mouse_reaching_parent = '/home/dleventh/SharedX/Neuro-Leventhal/data/Burgess_mouse_SR/mouse_SR_videos_to_analyze'
-    # for dropbox on laptop
-    # mouse_reaching_parent = 'C:\\Users\\dklev\Dropbox (University of Michigan)\\MED-LeventhalLab\\Burgess_data\\mouse_SR_videos_to_analyze'
+    # mouse_reaching_parent = '/home/dleventh/SharedX/Neuro-Leventhal/data/Burgess_mouse_SR/mouse_SR_videos_to_analyze'   # on lambda
+    mouse_reaching_parent = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\Burgess_mouse_SR\mouse_SR_videos_to_analyze'  # on office desktop
+    # mouse_reaching_parent = 'C:\\Users\\dklev\Dropbox (University of Michigan)\\MED-LeventhalLab\\Burgess_data\\mouse_SR_videos_to_analyze'   # dropbox on laptop
     scoring_csv = 'GFP Video Scoring - GFP8.csv'
 
     video_root_folder = os.path.join(mouse_reaching_parent, 'mouse_SR_videos_tocrop')

@@ -42,21 +42,29 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories):
 
     matched_points = collect_matched_dlc_points(cam_pickles)
 
-    F_new, F_msk = cv2.findFundamentalMat(stereo_unnorm[0], stereo_unnorm[1], cv2.FM_RANSAC, 0.1, 0.999)
-    E_new, E_msk = cv2.findEssentialMat(stereo_unnorm[0], stereo_unnorm[1], cal_data['mtx'][0], None,
-                                         cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 1)
+    E, E_mask = cv2.findEssentialMat(matched_points[0], matched_points[1], cal_data['mtx'][0], None,
+                                     cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
 
-    F_from_E = np.linalg.inv(mtx[1].T) @ E_new @ np.linalg.inv(mtx[0])
-    E_from_F = mtx[1].T @ F_new @ mtx[0]
+    matched_unnorm = []
+    for i_cam in range(2):
+        pts_ud = cv2.undistortPoints(matched_points[i_cam], cal_data['mtx'][i_cam], cal_data['dist'][i_cam])
+        pts_un = cvb.unnormalize_points(pts_ud, cal_data['mtx'][i_cam])
+        matched_unnorm.append(pts_un)
 
-    pass
+    F, F_mask = cv2.findFundamentalMat(matched_unnorm[0], matched_unnorm[1], cv2.FM_RANSAC, 0.1, 0.999)
+
+    F_from_E = np.linalg.inv(cal_data['mtx'][1].T) @ E @ np.linalg.inv(cal_data['mtx'][0])
+    E_from_F = cal_data['mtx'][1].T @ F @ cal_data['mtx'][0]
+
+    # todo: test that matched points are in the right place, and the F gives epipolar lines that look good
+
+    return E, F
 
 
 def collect_matched_dlc_points(cam_pickles):
 
     num_cams = len(cam_pickles)
 
-    matched_points = []
     cam_pickle_files = []
     for cam01_pickle in cam_pickles[0]:
         # find corresponding pickle file for camera 2
@@ -85,23 +93,25 @@ def collect_matched_dlc_points(cam_pickles):
         cam_meta_files = [pickle_file.replace('full.pickle', 'meta.pickle') for pickle_file in cam_pickle_files]
         dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in cam_meta_files]
 
-        match_frame_points(single_trial_dlc_output, pickle_metadata, dlc_metadata)
+        matched_trial_pts = match_trial_points(single_trial_dlc_output, pickle_metadata, dlc_metadata)
 
-        # create n x 2 arrays there n is the total number of points identified in both camera views for each frame
+        if 'matched_dlc_points' in locals():
+            matched_dlc_points = [np.vstack(matched_dlc_points[i_cam], matched_trial_pts[i_cam]) for i_cam in
+                                  range(num_cams)]
+        else:
+            matched_dlc_points = matched_trial_pts
 
-        # E, E_mask = cv2.findEssentialMat(all_imgpts_reshaped[0], all_imgpts_reshaped[1], cal_data['mtx'][0], None,
-        #                                  cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
-
+        return matched_dlc_points
         '''
         findEssentialMat or findFundamentalMat need matched points in the two images; arrays are points 
         '''
         # for i_cam, pickle_name in enumerate(cam_pickle_files):
         #     single_trial_dlc.append(skilled_reaching_io.read_pickle(pickle_name))
-        pass
+
         # pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam02_file))
 
 
-def match_frame_points(dlc_output, pickle_metadata, dlc_metadata):
+def match_trial_points(dlc_output, pickle_metadata, dlc_metadata, min_conf=0.98):
 
     if len(dlc_output) != len(pickle_metadata):
         print('each camera view does not have a .pickle file')
@@ -110,7 +120,27 @@ def match_frame_points(dlc_output, pickle_metadata, dlc_metadata):
     num_cams = len(dlc_output)
 
     pts_wrt_orig_img, dlc_conf = reconstruct_3d_optitrack.rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata)
-    pass
+
+    # now have all the identified points moved back into the original coordinate systems that the checkerboards were
+    # identified in, and confidence levels. pts_wrt_orig_img is an array (num_frames x num_joints x 2) and dlc_conf
+    # is an array (num_frames x num_joints). Zeros are stored where dlc was uncertain (no result for that joint on
+    # that frame)
+
+    # reshape arrays so that they are a long list of individual points
+    num_frames = np.shape(pts_wrt_orig_img[0])[0]
+    num_joints = np.shape(pts_wrt_orig_img[0])[1]
+    total_pts = num_frames * num_joints
+    all_pts = [np.reshape(img_pts, (total_pts, 2)) for img_pts in pts_wrt_orig_img]
+    all_conf = [np.reshape(cam_conf, (total_pts, 1)) for cam_conf in dlc_conf]
+    all_conf = np.hstack(all_conf)
+
+    # only consider points where confidence > threshold for both cameras
+    valid_pts_bool = (all_conf > min_conf).all(axis=1)
+
+    valid_pts = [cam_pts[valid_pts_bool] for cam_pts in all_pts]
+
+    return valid_pts
+
 
 def estimate_E_from_dlc(single_trial_dlc_output, cal_data):
     pass

@@ -664,8 +664,13 @@ def rotate_pts_180(pts, im_size):
         im_size = np.array(im_size)
 
     reflected_pts = []
+    pts = np.squeeze(pts)
     if np.ndim(pts) == 1:
-        pts = np.reshape(pts, (1, 2))
+        try:
+            # not quite sure why there are issues with array shape, but this seems to fix it
+            pts = np.reshape(pts, (1, 2))
+        except:
+            pass
     for i_pt, pt in enumerate(pts):
         if len(pt) > 0:
             try:

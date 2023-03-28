@@ -210,15 +210,20 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(pickle_files[i_cam]))
         orig_vid_names.append(navigation_utilities.find_original_optitrack_videos(video_root_folder, pickle_metadata[i_cam]))
 
+    recal_E, recal_F = skilled_reaching_calibration.refine_optitrack_calibration_from_dlc(pickle_metadata[0], parent_directories)
     # perform frame-by-frame reconstruction
     # set up numpy arrays to accept world points, measured points, dlc confidence values, reprojected points, and reprojection errors
     reconstructed_data = {
         'frame_points': np.zeros((num_frames, num_cams, pts_per_frame, 2)),
         'frame_points_ud': np.zeros((num_frames, num_cams, pts_per_frame, 2)),
         'worldpoints_E': np.zeros((num_frames, pts_per_frame, 3)),
+        'worldpoints_recal_E': np.zeros((num_frames, pts_per_frame, 3)),
         'reprojected_points_E': np.zeros((num_frames, num_cams, pts_per_frame, 2)),
+        'reprojected_points_recal_E': np.zeros((num_frames, pts_per_frame, 2)),
         'reprojection_errors_E': np.zeros((num_frames, num_cams, pts_per_frame)),
         'worldpoints_F': np.zeros((num_frames, pts_per_frame, 3)),
+        'worldpoints_recal_F': np.zeros((num_frames, pts_per_frame, 3)),
+        'reprojected_points_recal_F': np.zeros((num_frames, pts_per_frame, 2)),
         'reprojected_points_F': np.zeros((num_frames, num_cams, pts_per_frame, 2)),
         'reprojection_errors_F': np.zeros((num_frames, num_cams, pts_per_frame)),
         'frame_confidence': np.zeros((num_frames, num_cams, pts_per_frame)),
@@ -234,6 +239,8 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
 
         # frame_pts are the original identified points translated/rotated into the original video image (but turned upright)
         # so... I'm pretty sure they're still distorted.
+
+        # todo: working here... redo the calculations using the recalibrated E and F from dlc output
         frame_worldpoints_E, frame_reprojected_pts_E, frame_reproj_errors_E, frame_worldpoints_F, frame_reprojected_pts_F, frame_reproj_errors_F, frame_pts_ud = \
             reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_metadata, i_frame, parent_directories)
         # at this point, worldpoints is still in units of checkerboards, needs to be scaled by the size of individual checkerboard squares
@@ -643,7 +650,22 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
             conf = dlc_output[i_cam][frame]['confidence']
             # array_conf = convert_pickle_conf_to_array(conf)
 
-            dlc_conf[i_cam][i_frame, :] = conf
+            try:
+                dlc_conf[i_cam][i_frame, :] = conf
+            except:
+                # there is some weird bug in dlc output where sometimes confidence gives a 2-element array. Assume the
+                # first element if the correct one
+                conf_list = []
+                for ii, c in enumerate(conf):
+                    if len(c) > 1:
+                        conf_list.append(c[0].item())
+                    elif len(c) == 0:
+                        conf_list.append(0.)
+                    else:
+                        conf_list.append(np.squeeze(c).item())
+
+
+                dlc_conf[i_cam][i_frame, :] = conf_list
 
     return pts_wrt_orig_img, dlc_conf
 
@@ -729,6 +751,17 @@ def translate_back_to_orig_img(pickle_metadata, pts):
     else:
         crop_win = pickle_metadata
 
+    if not isinstance(pts, np.ndarray):
+        pts = np.array(pts)
+
+    pts = np.squeeze(pts)
+    if np.ndim(pts) == 1:
+        try:
+            # not quite sure why there are issues with array shape, but this seems to fix it
+            pts = np.reshape(pts, (1, 2))
+        except:
+            pass
+
     translated_pts = []
     for i_pt, pt in enumerate(pts):
         if len(pt) > 0:
@@ -809,7 +842,7 @@ def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_f
 
 
 def overlay_pts_in_cropped_img(pickle_metadata, current_coords, dlc_metadata, i_frame, mtx, dist, parent_directories, reprojected_pts=None, vid_type='.avi', plot_undistorted=False):
-    # todo: figure out how to account for undistortion in previously cropped image?
+
     if vid_type[0] != '.':
         vid_type = '.' + vid_type
 

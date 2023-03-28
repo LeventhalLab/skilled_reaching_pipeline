@@ -156,7 +156,7 @@ def reconstruct_optitrack_3d(parent_directories):
     cam01_folders = folders_to_reconstruct['cam01']
     cam02_folders = folders_to_reconstruct['cam02']
 
-    mouseID = 'GFP4'
+    mouseID = 'dLight15'
     session_date = datetime(2021, 7, 16)
 
     for i_dir, cam01_dir in enumerate(cam01_folders):
@@ -213,9 +213,9 @@ if __name__ == '__main__':
         'reconstruct3d_parent': reconstruct_3d_parent,
         'manual_scoring_parent': manual_scoring_parent
     }
-    test_metadata = {'mouseID': 'dLight15',
-                     'date': datetime.strptime('20210713', '%Y%m%d')}
-    skilled_reaching_calibration.refine_optitrack_calibration_from_dlc(test_metadata, parent_directories)
+    # test_metadata = {'mouseID': 'dLight15',
+    #                  'date': datetime.strptime('20210713', '%Y%m%d')}
+    # skilled_reaching_calibration.refine_optitrack_calibration_from_dlc(test_metadata, parent_directories)
 
     crop_params_csv_path = os.path.join(video_root_folder, 'optitrack_SR_video_crop_regions.csv')
 
@@ -261,7 +261,7 @@ if __name__ == '__main__':
         # except:
         #     pass
     # step 4 - reconstruct 3D images
-    # reconstruct_optitrack_3d(parent_directories)
+    reconstruct_optitrack_3d(parent_directories)
     #
     reconstruct_3d_optitrack.test_optitrack_reconstruction(parent_directories)
 

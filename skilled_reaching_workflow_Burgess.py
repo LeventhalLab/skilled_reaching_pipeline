@@ -186,7 +186,7 @@ if __name__ == '__main__':
     label_videos = True
     checkerboard_square_size = 7   # in mm
 
-    Burgess_DLC_config_path = '/home/dleventh/Public/mouse_skilledreaching/mouse_headfixed_skilledreaching-DanL-2021-11-05/config.yaml'
+    Burgess_DLC_config_path = '/home/dleventh/Public/mouse_skilledreaching/sr_hf-DanL-2021-11-05/config.yaml'
 
     # mouse_reaching_parent = '/home/dleventh/SharedX/Neuro-Leventhal/data/hf_mouse/'   # on lambda
     mouse_reaching_parent = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\hf_mouse'  # on office desktop

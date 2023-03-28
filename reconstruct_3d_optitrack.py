@@ -571,7 +571,14 @@ def rotate_and_translate_cropped2full(points, crop_win, orig_im_size, is_rotated
 
 
 def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata, orig_im_size=(1280, 1024)):
-
+    '''
+    loop through each frame for a camera pair, tranlate (and rotate if appropriate) points back into full original frame
+    :param dlc_output: list with dlc_output dictionary for each camera
+    :param pickle_metadata:
+    :param dlc_metadata:
+    :param orig_im_size:
+    :return:
+    '''
     # note that current algorithm for camera 1 crops, then rotates. We want a rotated, but uncropped transformation of
     # coordinates camera 2 is easy - just crops
     pts_wrt_orig_img = []

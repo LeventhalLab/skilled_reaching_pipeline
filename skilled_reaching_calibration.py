@@ -1,6 +1,7 @@
 import navigation_utilities
 import skilled_reaching_calibration
 import skilled_reaching_io
+import reconstruct_3d_optitrack
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from datetime import datetime
@@ -75,12 +76,44 @@ def collect_matched_dlc_points(cam_pickles):
             print('no matching camera 2 file for {}'.format(cam01_file))
             continue
 
+        pickle_metadata = [navigation_utilities.parse_dlc_output_pickle_name_optitrack(pickle_name) for pickle_name in cam_pickle_files]
+
         # read in pickle data from both files
-        single_trial_dlc = []
-        for i_cam, pickle_name in enumerate(cam_pickle_files):
-            single_trial_dlc.append(skilled_reaching_io.read_pickle(pickle_name))
+        # single_trial_dlc = []
+        single_trial_matched_points = []
+        single_trial_dlc_output = [skilled_reaching_io.read_pickle(pickle_name) for pickle_name in cam_pickle_files]
+        cam_meta_files = [pickle_file.replace('full.pickle', 'meta.pickle') for pickle_file in cam_pickle_files]
+        dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in cam_meta_files]
+
+        match_frame_points(single_trial_dlc_output, pickle_metadata, dlc_metadata)
+
+        # create n x 2 arrays there n is the total number of points identified in both camera views for each frame
+
+        # E, E_mask = cv2.findEssentialMat(all_imgpts_reshaped[0], all_imgpts_reshaped[1], cal_data['mtx'][0], None,
+        #                                  cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
+
+        '''
+        findEssentialMat or findFundamentalMat need matched points in the two images; arrays are points 
+        '''
+        # for i_cam, pickle_name in enumerate(cam_pickle_files):
+        #     single_trial_dlc.append(skilled_reaching_io.read_pickle(pickle_name))
         pass
         # pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam02_file))
+
+
+def match_frame_points(dlc_output, pickle_metadata, dlc_metadata):
+
+    if len(dlc_output) != len(pickle_metadata):
+        print('each camera view does not have a .pickle file')
+        return
+
+    num_cams = len(dlc_output)
+
+    pts_wrt_orig_img, dlc_conf = reconstruct_3d_optitrack.rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata)
+    pass
+
+def estimate_E_from_dlc(single_trial_dlc_output, cal_data):
+    pass
 
 def refine_calibrations_from_orig_vids(vid_folder_list, parent_directories):
     # this doesn't seem to be working so well. Perhaps better to refine from matched points identified by DLC

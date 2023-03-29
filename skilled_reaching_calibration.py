@@ -116,7 +116,7 @@ def collect_matched_dlc_points(cam_pickles):
         matched_trial_pts, matched_pts_conf = match_trial_points(single_trial_dlc_output, pickle_metadata, dlc_metadata)
 
         matched_dlc_points.append(matched_trial_pts)
-        matched_dlc_conf.append(matched_pts_conf[i_cam])
+        matched_dlc_conf.append(matched_pts_conf)
 
         # if 'matched_dlc_points' in locals():
         #     matched_dlc_points = [np.vstack(matched_dlc_points[i_cam], matched_trial_pts[i_cam]) for i_cam in

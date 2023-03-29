@@ -41,21 +41,23 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories):
     test_name = session_foldername + '_*_full.pickle'
     cam_pickles = [glob.glob(os.path.join(cf, test_name)) for cf in cam_folders]
 
-    matched_points = collect_matched_dlc_points(cam_pickles)
+    matched_points, matched_conf = collect_matched_dlc_points(cam_pickles)
+
     # matched_points should be a list of pairs of arrays of matched points
     # rearrange this into one massive array
 
     # test to make sure everything is matched correctly
-    num_trials = len(matched_points)
-    for i_frame in range(num_frames):
-        fig, axs = plt.subplots(1, 2)
-        for i_cam in range(2):
-            pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam_pickles[i_cam])
-            sr_visualization.overlay_pts_on_original_frame(matched_points[i_frame][i_cam], pickle_metadata[i_cam], camdlc_metadata, i_frame, cal_data,
-                                          parent_directories,
-                                          axs[i_cam], plot_undistorted=True, frame_pts_already_undistorted=False, **kwargs)
+    # num_trials = len(matched_points)
+    # for i_frame in range(num_frames):
+    #     fig, axs = plt.subplots(1, 2)
+    #     for i_cam in range(2):
+    #         pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam_pickles[i_cam])
+    #         sr_visualization.overlay_pts_on_original_frame(matched_points[i_frame][i_cam], pickle_metadata[i_cam], camdlc_metadata, i_frame, cal_data,
+    #                                       parent_directories,
+    #                                       axs[i_cam], plot_undistorted=True, frame_pts_already_undistorted=False, **kwargs)
 
-    E, E_mask = cv2.findEssentialMat(matched_points[0], matched_points[1], cal_data['mtx'][0], None,
+    # matched_points is a num_trials x 2 list of lists. matched_points[i_cam]
+    E, E_mask = cv2.findEssentialMat(matched_points[0][0][0], matched_points[1][0][0], cal_data['mtx'][0], None,
                                      cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
 
     matched_unnorm = []
@@ -63,6 +65,8 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories):
         pts_ud = cv2.undistortPoints(matched_points[i_cam], cal_data['mtx'][i_cam], cal_data['dist'][i_cam])
         pts_un = cvb.unnormalize_points(pts_ud, cal_data['mtx'][i_cam])
         matched_unnorm.append(pts_un)
+
+    all_pts, all_conf, valid_pts_bool = trialpts2allpts(matched_points, trials_conf, min_conf)
 
     F, F_mask = cv2.findFundamentalMat(matched_unnorm[0], matched_unnorm[1], cv2.FM_RANSAC, 0.1, 0.999)
 
@@ -80,6 +84,7 @@ def collect_matched_dlc_points(cam_pickles):
 
 
     matched_dlc_points = []
+    matched_dlc_conf = []
     for cam01_pickle in cam_pickles[0]:
         cam_pickle_files = []
         # find corresponding pickle file for camera 2
@@ -108,9 +113,10 @@ def collect_matched_dlc_points(cam_pickles):
         cam_meta_files = [pickle_file.replace('full.pickle', 'meta.pickle') for pickle_file in cam_pickle_files]
         dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in cam_meta_files]
 
-        matched_trial_pts = match_trial_points(single_trial_dlc_output, pickle_metadata, dlc_metadata)
+        matched_trial_pts, matched_pts_conf = match_trial_points(single_trial_dlc_output, pickle_metadata, dlc_metadata)
 
-        matched_dlc_points.append([matched_trial_pts[i_cam] for i_cam in range(num_cams)])
+        matched_dlc_points.append(matched_trial_pts)
+        matched_dlc_conf.append(matched_pts_conf[i_cam])
 
         # if 'matched_dlc_points' in locals():
         #     matched_dlc_points = [np.vstack(matched_dlc_points[i_cam], matched_trial_pts[i_cam]) for i_cam in
@@ -118,7 +124,7 @@ def collect_matched_dlc_points(cam_pickles):
         # else:
         #     matched_dlc_points = matched_trial_pts
 
-    return matched_dlc_points
+    return matched_dlc_points, matched_dlc_conf
     '''
     findEssentialMat or findFundamentalMat need matched points in the two images; arrays are points 
     '''
@@ -126,6 +132,24 @@ def collect_matched_dlc_points(cam_pickles):
     #     single_trial_dlc.append(skilled_reaching_io.read_pickle(pickle_name))
 
     # pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam02_file))
+
+
+def trialpts2allpts(trials_pts, trials_conf, min_conf):
+
+    num_frames = np.shape(trials_pts[0])[0]
+    num_joints = np.shape(trials_pts[0])[1]
+    total_pts = num_frames * num_joints
+
+    all_pts = [np.reshape(img_pts, (total_pts, 2)) for img_pts in trials_pts]
+    all_conf = [np.reshape(cam_conf, (total_pts, 1)) for cam_conf in trials_conf]
+    all_conf = np.hstack(all_conf)
+
+    # only consider points where confidence > threshold for both cameras
+    valid_pts_bool = (all_conf > min_conf).all(axis=1)
+
+    valid_pts = [cam_pts[valid_pts_bool] for cam_pts in all_pts]
+
+    return all_pts, all_conf, valid_pts_bool
 
 
 def match_trial_points(dlc_output, pickle_metadata, dlc_metadata, min_conf=0.98):
@@ -147,19 +171,17 @@ def match_trial_points(dlc_output, pickle_metadata, dlc_metadata, min_conf=0.98)
     num_frames = np.shape(pts_wrt_orig_img[0])[0]
     num_joints = np.shape(pts_wrt_orig_img[0])[1]
     total_pts = num_frames * num_joints
-    try:
-        all_pts = [np.reshape(img_pts, (total_pts, 2)) for img_pts in pts_wrt_orig_img]
-        all_conf = [np.reshape(cam_conf, (total_pts, 1)) for cam_conf in dlc_conf]
-    except:
-        pass
-    all_conf = np.hstack(all_conf)
 
-    # only consider points where confidence > threshold for both cameras
-    valid_pts_bool = (all_conf > min_conf).all(axis=1)
+    # all_pts = [np.reshape(img_pts, (total_pts, 2)) for img_pts in pts_wrt_orig_img]
+    # all_conf = [np.reshape(cam_conf, (total_pts, 1)) for cam_conf in dlc_conf]
+    # all_conf = np.hstack(all_conf)
+    #
+    # # only consider points where confidence > threshold for both cameras
+    # valid_pts_bool = (all_conf > min_conf).all(axis=1)
+    #
+    # valid_pts = [cam_pts[valid_pts_bool] for cam_pts in all_pts]
 
-    valid_pts = [cam_pts[valid_pts_bool] for cam_pts in all_pts]
-
-    return valid_pts
+    return pts_wrt_orig_img, dlc_conf
 
 
 def estimate_E_from_dlc(single_trial_dlc_output, cal_data):

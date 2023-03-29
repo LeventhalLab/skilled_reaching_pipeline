@@ -654,7 +654,7 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
                 dlc_conf[i_cam][i_frame, :] = conf
             except:
                 # there is some weird bug in dlc output where sometimes confidence gives a 2-element array. Assume the
-                # first element if the correct one
+                # first element is the correct one
                 conf_list = []
                 for ii, c in enumerate(conf):
                     if len(c) > 1:
@@ -751,45 +751,7 @@ def translate_back_to_orig_img(pickle_metadata, pts):
     else:
         crop_win = pickle_metadata
 
-    if isinstance(pts, tuple):
-        pts = pts[0]
-    if not isinstance(pts, np.ndarray):
-        pts = np.array(pts)
-
-    pts = np.squeeze(pts)
-    if isinstance(pts[0], list):
-        # not sure why dlc has this weird output as an array of a list of arrays. maybe something with the way numpy
-        # build arrays when lists have different sizes?
-        pts_as_array = pts[0][0]
-        for pt in pts[1:]:
-            # sometimes, the entry is empty
-            if len(pt) == 0:
-                pts_as_array = np.vstack((pts_as_array, np.array([0., 0.])))
-            elif isinstance(pt, list):
-                pts_as_array = np.vstack((pts_as_array, np.array(pt[0])))
-            elif isinstance(pt, np.ndarray):
-                if np.shape(pt)[0] > 1 and np.ndim(pt) > 1:
-                    # not sure why dlc would return 2 points for a given bodypart, but sometimes it does
-                    pts_as_array = np.vstack((pts_as_array, pt[0]))
-                else:
-                    pts_as_array = np.vstack((pts_as_array, pt))
-
-        pts = pts_as_array
-    else:
-        # make sure there is only one point for each bodypart
-        if np.shape(pts[0])[0] > 1 and np.ndim(pts[0]) > 1:
-            pts_array = pts[0][0]
-        elif len(pts[0]) == 0:
-            pts_array = np.array([0., 0.])
-        else:
-            pts_array = np.squeeze(pts[0])
-        for pt in pts[1:]:
-            if np.shape(pt)[0] > 1 and np.ndim(pt) > 1:
-                pts_array = np.vstack(pts_array, pt[0])
-            elif len(pt) == 0:
-                pts_array = np.vstack(np.array([0., 0.]))
-            else:
-                pts_array = np.vstack(np.squeeze(pt))
+    pts_as_array = dlc_utilities.dlc_coords_to_array(pts)
 
     if np.ndim(pts) == 1:
         # not quite sure why there are issues with array shape, but this seems to fix it

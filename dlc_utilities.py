@@ -1,5 +1,59 @@
 import numpy as np
 
+
+def dlc_conf_to_array(dlc_conf):
+    pass
+
+
+def dlc_coords_to_array(dlc_coords):
+    '''
+
+    :param dlc_coords:
+    :return:
+    '''
+
+    if isinstance(dlc_coords, tuple):
+        dlc_coords = dlc_coords[0]
+    if not isinstance(dlc_coords, np.ndarray):
+        dlc_coords = np.array(dlc_coords)
+
+    dlc_coords = np.squeeze(dlc_coords)
+
+    dlc_coords = np.squeeze(dlc_coords)
+    if isinstance(dlc_coords[0], list):
+        # not sure why dlc has this weird output as an array of a list of arrays. maybe something with the way numpy
+        # build arrays when lists have different sizes?
+        pts_as_array = dlc_coords[0][0]
+        for pt in dlc_coords[1:]:
+            # sometimes, the entry is empty
+            if len(pt) == 0:
+                pts_as_array = np.vstack((pts_as_array, np.array([0., 0.])))
+            elif isinstance(pt, list):
+                pts_as_array = np.vstack((pts_as_array, np.array(pt[0])))
+            elif isinstance(pt, np.ndarray):
+                if np.shape(pt)[0] > 1 and np.ndim(pt) > 1:
+                    # not sure why dlc would return 2 points for a given bodypart, but sometimes it does
+                    pts_as_array = np.vstack((pts_as_array, pt[0]))
+                else:
+                    pts_as_array = np.vstack((pts_as_array, pt))
+        else:
+            # make sure there is only one point for each bodypart
+            if np.shape(dlc_coords[0])[0] > 1 and np.ndim(dlc_coords[0]) > 1:
+                pts_as_array = dlc_coords[0][0]
+            elif len(dlc_coords[0]) == 0:
+                pts_as_array = np.array([0., 0.])
+            else:
+                pts_as_array = np.squeeze(dlc_coords[0])
+            for pt in dlc_coords[1:]:
+                if np.shape(pt)[0] > 1 and np.ndim(pt) > 1:
+                    pts_as_array = np.vstack(pts_as_array, pt[0])
+                elif len(pt) == 0:
+                    pts_as_array = np.vstack(np.array([0., 0.]))
+                else:
+                    pts_as_array = np.vstack(np.squeeze(pt))
+
+    return pts_as_array
+
 def collect_bp_data(view_dlc_data, dlc_key):
 
     bodyparts = tuple(view_dlc_data.keys())

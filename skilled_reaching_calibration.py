@@ -2,6 +2,7 @@ import navigation_utilities
 import skilled_reaching_calibration
 import skilled_reaching_io
 import reconstruct_3d_optitrack
+import sr_visualization
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from datetime import datetime
@@ -41,6 +42,18 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories):
     cam_pickles = [glob.glob(os.path.join(cf, test_name)) for cf in cam_folders]
 
     matched_points = collect_matched_dlc_points(cam_pickles)
+    # matched_points should be a list of pairs of arrays of matched points
+    # rearrange this into one massive array
+
+    # test to make sure everything is matched correctly
+    num_trials = len(matched_points)
+    for i_frame in range(num_frames):
+        fig, axs = plt.subplots(1, 2)
+        for i_cam in range(2):
+            pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam_pickles[i_cam])
+            sr_visualization.overlay_pts_on_original_frame(matched_points[i_frame][i_cam], pickle_metadata[i_cam], camdlc_metadata, i_frame, cal_data,
+                                          parent_directories,
+                                          axs[i_cam], plot_undistorted=True, frame_pts_already_undistorted=False, **kwargs)
 
     E, E_mask = cv2.findEssentialMat(matched_points[0], matched_points[1], cal_data['mtx'][0], None,
                                      cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
@@ -66,6 +79,7 @@ def collect_matched_dlc_points(cam_pickles):
     num_cams = len(cam_pickles)
 
     cam_pickle_files = []
+    matched_dlc_points = []
     for cam01_pickle in cam_pickles[0]:
         # find corresponding pickle file for camera 2
         cam01_folder, cam01_pickle_name = os.path.split(cam01_pickle)
@@ -95,20 +109,22 @@ def collect_matched_dlc_points(cam_pickles):
 
         matched_trial_pts = match_trial_points(single_trial_dlc_output, pickle_metadata, dlc_metadata)
 
-        if 'matched_dlc_points' in locals():
-            matched_dlc_points = [np.vstack(matched_dlc_points[i_cam], matched_trial_pts[i_cam]) for i_cam in
-                                  range(num_cams)]
-        else:
-            matched_dlc_points = matched_trial_pts
+        matched_dlc_points.append([matched_trial_pts[i_cam] for i_cam in range(num_cams)])
 
-        return matched_dlc_points
-        '''
-        findEssentialMat or findFundamentalMat need matched points in the two images; arrays are points 
-        '''
-        # for i_cam, pickle_name in enumerate(cam_pickle_files):
-        #     single_trial_dlc.append(skilled_reaching_io.read_pickle(pickle_name))
+        # if 'matched_dlc_points' in locals():
+        #     matched_dlc_points = [np.vstack(matched_dlc_points[i_cam], matched_trial_pts[i_cam]) for i_cam in
+        #                           range(num_cams)]
+        # else:
+        #     matched_dlc_points = matched_trial_pts
 
-        # pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam02_file))
+    return matched_dlc_points
+    '''
+    findEssentialMat or findFundamentalMat need matched points in the two images; arrays are points 
+    '''
+    # for i_cam, pickle_name in enumerate(cam_pickle_files):
+    #     single_trial_dlc.append(skilled_reaching_io.read_pickle(pickle_name))
+
+    # pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam02_file))
 
 
 def match_trial_points(dlc_output, pickle_metadata, dlc_metadata, min_conf=0.98):

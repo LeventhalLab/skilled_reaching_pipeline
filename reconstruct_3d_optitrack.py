@@ -363,7 +363,7 @@ def plot_projpoints(projPoints, dlc_metadata):
                     x, y = pt
                 # x = int(round(x))
                 # y = int(round(y))
-                bp_color = color_from_bodypart(bodyparts[i_pt])
+                bp_color = sr_visualization.color_from_bodypart(bodyparts[i_pt])
 
                 axs[i_cam].scatter(x, y, marker='o', s=dotsize, color=bp_color)
 
@@ -411,7 +411,7 @@ def plot_worldpoints(worldpoints, dlc_metadata, pickle_metadata, i_frame, parent
                 x, y, z = pt
             # x = int(round(x))
             # y = int(round(y))
-            bp_color = color_from_bodypart(bodyparts[i_pt])
+            bp_color = sr_visualization.color_from_bodypart(bodyparts[i_pt])
 
             ax.scatter(x, y, z, marker='o', s=dotsize, color=bp_color)
 
@@ -755,6 +755,18 @@ def translate_back_to_orig_img(pickle_metadata, pts):
         pts = np.array(pts)
 
     pts = np.squeeze(pts)
+    if type(pts[0]) == 'list':
+        # not sure why dlc has this weird output as an array of a list of arrays. maybe something with the way numpy
+        # build arrays when lists have different sizes?
+        pts_as_array = pts[0][0]
+        for pt in pts[1:]:
+            # sometimes, the entry is empty
+            if len(pt) == 0:
+                pts_as_array = np.vstack((pts_as_array, np.array([0., 0.])))
+            else:
+                pts_as_array = np.vstack((pts_as_array, pt[0]))
+        pts = pts_as_array
+
     if np.ndim(pts) == 1:
         try:
             # not quite sure why there are issues with array shape, but this seems to fix it
@@ -766,15 +778,22 @@ def translate_back_to_orig_img(pickle_metadata, pts):
     for i_pt, pt in enumerate(pts):
         if len(pt) > 0:
             pt = np.squeeze(pt)
+
             x = pt[0]
             y = pt[1]
 
-            new_x = crop_win[0] + x
-            new_y = crop_win[2] + y
+            if all(pt == 0):
+                new_x = 0.
+                new_y = 0.
+            else:
+                new_x = crop_win[0] + x
+                new_y = crop_win[2] + y
 
             translated_pts.append([np.array([new_x, new_y])])
         else:
-            translated_pts.append(np.array([]))
+            translated_pts.append(np.array([0., 0.]))
+
+    translated_pts = np.squeeze(np.array(translated_pts))
 
     return translated_pts
 
@@ -835,7 +854,7 @@ def overlay_pts_in_orig_image(pickle_metadata, current_coords, dlc_metadata, i_f
     #             x, y = pt
     #         x = int(round(x))
     #         y = int(round(y))
-    #         bp_color = color_from_bodypart(bodyparts[i_pt])
+    #         bp_color = sr_visualization.color_from_bodypart(bodyparts[i_pt])
     #         new_img = cv2.circle(new_img, (x, y), 3, bp_color, -1)
     #
     # cv2.imwrite(jpg_name, new_img)
@@ -935,7 +954,7 @@ def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, marker
                 to_plot = cvb.unnormalize_points(pt_ud_norm, mtx)
             else:
                 to_plot = np.array([x, y])
-            bp_color = color_from_bodypart(bodyparts[i_pt])
+            bp_color = sr_visualization.color_from_bodypart(bodyparts[i_pt])
 
             ax[0][0].plot(to_plot[0], to_plot[1], marker=markertype[0], ms=dotsize, color=bp_color)
             # ax.plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
@@ -955,7 +974,7 @@ def overlay_pts_on_image(img, mtx, dist, pts, reprojected_pts, bodyparts, marker
                     to_plot = np.array([x, y])
                 # x = int(round(x))
                 # y = int(round(y))
-                bp_color = color_from_bodypart(bodyparts[i_rpt])
+                bp_color = sr_visualization.color_from_bodypart(bodyparts[i_rpt])
 
                 ax[0][0].plot(to_plot[0], to_plot[1], marker=markertype[1], ms=3, color=bp_color)
 
@@ -1069,7 +1088,7 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
                     x, y = pt
                 # x = int(round(x))
                 # y = int(round(y))
-                bp_color = color_from_bodypart(bodyparts[i_pt])   # undistorted point identified by DLC
+                bp_color = sr_visualization.color_from_bodypart(bodyparts[i_pt])   # undistorted point identified by DLC
 
                 axs[0][i_cam].plot(x, y, marker=markertype[0], ms=dotsize, color=bp_color)
                 # x2 = points_in_img[i_pt, 0]
@@ -1131,7 +1150,7 @@ def draw_epipolar_lines_on_img(img_pts, whichImage, F, im_size, bodyparts, ax, l
 
     for i_line, epiline in enumerate(epilines):
 
-        bp_color = color_from_bodypart(bodyparts[i_line])
+        bp_color = sr_visualization.color_from_bodypart(bodyparts[i_line])
         epiline = np.squeeze(epiline)
         edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
 
@@ -1190,54 +1209,10 @@ def overlay_pts(pickle_metadata, current_coords, dlc_metadata, i_frame, rotate_i
                 pass
             x = int(round(x))
             y = int(round(y))
-            bp_color = color_from_bodypart(bodyparts[i_pt])
+            bp_color = sr_visualization.color_from_bodypart(bodyparts[i_pt])
             new_img = cv2.circle(new_img, (x, y), 3, bp_color, -1)
 
     cv2.imwrite(jpg_name, new_img)
-
-
-def color_from_bodypart(bodypart):
-
-    if bodypart == 'leftear':
-        bp_color = (127,0,0)
-    elif bodypart == 'rightear':
-        bp_color = (255,0,0)
-    elif bodypart == 'lefteye':
-        bp_color = (150,150,150)
-    elif bodypart == 'righteye':
-        bp_color = (200,200,200)
-    elif bodypart == 'nose':
-        bp_color = (0,0,0)
-    elif bodypart == 'leftpaw':
-        bp_color = (0,50,0)
-    elif bodypart == 'leftdigit1':
-        bp_color = (0, 100, 0)
-    elif bodypart == 'leftdigit2':
-        bp_color = (0,150,0)
-    elif bodypart == 'leftdigit3':
-        bp_color = (0, 200, 0)
-    elif bodypart == 'leftdigit4':
-        bp_color = (0,250,0)
-    elif bodypart == 'rightpaw':
-        bp_color = (0,0,50)
-    elif bodypart == 'rightdigit1':
-        bp_color = (0, 0, 100)
-    elif bodypart == 'rightdigit2':
-        bp_color = (0,0,150)
-    elif bodypart == 'rightdigit3':
-        bp_color = (0, 0, 200)
-    elif bodypart == 'rightdigit4':
-        bp_color = (0,0,250)
-    elif bodypart == 'pellet1':
-        bp_color = (100,0,100)
-    elif bodypart == 'pellet2':
-        bp_color = (200,0,200)
-    else:
-        bp_color = (0,0,255)
-
-    bp_color = [float(bpc)/255. for bpc in bp_color]
-
-    return bp_color
 
 
 def smooth_3d_trajectory(r3d_data, frame_valid_pts, pt_euc_diffs):

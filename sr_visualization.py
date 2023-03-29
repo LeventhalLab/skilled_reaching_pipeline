@@ -367,19 +367,161 @@ def show_crop_frame_with_pts(img, cw, frame_pts, bodyparts, bpts2connect, valid_
     connect_bodyparts(frame_pts, bodyparts, bpts2connect, valid_3dpoints, ax)
 
 
-def overlay_pts(pts, bodyparts, valid_3dpoints, ax, **kwargs):
+def overlay_pts(pts, bodyparts, plot_point_bool, ax, **kwargs):
+    '''
 
+    :param pts:
+    :param bodyparts:
+    :param plot_point_bool:
+    :param ax:
+    :param kwargs:
+    :return:
+    '''
     kwargs.setdefault('marker', 'o')
     kwargs.setdefault('s', 3)
     bp_c = mouse_bp_colors()
 
     for i_pt, pt in enumerate(pts):
-        if valid_3dpoints[i_pt]:
+        if plot_point_bool[i_pt]:
             pt = np.squeeze(pt)
             if all(pt == 0):
                 continue    # [0, 0] are points that weren't properly identified
             kwargs['c'] = bp_c[bodyparts[i_pt]]
             ax.scatter(pt[0], pt[1], **kwargs)
+
+
+def overlay_pts_on_original_frame(frame_pts, campickle_metadata, camdlc_metadata, frame_num, cal_data, parent_directories,
+                                  ax, plot_undistorted=True, frame_pts_already_undistorted=False, **kwargs):
+    '''
+
+    :param frame_pts:
+    :param campickle_metadata: a single pickle_metadata structure
+    :param camdlc_metadata:
+    :param frame_num:
+    :param cal_data:
+    :param parent_directories:
+    :param ax:
+    :param kwargs:
+    :return:
+    '''
+
+    cam_num = campickle_metadata['cam_num']
+    video_root_folder = parent_directories['video_root_folder']
+
+    bodyparts = camdlc_metadata['data']['DLC-model-config file']['all_joints_names']
+    mouseID = campickle_metadata['mouseID']
+    day_dir = mouseID + '_' + campickle_metadata['trialtime'].strftime('%Y%m%d')
+    orig_vid_folder = os.path.join(video_root_folder, mouseID, day_dir)
+
+    orig_vid_name_base = '_'.join([campickle_metadata['prefix'] + mouseID,
+                             campickle_metadata['trialtime'].strftime('%Y%m%d_%H-%M-%S'),
+                             '{:d}'.format(campickle_metadata['session_num']),
+                             '{:03d}'.format(campickle_metadata['vid_num']),
+                             'cam{:02d}.avi'.format(cam_num)
+                             ])
+
+    orig_vid_name = os.path.join(orig_vid_folder, orig_vid_name_base)
+
+    if not os.path.exists(orig_vid_name):
+        # sometimes session number has 2 digits, sometimes one
+        orig_vid_name_base = '_'.join([campickle_metadata['prefix'] + mouseID,
+                                       campickle_metadata['trialtime'].strftime('%Y%m%d_%H-%M-%S'),
+                                       '{:02d}'.format(campickle_metadata['session_num']),
+                                       '{:03d}'.format(campickle_metadata['vid_num']),
+                                       'cam{:02d}.avi'.format(cam_num)
+                                       ])
+        orig_vid_name = os.path.join(orig_vid_folder, orig_vid_name_base)
+
+    #read in image
+    video_object = cv2.VideoCapture(orig_vid_name)
+
+    video_object.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+    ret, img = video_object.read()
+
+    mtx = cal_data['mtx'][cam_num]
+    dist = cal_data['dist'][cam_num]
+
+    if cam_num == 0:
+        img = cv2.rotate(img, cv2.ROTATE_180)
+    img_ud = cv2.undistort(img, mtx, dist)
+
+    video_object.release()
+
+    h, w, _ = np.shape(img_ud)
+    im_size = (w, h)
+
+    if plot_undistorted:
+        # undistorted image
+        ax.imshow(img_ud)
+    else:
+        # distorted original image
+        ax.imshow(img)
+
+    if not frame_pts_already_undistorted:
+        pt_ud_norm = np.squeeze(cv2.undistortPoints(frame_pts, mtx, dist))
+        pt_ud = cvb.unnormalize_points(pt_ud_norm, mtx)
+    else:
+        pt_ud = frame_pts
+
+    num_pts = np.shape(frame_pts)[0]
+    if num_pts == 1:
+        # only one point
+        pt_ud = [pt_ud]
+
+    if plot_undistorted:
+        to_plot = pt_ud
+    else:
+        to_plot = frame_pts
+
+
+    plot_point_bool = np.ones((num_pts, 1), dtype=bool)
+    overlay_pts(to_plot, bodyparts, plot_point_bool, ax, **kwargs)
+
+    plt.show()
+
+
+def color_from_bodypart(bodypart):
+
+    if bodypart == 'leftear':
+        bp_color = (127,0,0)
+    elif bodypart == 'rightear':
+        bp_color = (255,0,0)
+    elif bodypart == 'lefteye':
+        bp_color = (150,150,150)
+    elif bodypart == 'righteye':
+        bp_color = (200,200,200)
+    elif bodypart == 'nose':
+        bp_color = (0,0,0)
+    elif bodypart == 'leftpaw':
+        bp_color = (0,50,0)
+    elif bodypart == 'leftdigit1':
+        bp_color = (0, 100, 0)
+    elif bodypart == 'leftdigit2':
+        bp_color = (0,150,0)
+    elif bodypart == 'leftdigit3':
+        bp_color = (0, 200, 0)
+    elif bodypart == 'leftdigit4':
+        bp_color = (0,250,0)
+    elif bodypart == 'rightpaw':
+        bp_color = (0,0,50)
+    elif bodypart == 'rightdigit1':
+        bp_color = (0, 0, 100)
+    elif bodypart == 'rightdigit2':
+        bp_color = (0,0,150)
+    elif bodypart == 'rightdigit3':
+        bp_color = (0, 0, 200)
+    elif bodypart == 'rightdigit4':
+        bp_color = (0,0,250)
+    elif bodypart == 'pellet1':
+        bp_color = (100,0,100)
+    elif bodypart == 'pellet2':
+        bp_color = (200,0,200)
+    else:
+        bp_color = (0,0,255)
+
+    bp_color = [float(bpc)/255. for bpc in bp_color]
+
+    return bp_color
 
 
 def connect_bodyparts(frame_pts, bodyparts, bpts2connect, valid_3dpoints, ax, **kwargs):

@@ -679,15 +679,17 @@ def rotate_pts_180(pts, im_size):
                 # must be a vector instead of an array
                 x, y = pt
             # possible that im_size is width x height or height x width
-            try:
+            if all(np.array([x, y]) == 0):
+                # if this point wasn't actually found by dlc, keep the coordinate as (0, 0)
+                new_x = 0.
+                new_y = 0.
+            else:
                 new_x = im_size[0] - x
                 new_y = im_size[1] - y
-            except:
-                pass
 
             reflected_pts.append([np.array([new_x, new_y])])
         else:
-            reflected_pts.append(np.array([]))
+            reflected_pts.append(np.array([0., 0.]))
 
     reflected_pts = np.array(reflected_pts)
     reflected_pts = np.squeeze(reflected_pts)

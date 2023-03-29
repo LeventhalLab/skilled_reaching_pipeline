@@ -751,11 +751,13 @@ def translate_back_to_orig_img(pickle_metadata, pts):
     else:
         crop_win = pickle_metadata
 
+    if isinstance(pts, tuple):
+        pts = pts[0]
     if not isinstance(pts, np.ndarray):
         pts = np.array(pts)
 
     pts = np.squeeze(pts)
-    if type(pts[0]) == 'list':
+    if isinstance(pts[0], list):
         # not sure why dlc has this weird output as an array of a list of arrays. maybe something with the way numpy
         # build arrays when lists have different sizes?
         pts_as_array = pts[0][0]
@@ -763,16 +765,35 @@ def translate_back_to_orig_img(pickle_metadata, pts):
             # sometimes, the entry is empty
             if len(pt) == 0:
                 pts_as_array = np.vstack((pts_as_array, np.array([0., 0.])))
-            else:
-                pts_as_array = np.vstack((pts_as_array, pt[0]))
+            elif isinstance(pt, list):
+                pts_as_array = np.vstack((pts_as_array, np.array(pt[0])))
+            elif isinstance(pt, np.ndarray):
+                if np.shape(pt)[0] > 1 and np.ndim(pt) > 1:
+                    # not sure why dlc would return 2 points for a given bodypart, but sometimes it does
+                    pts_as_array = np.vstack((pts_as_array, pt[0]))
+                else:
+                    pts_as_array = np.vstack((pts_as_array, pt))
+
         pts = pts_as_array
+    else:
+        # make sure there is only one point for each bodypart
+        if np.shape(pts[0])[0] > 1 and np.ndim(pts[0]) > 1:
+            pts_array = pts[0][0]
+        elif len(pts[0]) == 0:
+            pts_array = np.array([0., 0.])
+        else:
+            pts_array = np.squeeze(pts[0])
+        for pt in pts[1:]:
+            if np.shape(pt)[0] > 1 and np.ndim(pt) > 1:
+                pts_array = np.vstack(pts_array, pt[0])
+            elif len(pt) == 0:
+                pts_array = np.vstack(np.array([0., 0.]))
+            else:
+                pts_array = np.vstack(np.squeeze(pt))
 
     if np.ndim(pts) == 1:
-        try:
-            # not quite sure why there are issues with array shape, but this seems to fix it
-            pts = np.reshape(pts, (1, 2))
-        except:
-            pass
+        # not quite sure why there are issues with array shape, but this seems to fix it
+        pts = np.reshape(pts, (1, 2))
 
     translated_pts = []
     for i_pt, pt in enumerate(pts):

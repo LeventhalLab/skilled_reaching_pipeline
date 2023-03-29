@@ -1,13 +1,40 @@
 import numpy as np
 
 
+def isnumber(test_var):
+    num_types = [float, np.float64, np.float32, int]
+
+    if type(test_var) in num_types:
+        return True
+    else:
+        return False
+
+
 def dlc_conf_to_array(dlc_conf):
-    pass
+
+    # there is some weird bug in dlc output where sometimes confidence gives a 2-element array. Assume the
+    # first element is the correct one
+    conf_list = []
+    for ii, c in enumerate(dlc_conf):
+        if isnumber(c):
+            conf_list.append(c)
+        elif len(c) > 1:
+            conf_list.append(c[0].item())
+        elif len(c) == 0:
+            conf_list.append(0.)
+        else:
+            conf_list.append(np.squeeze(c).item())
+
+    conf = np.array(conf_list)
+
+    return conf
 
 
 def dlc_coords_to_array(dlc_coords):
     '''
-
+    take dlc_coords data, which sometimes show up as a list, sometimes as an array, has different-sized elements
+    (sometimes empty, sometimes 2 points), and turns it into a single numpy array that is n x 2 where n is the number of
+    joints. Any missing data (i.e., empty points) are set to (0, 0)
     :param dlc_coords:
     :return:
     '''
@@ -50,13 +77,14 @@ def dlc_coords_to_array(dlc_coords):
             pts_as_array = np.squeeze(dlc_coords[0])
         for pt in dlc_coords[1:]:
             if np.shape(pt)[0] > 1 and np.ndim(pt) > 1:
-                pts_as_array = np.vstack(pts_as_array, pt[0])
+                pts_as_array = np.vstack((pts_as_array, pt[0]))
             elif len(pt) == 0:
-                pts_as_array = np.vstack(np.array([0., 0.]))
+                pts_as_array = np.vstack((pts_as_array, np.array([0., 0.])))
             else:
-                pts_as_array = np.vstack(np.squeeze(pt))
+                pts_as_array = np.vstack((pts_as_array, np.squeeze(pt)))
 
     return pts_as_array
+
 
 def collect_bp_data(view_dlc_data, dlc_key):
 

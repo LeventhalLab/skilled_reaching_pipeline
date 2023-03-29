@@ -78,9 +78,10 @@ def collect_matched_dlc_points(cam_pickles):
 
     num_cams = len(cam_pickles)
 
-    cam_pickle_files = []
+
     matched_dlc_points = []
     for cam01_pickle in cam_pickles[0]:
+        cam_pickle_files = []
         # find corresponding pickle file for camera 2
         cam01_folder, cam01_pickle_name = os.path.split(cam01_pickle)
         session_folder, _ = os.path.split(cam01_folder)
@@ -146,8 +147,11 @@ def match_trial_points(dlc_output, pickle_metadata, dlc_metadata, min_conf=0.98)
     num_frames = np.shape(pts_wrt_orig_img[0])[0]
     num_joints = np.shape(pts_wrt_orig_img[0])[1]
     total_pts = num_frames * num_joints
-    all_pts = [np.reshape(img_pts, (total_pts, 2)) for img_pts in pts_wrt_orig_img]
-    all_conf = [np.reshape(cam_conf, (total_pts, 1)) for cam_conf in dlc_conf]
+    try:
+        all_pts = [np.reshape(img_pts, (total_pts, 2)) for img_pts in pts_wrt_orig_img]
+        all_conf = [np.reshape(cam_conf, (total_pts, 1)) for cam_conf in dlc_conf]
+    except:
+        pass
     all_conf = np.hstack(all_conf)
 
     # only consider points where confidence > threshold for both cameras

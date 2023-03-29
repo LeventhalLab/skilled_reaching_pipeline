@@ -650,22 +650,7 @@ def rotate_translate_optitrack_points(dlc_output, pickle_metadata, dlc_metadata,
             conf = dlc_output[i_cam][frame]['confidence']
             # array_conf = convert_pickle_conf_to_array(conf)
 
-            try:
-                dlc_conf[i_cam][i_frame, :] = conf
-            except:
-                # there is some weird bug in dlc output where sometimes confidence gives a 2-element array. Assume the
-                # first element is the correct one
-                conf_list = []
-                for ii, c in enumerate(conf):
-                    if len(c) > 1:
-                        conf_list.append(c[0].item())
-                    elif len(c) == 0:
-                        conf_list.append(0.)
-                    else:
-                        conf_list.append(np.squeeze(c).item())
-
-
-                dlc_conf[i_cam][i_frame, :] = conf_list
+            dlc_conf[i_cam][i_frame, :] = dlc_utilities.dlc_conf_to_array(conf)
 
     return pts_wrt_orig_img, dlc_conf
 
@@ -753,12 +738,12 @@ def translate_back_to_orig_img(pickle_metadata, pts):
 
     pts_as_array = dlc_utilities.dlc_coords_to_array(pts)
 
-dl    if np.ndim(pts) == 1:
-        # not quite sure why there are issues with array shape, but this seems to fix it
-        pts = np.reshape(pts, (1, 2))
+    # if np.ndim(pts) == 1:
+    #     # not quite sure why there are issues with array shape, but this seems to fix it
+    #     pts = np.reshape(pts, (1, 2))
 
     translated_pts = []
-    for i_pt, pt in enumerate(pts):
+    for i_pt, pt in enumerate(pts_as_array):
         if len(pt) > 0:
             pt = np.squeeze(pt)
 

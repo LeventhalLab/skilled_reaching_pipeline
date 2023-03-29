@@ -78,14 +78,15 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories):
     return E, F
 
 
-def collect_matched_dlc_points(cam_pickles):
+def collect_matched_dlc_points(cam_pickles, num_trials_to_match=5):
 
     num_cams = len(cam_pickles)
 
-
+    #todo: pick num_trials_to_match trials at random for point-matching
     matched_dlc_points = []
     matched_dlc_conf = []
     for cam01_pickle in cam_pickles[0]:
+        print('matching points for {}'.format(cam01_pickle))
         cam_pickle_files = []
         # find corresponding pickle file for camera 2
         cam01_folder, cam01_pickle_name = os.path.split(cam01_pickle)
@@ -107,8 +108,6 @@ def collect_matched_dlc_points(cam_pickles):
         pickle_metadata = [navigation_utilities.parse_dlc_output_pickle_name_optitrack(pickle_name) for pickle_name in cam_pickle_files]
 
         # read in pickle data from both files
-        # single_trial_dlc = []
-        single_trial_matched_points = []
         single_trial_dlc_output = [skilled_reaching_io.read_pickle(pickle_name) for pickle_name in cam_pickle_files]
         cam_meta_files = [pickle_file.replace('full.pickle', 'meta.pickle') for pickle_file in cam_pickle_files]
         dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in cam_meta_files]
@@ -135,7 +134,13 @@ def collect_matched_dlc_points(cam_pickles):
 
 
 def trialpts2allpts(trials_pts, trials_conf, min_conf):
-
+    '''
+    take points from all frames for a trial and concatenate them into a single array for stereo calibration
+    :param trials_pts:
+    :param trials_conf:
+    :param min_conf:
+    :return:
+    '''
     num_frames = np.shape(trials_pts[0])[0]
     num_joints = np.shape(trials_pts[0])[1]
     total_pts = num_frames * num_joints

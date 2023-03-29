@@ -753,7 +753,7 @@ def translate_back_to_orig_img(pickle_metadata, pts):
 
     pts_as_array = dlc_utilities.dlc_coords_to_array(pts)
 
-    if np.ndim(pts) == 1:
+dl    if np.ndim(pts) == 1:
         # not quite sure why there are issues with array shape, but this seems to fix it
         pts = np.reshape(pts, (1, 2))
 

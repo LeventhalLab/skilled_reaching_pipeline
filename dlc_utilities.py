@@ -12,6 +12,11 @@ def dlc_coords_to_array(dlc_coords):
     :return:
     '''
 
+    if isinstance(dlc_coords, np.ndarray):
+        # if this is already a num_bodyparts x 2 array, just return dlc_coords
+        if np.ndim(dlc_coords) == 2 and np.shape(dlc_coords)[1] == 2:
+            return dlc_coords
+
     if isinstance(dlc_coords, tuple):
         dlc_coords = dlc_coords[0]
     if not isinstance(dlc_coords, np.ndarray):
@@ -19,7 +24,6 @@ def dlc_coords_to_array(dlc_coords):
 
     dlc_coords = np.squeeze(dlc_coords)
 
-    dlc_coords = np.squeeze(dlc_coords)
     if isinstance(dlc_coords[0], list):
         # not sure why dlc has this weird output as an array of a list of arrays. maybe something with the way numpy
         # build arrays when lists have different sizes?
@@ -36,21 +40,21 @@ def dlc_coords_to_array(dlc_coords):
                     pts_as_array = np.vstack((pts_as_array, pt[0]))
                 else:
                     pts_as_array = np.vstack((pts_as_array, pt))
+    else:
+        # make sure there is only one point for each bodypart
+        if np.shape(dlc_coords[0])[0] > 1 and np.ndim(dlc_coords[0]) > 1:
+            pts_as_array = dlc_coords[0][0]
+        elif len(dlc_coords[0]) == 0:
+            pts_as_array = np.array([0., 0.])
         else:
-            # make sure there is only one point for each bodypart
-            if np.shape(dlc_coords[0])[0] > 1 and np.ndim(dlc_coords[0]) > 1:
-                pts_as_array = dlc_coords[0][0]
-            elif len(dlc_coords[0]) == 0:
-                pts_as_array = np.array([0., 0.])
+            pts_as_array = np.squeeze(dlc_coords[0])
+        for pt in dlc_coords[1:]:
+            if np.shape(pt)[0] > 1 and np.ndim(pt) > 1:
+                pts_as_array = np.vstack(pts_as_array, pt[0])
+            elif len(pt) == 0:
+                pts_as_array = np.vstack(np.array([0., 0.]))
             else:
-                pts_as_array = np.squeeze(dlc_coords[0])
-            for pt in dlc_coords[1:]:
-                if np.shape(pt)[0] > 1 and np.ndim(pt) > 1:
-                    pts_as_array = np.vstack(pts_as_array, pt[0])
-                elif len(pt) == 0:
-                    pts_as_array = np.vstack(np.array([0., 0.]))
-                else:
-                    pts_as_array = np.vstack(np.squeeze(pt))
+                pts_as_array = np.vstack(np.squeeze(pt))
 
     return pts_as_array
 

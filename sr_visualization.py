@@ -390,8 +390,23 @@ def overlay_pts(pts, bodyparts, plot_point_bool, ax, **kwargs):
             ax.scatter(pt[0], pt[1], **kwargs)
 
 
+def draw_epipolar_lines_on_img(img_pts, whichImage, F, im_size, bodyparts, plot_point_bool, ax, lwidth=0.5, linestyle='-'):
+
+    epilines = cv2.computeCorrespondEpilines(img_pts, whichImage, F)
+
+    for i_line, epiline in enumerate(epilines):
+
+        if plot_point_bool[i_line]:
+            bp_color = sr_visualization.color_from_bodypart(bodyparts[i_line])
+            epiline = np.squeeze(epiline)
+            edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
+
+            if not np.all(edge_pts == 0):
+                ax.plot(edge_pts[:, 0], edge_pts[:, 1], color=bp_color, ls=linestyle, marker='.', lw=lwidth)
+
+
 def overlay_pts_on_original_frame(frame_pts, pts_conf, campickle_metadata, camdlc_metadata, frame_num, cal_data, parent_directories,
-                                  ax, plot_undistorted=True, frame_pts_already_undistorted=False, , min_conf=0.98, **kwargs):
+                                  ax, plot_undistorted=True, frame_pts_already_undistorted=False, min_conf=0.98, **kwargs):
     '''
 
     :param frame_pts:
@@ -474,10 +489,12 @@ def overlay_pts_on_original_frame(frame_pts, pts_conf, campickle_metadata, camdl
         to_plot = frame_pts
 
 
-    plot_point_bool = np.ones((num_pts, 1), dtype=bool)
+    plot_point_bool = pts_conf > min_conf   # np.ones((num_pts, 1), dtype=bool)
     overlay_pts(to_plot, bodyparts, plot_point_bool, ax, **kwargs)
 
     plt.show()
+
+    return im_size
 
 
 def color_from_bodypart(bodypart):

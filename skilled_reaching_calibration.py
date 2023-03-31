@@ -82,11 +82,17 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, 
     cam_pickle_files = navigation_utilities.find_other_optitrack_pickles(cam01_pickle_files[trial_idx], parent_directories)
     cam_meta_files = [pickle_file.replace('full.pickle', 'meta.pickle') for pickle_file in cam_pickle_files]
     dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in cam_meta_files]
+    im_size = []
     for i_cam in range(2):
         pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam_pickle_files[i_cam])
 
-        sr_visualization.overlay_pts_on_original_frame(matched_points[trial_idx][i_cam][i_frame], matched_conf[trial_idx][i_cam][i_frame, :], pickle_metadata, dlc_metadata[i_cam], i_frame, cal_data, parent_directories,
-                                      axs[i_cam], plot_undistorted=True, frame_pts_already_undistorted=False, min_conf=0.98)
+        im_size.append(sr_visualization.overlay_pts_on_original_frame(matched_points[trial_idx][i_cam][i_frame], matched_conf[trial_idx][i_cam][i_frame, :], pickle_metadata, dlc_metadata[i_cam], i_frame, cal_data, parent_directories,
+                                      axs[i_cam], plot_undistorted=True, frame_pts_already_undistorted=False, min_conf=min_conf2match))
+    for i_cam in range(2):
+        plot_point_bool = matched_conf[trial_idx][i_cam][i_frame, :] > min_conf2match
+        bodyparts = dlc_metadata[i_cam]['data']['DLC-model-config file']['all_joints_names']
+        sr_visualization.draw_epipolar_lines_on_img(matched_points[trial_idx][i_cam][i_frame], 1 + i_cam, F, im_size[i_cam], bodyparts, plot_point_bool, ax[1-i_cam], lwidth=0.5,
+                                   linestyle='-')
 
     return E, F
 

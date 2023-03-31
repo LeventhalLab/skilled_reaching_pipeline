@@ -11,6 +11,7 @@ import crop_videos
 import os
 import csv
 import numpy as np
+import random
 import cv2
 import glob
 import computer_vision_basics as cvb
@@ -20,7 +21,7 @@ import matplotlib
 matplotlib.use('TKAgg')
 
 
-def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories):
+def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, min_conf2match=0.98):
 
     # find the folder containing cropped videos and dlc pickle files for this session
     session_folder, cam_folders = navigation_utilities.find_cropped_session_folder(session_metadata, parent_directories)
@@ -41,7 +42,7 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories):
     test_name = session_foldername + '_*_full.pickle'
     cam_pickles = [glob.glob(os.path.join(cf, test_name)) for cf in cam_folders]
 
-    matched_points, matched_conf = collect_matched_dlc_points(cam_pickles)
+    matched_points, matched_conf, cam01_pickle_files = collect_matched_dlc_points(cam_pickles)
 
     # matched_points should be a list of pairs of arrays of matched points
     # rearrange this into one massive array
@@ -56,17 +57,18 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories):
     #                                       parent_directories,
     #                                       axs[i_cam], plot_undistorted=True, frame_pts_already_undistorted=False, **kwargs)
 
+    all_pts, all_conf, valid_pts_bool = trialpts2allpts(matched_points, matched_conf, min_conf2match)
+    valid_pts = [cam_pts[valid_pts_bool, :] for cam_pts in all_pts]
+
     # matched_points is a num_trials x 2 list of lists. matched_points[i_cam]
-    E, E_mask = cv2.findEssentialMat(matched_points[0][0][0], matched_points[1][0][0], cal_data['mtx'][0], None,
+    E, E_mask = cv2.findEssentialMat(valid_pts[0], valid_pts[1], cal_data['mtx'][0], None,
                                      cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
 
     matched_unnorm = []
     for i_cam in range(2):
-        pts_ud = cv2.undistortPoints(matched_points[i_cam], cal_data['mtx'][i_cam], cal_data['dist'][i_cam])
+        pts_ud = cv2.undistortPoints(valid_pts[i_cam], cal_data['mtx'][i_cam], cal_data['dist'][i_cam])
         pts_un = cvb.unnormalize_points(pts_ud, cal_data['mtx'][i_cam])
         matched_unnorm.append(pts_un)
-
-    all_pts, all_conf, valid_pts_bool = trialpts2allpts(matched_points, trials_conf, min_conf)
 
     F, F_mask = cv2.findFundamentalMat(matched_unnorm[0], matched_unnorm[1], cv2.FM_RANSAC, 0.1, 0.999)
 
@@ -81,12 +83,17 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories):
 def collect_matched_dlc_points(cam_pickles, num_trials_to_match=5):
 
     num_cams = len(cam_pickles)
+    num_trials = len(cam_pickles[0])
+    trial_idx_to_match = random.sample(range(num_trials), num_trials_to_match)
 
     #todo: pick num_trials_to_match trials at random for point-matching
     matched_dlc_points = []
     matched_dlc_conf = []
-    for cam01_pickle in cam_pickles[0]:
-        print('matching points for {}'.format(cam01_pickle))
+    cam01_names = []
+    for trial_idx in trial_idx_to_match:
+        cam01_pickle = cam_pickles[0][trial_idx]
+        _, pickle_name = os.path.split(cam01_pickle)
+        print('matching points for {}'.format(pickle_name))
         cam_pickle_files = []
         # find corresponding pickle file for camera 2
         cam01_folder, cam01_pickle_name = os.path.split(cam01_pickle)
@@ -104,6 +111,8 @@ def collect_matched_dlc_points(cam_pickles, num_trials_to_match=5):
         else:
             print('no matching camera 2 file for {}'.format(cam01_file))
             continue
+
+        cam01_names.append(cam01_pickle)
 
         pickle_metadata = [navigation_utilities.parse_dlc_output_pickle_name_optitrack(pickle_name) for pickle_name in cam_pickle_files]
 
@@ -123,7 +132,12 @@ def collect_matched_dlc_points(cam_pickles, num_trials_to_match=5):
         # else:
         #     matched_dlc_points = matched_trial_pts
 
-    return matched_dlc_points, matched_dlc_conf
+    # matched_dlc_points is a list containing num_trials_to_match 2-element lists (one for each camera) of
+    # num_frames x num_joints x 2 arrays containing matched points from the two videos
+    # matched_dlc_conf is a list containing num_trials_to_match lists of 2-element lists (one for each camera) of
+    # num_frames x num_joints arrays containing confidence levels
+    # cam01_names is a num_trials_to_match element list of pickle file names from which dlc points were extracted
+    return matched_dlc_points, matched_dlc_conf, cam01_names
     '''
     findEssentialMat or findFundamentalMat need matched points in the two images; arrays are points 
     '''
@@ -141,18 +155,32 @@ def trialpts2allpts(trials_pts, trials_conf, min_conf):
     :param min_conf:
     :return:
     '''
-    num_frames = np.shape(trials_pts[0])[0]
-    num_joints = np.shape(trials_pts[0])[1]
-    total_pts = num_frames * num_joints
 
-    all_pts = [np.reshape(img_pts, (total_pts, 2)) for img_pts in trials_pts]
-    all_conf = [np.reshape(cam_conf, (total_pts, 1)) for cam_conf in trials_conf]
-    all_conf = np.hstack(all_conf)
+    num_trials = len(trials_pts)
+    num_cams = np.shape(trials_pts[0])[0]
+    frames_per_trial = [[] for ii in range(num_cams)]
+    for i_cam in range(num_cams):
+        frames_per_trial[i_cam].append([np.shape(trials_pts[i_trial][0])[0] for i_trial in range(num_trials)])
+    frame_per_trial = np.squeeze(np.array(frames_per_trial))
+    frame_per_trial = frame_per_trial.T
+    num_joints = np.shape(trials_pts[0])[1]
+
+    all_pts = [[] for ii in range(num_cams)]
+    all_conf = [[] for ii in range(num_cams)]
+    for i_trial in range(num_trials):
+        for i_cam in range(num_cams):
+            current_frames_to_match = min(frame_per_trial[i_trial, :])
+            if i_trial == 0:
+                all_pts[i_cam] = np.reshape(trials_pts[i_trial][i_cam][:current_frames_to_match, :, :], (-1, 2))
+                all_conf[i_cam] = np.reshape(trials_conf[i_trial][i_cam][:current_frames_to_match], (-1))
+            else:
+                all_pts[i_cam] = np.vstack((all_pts[i_cam], np.reshape(trials_pts[i_trial][i_cam][:current_frames_to_match, :], (-1, 2))))
+                all_conf[i_cam] = np.hstack((all_conf[i_cam], np.reshape(trials_conf[i_trial][i_cam][:current_frames_to_match], (-1))))
+
+    all_conf = np.array(all_conf).T
 
     # only consider points where confidence > threshold for both cameras
     valid_pts_bool = (all_conf > min_conf).all(axis=1)
-
-    valid_pts = [cam_pts[valid_pts_bool] for cam_pts in all_pts]
 
     return all_pts, all_conf, valid_pts_bool
 

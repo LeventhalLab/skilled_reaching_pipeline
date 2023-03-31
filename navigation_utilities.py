@@ -805,9 +805,9 @@ def find_other_optitrack_pickles(pickle_file, parent_directories):
     test_name = session_foldername + '_*_full.pickle'
     cam_pickles = [glob.glob(os.path.join(cf, test_name)) for cf in cam_folders]
 
+    orig_cam = pickle_metadata['cam_num']
     orig_cam_pickle_stem = orig_pickle_name[:orig_pickle_name.find('cam{:02d}'.format(orig_cam)) + 5]
 
-    orig_cam = pickle_metadata['cam_num']
     cur_cam = 1
 
     camera_exists = True

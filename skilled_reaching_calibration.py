@@ -79,13 +79,14 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, 
     fig, axs = plt.subplots(nrows=1, ncols=2)
     trial_idx = 0
     i_frame = 10
+    cam_pickle_files = navigation_utilities.find_other_optitrack_pickles(cam01_pickle_files[trial_idx], parent_directories)
+    cam_meta_files = [pickle_file.replace('full.pickle', 'meta.pickle') for pickle_file in cam_pickle_files]
+    dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in cam_meta_files]
     for i_cam in range(2):
-        if i_cam == 0:
-            pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_pickle_files[trial_idx])
-        else:
-            pass
-        sr_visualization.overlay_pts_on_original_frame(matched_points[trial_idx][i_cam][i_frame], campickle_metadata, camdlc_metadata, frame_num, cal_data, parent_directories,
-                                      axs[i_cam], plot_undistorted=True, frame_pts_already_undistorted=False, **kwargs)
+        pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam_pickle_files[i_cam])
+
+        sr_visualization.overlay_pts_on_original_frame(matched_points[trial_idx][i_cam][i_frame], matched_conf[trial_idx][i_cam][i_frame, :], pickle_metadata, dlc_metadata[i_cam], i_frame, cal_data, parent_directories,
+                                      axs[i_cam], plot_undistorted=True, frame_pts_already_undistorted=False, min_conf=0.98)
 
     return E, F
 
@@ -105,25 +106,25 @@ def collect_matched_dlc_points(cam_pickles, parent_directories, num_trials_to_ma
         cam01_folder, cam01_pickle_name = os.path.split(cam01_pickle)
         print('matching points for {}'.format(cam01_pickle_name))
 
-        navigation_utilities.find_other_optitrack_pickles(cam01_pickle, parent_directories)
-        cam_pickle_files = []
-        # find corresponding pickle file for camera 2
-        session_folder, _ = os.path.split(cam01_folder)
-        cam01_pickle_stem = cam01_pickle_name[:cam01_pickle_name.find('cam01') + 5]
-        cam02_pickle_stem = cam01_pickle_stem.replace('cam01', 'cam02')
+        cam_pickle_files = navigation_utilities.find_other_optitrack_pickles(cam01_pickle, parent_directories)
+        # cam_pickle_files = []
+        # # find corresponding pickle file for camera 2
+        # session_folder, _ = os.path.split(cam01_folder)
+        # cam01_pickle_stem = cam01_pickle_name[:cam01_pickle_name.find('cam01') + 5]
+        # cam02_pickle_stem = cam01_pickle_stem.replace('cam01', 'cam02')
+        #
+        # cam02_pickle = [c02_pickle for c02_pickle in cam_pickles[1] if cam02_pickle_stem in c02_pickle]
+        #
+        # # cam02_file_list = glob.glob(os.path.join(view_directories[1], cam02_pickle_stem + '*full.pickle'))
+        # if len(cam02_pickle) == 1:
+        #     cam02_pickle = cam02_pickle[0]
+        #     cam_pickle_files.append(cam01_pickle)
+        #     cam_pickle_files.append(cam02_pickle)
+        # else:
+        #     print('no matching camera 2 file for {}'.format(cam01_file))
+        #     continue
 
-        cam02_pickle = [c02_pickle for c02_pickle in cam_pickles[1] if cam02_pickle_stem in c02_pickle]
-
-        # cam02_file_list = glob.glob(os.path.join(view_directories[1], cam02_pickle_stem + '*full.pickle'))
-        if len(cam02_pickle) == 1:
-            cam02_pickle = cam02_pickle[0]
-            cam_pickle_files.append(cam01_pickle)
-            cam_pickle_files.append(cam02_pickle)
-        else:
-            print('no matching camera 2 file for {}'.format(cam01_file))
-            continue
-
-        cam01_names.append(cam01_pickle)
+        cam01_names.append(cam_pickle_files[0])
 
         pickle_metadata = [navigation_utilities.parse_dlc_output_pickle_name_optitrack(pickle_name) for pickle_name in cam_pickle_files]
 

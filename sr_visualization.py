@@ -390,8 +390,8 @@ def overlay_pts(pts, bodyparts, plot_point_bool, ax, **kwargs):
             ax.scatter(pt[0], pt[1], **kwargs)
 
 
-def overlay_pts_on_original_frame(frame_pts, campickle_metadata, camdlc_metadata, frame_num, cal_data, parent_directories,
-                                  ax, plot_undistorted=True, frame_pts_already_undistorted=False, **kwargs):
+def overlay_pts_on_original_frame(frame_pts, pts_conf, campickle_metadata, camdlc_metadata, frame_num, cal_data, parent_directories,
+                                  ax, plot_undistorted=True, frame_pts_already_undistorted=False, , min_conf=0.98, **kwargs):
     '''
 
     :param frame_pts:
@@ -438,10 +438,10 @@ def overlay_pts_on_original_frame(frame_pts, campickle_metadata, camdlc_metadata
     video_object.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
     ret, img = video_object.read()
 
-    mtx = cal_data['mtx'][cam_num]
-    dist = cal_data['dist'][cam_num]
+    mtx = cal_data['mtx'][cam_num-1]
+    dist = cal_data['dist'][cam_num-1]
 
-    if cam_num == 0:
+    if cam_num == 1:
         img = cv2.rotate(img, cv2.ROTATE_180)
     img_ud = cv2.undistort(img, mtx, dist)
 

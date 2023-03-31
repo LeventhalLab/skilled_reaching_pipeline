@@ -42,7 +42,7 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, 
     test_name = session_foldername + '_*_full.pickle'
     cam_pickles = [glob.glob(os.path.join(cf, test_name)) for cf in cam_folders]
 
-    matched_points, matched_conf, cam01_pickle_files = collect_matched_dlc_points(cam_pickles)
+    matched_points, matched_conf, cam01_pickle_files = collect_matched_dlc_points(cam_pickles, parent_directories)
 
     # matched_points should be a list of pairs of arrays of matched points
     # rearrange this into one massive array
@@ -76,11 +76,21 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, 
     E_from_F = cal_data['mtx'][1].T @ F @ cal_data['mtx'][0]
 
     # todo: test that matched points are in the right place, and the F gives epipolar lines that look good
+    fig, axs = plt.subplots(nrows=1, ncols=2)
+    trial_idx = 0
+    i_frame = 10
+    for i_cam in range(2):
+        if i_cam == 0:
+            pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam01_pickle_files[trial_idx])
+        else:
+            pass
+        sr_visualization.overlay_pts_on_original_frame(matched_points[trial_idx][i_cam][i_frame], campickle_metadata, camdlc_metadata, frame_num, cal_data, parent_directories,
+                                      axs[i_cam], plot_undistorted=True, frame_pts_already_undistorted=False, **kwargs)
 
     return E, F
 
 
-def collect_matched_dlc_points(cam_pickles, num_trials_to_match=5):
+def collect_matched_dlc_points(cam_pickles, parent_directories, num_trials_to_match=5):
 
     num_cams = len(cam_pickles)
     num_trials = len(cam_pickles[0])
@@ -92,11 +102,12 @@ def collect_matched_dlc_points(cam_pickles, num_trials_to_match=5):
     cam01_names = []
     for trial_idx in trial_idx_to_match:
         cam01_pickle = cam_pickles[0][trial_idx]
-        _, pickle_name = os.path.split(cam01_pickle)
-        print('matching points for {}'.format(pickle_name))
+        cam01_folder, cam01_pickle_name = os.path.split(cam01_pickle)
+        print('matching points for {}'.format(cam01_pickle_name))
+
+        navigation_utilities.find_other_optitrack_pickles(cam01_pickle, parent_directories)
         cam_pickle_files = []
         # find corresponding pickle file for camera 2
-        cam01_folder, cam01_pickle_name = os.path.split(cam01_pickle)
         session_folder, _ = os.path.split(cam01_folder)
         cam01_pickle_stem = cam01_pickle_name[:cam01_pickle_name.find('cam01') + 5]
         cam02_pickle_stem = cam01_pickle_stem.replace('cam01', 'cam02')

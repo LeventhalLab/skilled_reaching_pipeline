@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 import shutil
 from datetime import datetime, timedelta
+import navigation_utilities
 
 
 def find_cropped_session_folder(session_metadata, parent_directories):
@@ -790,6 +791,46 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
     pickle_metadata['scorername']
 
     return pickle_metadata
+
+
+def find_other_optitrack_pickles(pickle_file, parent_directories):
+
+    pickle_metadata = parse_dlc_output_pickle_name_optitrack(pickle_file)
+    orig_pickle_folder, orig_pickle_name = os.path.split(pickle_file)
+
+    session_folder, cam_folders = navigation_utilities.find_cropped_session_folder(pickle_metadata, parent_directories)
+    # session_folder, _ = os.path.split(orig_pickle_folder)
+
+    _, session_foldername = os.path.split(session_folder)
+    test_name = session_foldername + '_*_full.pickle'
+    cam_pickles = [glob.glob(os.path.join(cf, test_name)) for cf in cam_folders]
+
+    orig_cam_pickle_stem = orig_pickle_name[:orig_pickle_name.find('cam{:02d}'.format(orig_cam)) + 5]
+
+    orig_cam = pickle_metadata['cam_num']
+    cur_cam = 1
+
+    camera_exists = True
+    cam_pickle_files = []
+    while camera_exists:
+        if orig_cam == cur_cam:
+            cam_pickle_files.append(pickle_file)
+            cur_cam += 1
+            continue
+
+        cam_idx = cur_cam - 1
+        curcam_pickle_stem = orig_cam_pickle_stem.replace('cam{:02d}'.format(orig_cam), 'cam{:02d}'.format(cur_cam))
+
+        curcam_pickle = [cc_pickle for cc_pickle in cam_pickles[cam_idx] if curcam_pickle_stem in cc_pickle]
+
+        if len(curcam_pickle) == 1:
+            curcam_pickle = curcam_pickle[0]
+            cam_pickle_files.append(curcam_pickle)
+        else:
+            print('no matching camera {:d} pickle file for {}'.format(cur_cam, orig_pickle_name))
+            camera_exists = False
+
+    return cam_pickle_files
 
 
 def parse_dlc_output_pickle_name_optitrack(dlc_output_pickle_name):

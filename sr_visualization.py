@@ -393,11 +393,12 @@ def overlay_pts(pts, bodyparts, plot_point_bool, ax, **kwargs):
 def draw_epipolar_lines_on_img(img_pts, whichImage, F, im_size, bodyparts, plot_point_bool, ax, lwidth=0.5, linestyle='-'):
 
     epilines = cv2.computeCorrespondEpilines(img_pts, whichImage, F)
+    bp_c = mouse_bp_colors()
 
     for i_line, epiline in enumerate(epilines):
 
         if plot_point_bool[i_line]:
-            bp_color = sr_visualization.color_from_bodypart(bodyparts[i_line])
+            bp_color = bp_c[bodyparts[i_line]]    # color_from_bodypart(bodyparts[i_line])
             epiline = np.squeeze(epiline)
             edge_pts = cvb.find_line_edge_coordinates(epiline, im_size)
 
@@ -491,8 +492,6 @@ def overlay_pts_on_original_frame(frame_pts, pts_conf, campickle_metadata, camdl
 
     plot_point_bool = pts_conf > min_conf   # np.ones((num_pts, 1), dtype=bool)
     overlay_pts(to_plot, bodyparts, plot_point_bool, ax, **kwargs)
-
-    plt.show()
 
     return im_size
 

@@ -91,7 +91,7 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, 
     for i_cam in range(2):
         plot_point_bool = matched_conf[trial_idx][i_cam][i_frame, :] > min_conf2match
         bodyparts = dlc_metadata[i_cam]['data']['DLC-model-config file']['all_joints_names']
-        sr_visualization.draw_epipolar_lines_on_img(matched_points[trial_idx][i_cam][i_frame], 1 + i_cam, F, im_size[i_cam], bodyparts, plot_point_bool, axs[1-i_cam], lwidth=0.5,
+        sr_visualization.draw_epipolar_lines_on_img(matched_points[trial_idx][i_cam][i_frame], 1 + i_cam, cal_data['F_from_E'], im_size[i_cam], bodyparts, plot_point_bool, axs[1-i_cam], lwidth=0.5,
                                    linestyle='-')
 
     plt.show()

@@ -733,7 +733,7 @@ def mouse_bp_colors():
     bp_c['lefteye'] = (1, 0, 1)
     bp_c['righteye'] = tuple(np.array(bp_c['lefteye']) * 0.5)
 
-    bp_c['nose'] = (1, 1, 1)
+    bp_c['nose'] = (0, 0, 0)
 
     bp_c['rightpaw'] = (0, 0, 1)
     bp_c['rightdigit1'] = tuple(np.array(bp_c['rightpaw']) * 0.9)

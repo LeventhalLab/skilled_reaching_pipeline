@@ -45,59 +45,92 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, 
     matched_points, matched_conf, cam01_pickle_files = collect_matched_dlc_points(cam_pickles, parent_directories)
 
     # matched_points should be a list of pairs of arrays of matched points
-    # rearrange this into one massive array
-
-    # test to make sure everything is matched correctly
-    # num_trials = len(matched_points)
-    # for i_frame in range(num_frames):
-    #     fig, axs = plt.subplots(1, 2)
-    #     for i_cam in range(2):
-    #         pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam_pickles[i_cam])
-    #         sr_visualization.overlay_pts_on_original_frame(matched_points[i_frame][i_cam], pickle_metadata[i_cam], camdlc_metadata, i_frame, cal_data,
-    #                                       parent_directories,
-    #                                       axs[i_cam], plot_undistorted=True, frame_pts_already_undistorted=False, **kwargs)
 
     all_pts, all_conf, valid_pts_bool = trialpts2allpts(matched_points, matched_conf, min_conf2match)
     valid_pts = [cam_pts[valid_pts_bool, :] for cam_pts in all_pts]
 
     # matched_points is a num_trials x 2 list of lists. matched_points[i_cam]
-    E, E_mask = cv2.findEssentialMat(valid_pts[0], valid_pts[1], cal_data['mtx'][0], None,
+    recal_E, E_mask = cv2.findEssentialMat(valid_pts[0], valid_pts[1], cal_data['mtx'][0], None,
                                      cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
 
-    matched_unnorm = []
+    stereo_ud = collect_cam_undistorted_points(all_pts, cal_data)
+
+    # calculate R and T based on the recalibrated essential matrix
+    _, R_from_E_recal, T_Eunit_recal, ffm_msk = cv2.recoverPose(recal_E, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :],
+                                                    cal_data['mtx'][0])
+
+    # matched_unnorm = []
+    # for i_cam in range(2):
+    #     pts_ud = cv2.undistortPoints(valid_pts[i_cam], cal_data['mtx'][i_cam], cal_data['dist'][i_cam])
+    #     pts_un = cvb.unnormalize_points(pts_ud, cal_data['mtx'][i_cam])
+    #     matched_unnorm.append(pts_un)
+    #
+    # F, F_mask = cv2.findFundamentalMat(matched_unnorm[0], matched_unnorm[1], cv2.FM_RANSAC, 0.1, 0.999)
+
+    # F_from_E = np.linalg.inv(cal_data['mtx'][1].T) @ E @ np.linalg.inv(cal_data['mtx'][0])
+    # E_from_F = cal_data['mtx'][1].T @ F @ cal_data['mtx'][0]
+
+    # test that matched points are in the right place, and the F gives epipolar lines that look good
+    # fig, axs = plt.subplots(nrows=1, ncols=2)
+    # trial_idx = 0
+    # i_frame = 10
+    # cam_pickle_files = navigation_utilities.find_other_optitrack_pickles(cam01_pickle_files[trial_idx], parent_directories)
+    # cam_meta_files = [pickle_file.replace('full.pickle', 'meta.pickle') for pickle_file in cam_pickle_files]
+    # dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in cam_meta_files]
+    # im_size = []
+    # for i_cam in range(2):
+    #     pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam_pickle_files[i_cam])
+    #
+    #     im_size.append(sr_visualization.overlay_pts_on_original_frame(matched_points[trial_idx][i_cam][i_frame], matched_conf[trial_idx][i_cam][i_frame, :], pickle_metadata, dlc_metadata[i_cam], i_frame, cal_data, parent_directories,
+    #                                   axs[i_cam], plot_undistorted=True, frame_pts_already_undistorted=False, min_conf=min_conf2match))
+    # for i_cam in range(2):
+    #     plot_point_bool = matched_conf[trial_idx][i_cam][i_frame, :] > min_conf2match
+    #     bodyparts = dlc_metadata[i_cam]['data']['DLC-model-config file']['all_joints_names']
+    #     sr_visualization.draw_epipolar_lines_on_img(matched_points[trial_idx][i_cam][i_frame], 1 + i_cam, F_from_E, im_size[i_cam], bodyparts, plot_point_bool, axs[1-i_cam], lwidth=0.5,
+    #                                linestyle='-')
+    #
+    # plt.show()
+
+    return recal_E
+
+
+def collect_cam_undistorted_points(distorted_pts, cal_data):
+    # todo: WORKING HERE... return undistorted points given distorted points
+    # convert to normalized coordinates for pose recovery
+    stereo_ud_norm = []
+    stereo_ud = []
+    stereo_ud_norm_for_T = []
+    stereo_ud_for_T = []
     for i_cam in range(2):
-        pts_ud = cv2.undistortPoints(valid_pts[i_cam], cal_data['mtx'][i_cam], cal_data['dist'][i_cam])
-        pts_un = cvb.unnormalize_points(pts_ud, cal_data['mtx'][i_cam])
-        matched_unnorm.append(pts_un)
+        pts = np.array(cal_data['stereo_imgpoints'][i_cam])
+        framepts_ud_norm = [cv2.undistortPoints(frame_pts, mtx[i_cam], cal_data['dist'][i_cam]) for frame_pts in pts]
+        framepts_ud = [cvb.unnormalize_points(fpts_ud_norm, mtx[i_cam]) for fpts_ud_norm in framepts_ud_norm]
+        num_frames = np.shape(framepts_ud)[0]
+        pts_per_frame = np.shape(framepts_ud)[1]
+        pts_r = np.reshape(pts, (-1, 2))
+        pts_ud_norm = cv2.undistortPoints(pts_r, mtx[i_cam], cal_data['dist'][i_cam])
+        pts_ud = cvb.unnormalize_points(pts_ud_norm, mtx[i_cam])
+        stereo_ud_norm.append(pts_ud_norm)
+        stereo_ud.append(pts_ud)
+        stereo_ud_norm_for_T.append(framepts_ud_norm)
 
-    F, F_mask = cv2.findFundamentalMat(matched_unnorm[0], matched_unnorm[1], cv2.FM_RANSAC, 0.1, 0.999)
-
-    F_from_E = np.linalg.inv(cal_data['mtx'][1].T) @ E @ np.linalg.inv(cal_data['mtx'][0])
-    E_from_F = cal_data['mtx'][1].T @ F @ cal_data['mtx'][0]
-
-    # todo: test that matched points are in the right place, and the F gives epipolar lines that look good
-    fig, axs = plt.subplots(nrows=1, ncols=2)
-    trial_idx = 0
-    i_frame = 10
-    cam_pickle_files = navigation_utilities.find_other_optitrack_pickles(cam01_pickle_files[trial_idx], parent_directories)
-    cam_meta_files = [pickle_file.replace('full.pickle', 'meta.pickle') for pickle_file in cam_pickle_files]
-    dlc_metadata = [skilled_reaching_io.read_pickle(cam_meta_file) for cam_meta_file in cam_meta_files]
-    im_size = []
-    for i_cam in range(2):
-        pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name_optitrack(cam_pickle_files[i_cam])
-
-        im_size.append(sr_visualization.overlay_pts_on_original_frame(matched_points[trial_idx][i_cam][i_frame], matched_conf[trial_idx][i_cam][i_frame, :], pickle_metadata, dlc_metadata[i_cam], i_frame, cal_data, parent_directories,
-                                      axs[i_cam], plot_undistorted=True, frame_pts_already_undistorted=False, min_conf=min_conf2match))
-    for i_cam in range(2):
-        plot_point_bool = matched_conf[trial_idx][i_cam][i_frame, :] > min_conf2match
-        bodyparts = dlc_metadata[i_cam]['data']['DLC-model-config file']['all_joints_names']
-        sr_visualization.draw_epipolar_lines_on_img(matched_points[trial_idx][i_cam][i_frame], 1 + i_cam, F_from_E, im_size[i_cam], bodyparts, plot_point_bool, axs[1-i_cam], lwidth=0.5,
-                                   linestyle='-')
-
-    plt.show()
-
-    return E, F
-
+        for i_frame, fpts in enumerate(framepts_ud):
+            framepts_ud[i_frame] = np.reshape(fpts, (pts_per_frame, 1, 2))
+        stereo_ud_for_T.append(framepts_ud)
+    # select 2000 points at random for chirality check (using all the points takes a really long time)
+    num_pts = np.shape(pts_ud)[0]
+    pt_idx = np.random.randint(0, num_pts, 2000)
+    _, R_from_E, T_Eunit, ffm_msk = cv2.recoverPose(E, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :],
+                                                    cal_data['mtx'][0])
+    _, R_from_F, T_Funit, ffm_msk = cv2.recoverPose(E_from_F, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :],
+                                                    cal_data['mtx'][0])
+    _, R_norm, T_norm_unit, ffm_msk = cv2.recoverPose(E_norm, stereo_ud_norm[0][pt_idx, :],
+                                                      stereo_ud_norm[1][pt_idx, :],
+                                                      np.identity(3))
+    norm_mtx = [np.identity(3) for i_cam in range(2)]
+    T_norm = estimate_T_from_ffm(stereo_objpoints, stereo_ud_norm_for_T, im_size, norm_mtx, R_norm)
+    T_from_E = estimate_T_from_ffm(stereo_objpoints, stereo_ud_for_T, im_size, mtx, R_from_E)
+    T_from_F = estimate_T_from_ffm(stereo_objpoints, stereo_ud_for_T, im_size, mtx, R_from_F)
 
 def collect_matched_dlc_points(cam_pickles, parent_directories, num_trials_to_match=5):
 
@@ -1288,7 +1321,7 @@ def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directorie
             for i_frame, fpts in enumerate(framepts_ud):
                 framepts_ud[i_frame] = np.reshape(fpts, (pts_per_frame, 1, 2))
             stereo_ud_for_T.append(framepts_ud)
-        # select 2000 points at random for cheirality check (using all the points takes a really long time)
+        # select 2000 points at random for chirality check (using all the points takes a really long time)
         num_pts = np.shape(pts_ud)[0]
         pt_idx = np.random.randint(0, num_pts, 2000)
         _, R_from_E, T_Eunit, ffm_msk = cv2.recoverPose(E, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :], cal_data['mtx'][0])

@@ -210,7 +210,9 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(pickle_files[i_cam]))
         orig_vid_names.append(navigation_utilities.find_original_optitrack_videos(video_root_folder, pickle_metadata[i_cam]))
 
-    recal_E, recal_F = skilled_reaching_calibration.refine_optitrack_calibration_from_dlc(pickle_metadata[0], parent_directories)
+    recal_E = skilled_reaching_calibration.refine_optitrack_calibration_from_dlc(pickle_metadata[0], parent_directories)
+    cal_data['recal_E'] = recal_E
+
     # perform frame-by-frame reconstruction
     # set up numpy arrays to accept world points, measured points, dlc confidence values, reprojected points, and reprojection errors
     reconstructed_data = {

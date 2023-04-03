@@ -49,14 +49,25 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, 
     all_pts, all_conf, valid_pts_bool = trialpts2allpts(matched_points, matched_conf, min_conf2match)
     valid_pts = [cam_pts[valid_pts_bool, :] for cam_pts in all_pts]
 
+    collect_cam_undistorted_points(valid_pts, cal_data)
+
     # matched_points is a num_trials x 2 list of lists. matched_points[i_cam]
     recal_E, E_mask = cv2.findEssentialMat(valid_pts[0], valid_pts[1], cal_data['mtx'][0], None,
                                      cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
 
-    stereo_ud = collect_cam_undistorted_points(all_pts, cal_data)
+    # convert E_mask into a boolean vector for indexing
+    inlier_idx = np.squeeze(E_mask) != 0
+
+    inliers = [np.squeeze(cam_val_pts[inlier_idx, :]) for cam_val_pts in valid_pts]
+    stereo_ud, stereo_ud_norm = collect_cam_undistorted_points(inliers, cal_data)
 
     # calculate R and T based on the recalibrated essential matrix
-    _, R_from_E_recal, T_Eunit_recal, ffm_msk = cv2.recoverPose(recal_E, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :],
+    # select 2000 points at random for chirality check (using all the points takes a really long time)
+    num_pts = np.shape(stereo_ud[0])[0]
+    # pt_idx = np.random.randint(0, num_pts, 2000)
+    # _, R_from_E, T_Eunit, ffm_msk = cv2.recoverPose(E, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :],
+    #                                                 cal_data['mtx'][0])
+    _, R_from_E_recal, T_Eunit_recal, rp_msk = cv2.recoverPose(recal_E, stereo_ud[0], stereo_ud[1],
                                                     cal_data['mtx'][0])
 
     # matched_unnorm = []
@@ -91,46 +102,60 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, 
     #
     # plt.show()
 
-    return recal_E
+    return recal_E, R_from_E_recal, T_Eunit_recal
 
 
 def collect_cam_undistorted_points(distorted_pts, cal_data):
     # todo: WORKING HERE... return undistorted points given distorted points
+    # make this work whether distorted_pts is a list of single frame distorted points or one large array of distorted points
+
     # convert to normalized coordinates for pose recovery
-    stereo_ud_norm = []
-    stereo_ud = []
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+
+    pts_ud_norm = []
+    pts_ud = []
     stereo_ud_norm_for_T = []
     stereo_ud_for_T = []
     for i_cam in range(2):
-        pts = np.array(cal_data['stereo_imgpoints'][i_cam])
-        framepts_ud_norm = [cv2.undistortPoints(frame_pts, mtx[i_cam], cal_data['dist'][i_cam]) for frame_pts in pts]
-        framepts_ud = [cvb.unnormalize_points(fpts_ud_norm, mtx[i_cam]) for fpts_ud_norm in framepts_ud_norm]
-        num_frames = np.shape(framepts_ud)[0]
-        pts_per_frame = np.shape(framepts_ud)[1]
-        pts_r = np.reshape(pts, (-1, 2))
-        pts_ud_norm = cv2.undistortPoints(pts_r, mtx[i_cam], cal_data['dist'][i_cam])
-        pts_ud = cvb.unnormalize_points(pts_ud_norm, mtx[i_cam])
-        stereo_ud_norm.append(pts_ud_norm)
-        stereo_ud.append(pts_ud)
-        stereo_ud_norm_for_T.append(framepts_ud_norm)
+        pts = np.array(distorted_pts[i_cam])
 
-        for i_frame, fpts in enumerate(framepts_ud):
-            framepts_ud[i_frame] = np.reshape(fpts, (pts_per_frame, 1, 2))
-        stereo_ud_for_T.append(framepts_ud)
+        if np.ndim(pts) == 2:
+            # pts is an n x 2 array, convert directly to undistorted points
+            pts_ud_norm.append(cv2.undistortPoints(pts, mtx[i_cam], dist[i_cam]))
+            pts_ud.append(cvb.unnormalize_points(pts_ud_norm[i_cam], mtx[i_cam]))
+        else:
+            # need to clean this up at some points to undistort points on a per-frame basis
+            framepts_ud_norm = [cv2.undistortPoints(frame_pts, mtx[i_cam], dist[i_cam]) for frame_pts in pts]
+            framepts_ud = [cvb.unnormalize_points(fpts_ud_norm, mtx[i_cam]) for fpts_ud_norm in framepts_ud_norm]
+            num_frames = np.shape(framepts_ud)[0]
+            pts_per_frame = np.shape(framepts_ud)[1]
+            pts_r = np.reshape(pts, (-1, 2))
+            pts_ud_norm = cv2.undistortPoints(pts_r, mtx[i_cam], cal_data['dist'][i_cam])
+            pts_ud = cvb.unnormalize_points(pts_ud_norm, mtx[i_cam])
+            stereo_ud_norm.append(pts_ud_norm)
+            stereo_ud.append(pts_ud)
+            stereo_ud_norm_for_T.append(framepts_ud_norm)
+
+        # for i_frame, fpts in enumerate(framepts_ud):
+        #     framepts_ud[i_frame] = np.reshape(fpts, (pts_per_frame, 1, 2))
+        # stereo_ud_for_T.append(framepts_ud)
+
+    return pts_ud, pts_ud_norm
     # select 2000 points at random for chirality check (using all the points takes a really long time)
-    num_pts = np.shape(pts_ud)[0]
-    pt_idx = np.random.randint(0, num_pts, 2000)
-    _, R_from_E, T_Eunit, ffm_msk = cv2.recoverPose(E, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :],
-                                                    cal_data['mtx'][0])
-    _, R_from_F, T_Funit, ffm_msk = cv2.recoverPose(E_from_F, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :],
-                                                    cal_data['mtx'][0])
-    _, R_norm, T_norm_unit, ffm_msk = cv2.recoverPose(E_norm, stereo_ud_norm[0][pt_idx, :],
-                                                      stereo_ud_norm[1][pt_idx, :],
-                                                      np.identity(3))
-    norm_mtx = [np.identity(3) for i_cam in range(2)]
-    T_norm = estimate_T_from_ffm(stereo_objpoints, stereo_ud_norm_for_T, im_size, norm_mtx, R_norm)
-    T_from_E = estimate_T_from_ffm(stereo_objpoints, stereo_ud_for_T, im_size, mtx, R_from_E)
-    T_from_F = estimate_T_from_ffm(stereo_objpoints, stereo_ud_for_T, im_size, mtx, R_from_F)
+    # num_pts = np.shape(pts_ud)[0]
+    # pt_idx = np.random.randint(0, num_pts, 2000)
+    # _, R_from_E, T_Eunit, ffm_msk = cv2.recoverPose(E, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :],
+    #                                                 cal_data['mtx'][0])
+    # _, R_from_F, T_Funit, ffm_msk = cv2.recoverPose(E_from_F, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :],
+    #                                                 cal_data['mtx'][0])
+    # _, R_norm, T_norm_unit, ffm_msk = cv2.recoverPose(E_norm, stereo_ud_norm[0][pt_idx, :],
+    #                                                   stereo_ud_norm[1][pt_idx, :],
+    #                                                   np.identity(3))
+    # norm_mtx = [np.identity(3) for i_cam in range(2)]
+    # T_norm = estimate_T_from_ffm(stereo_objpoints, stereo_ud_norm_for_T, im_size, norm_mtx, R_norm)
+    # T_from_E = estimate_T_from_ffm(stereo_objpoints, stereo_ud_for_T, im_size, mtx, R_from_E)
+    # T_from_F = estimate_T_from_ffm(stereo_objpoints, stereo_ud_for_T, im_size, mtx, R_from_F)
 
 def collect_matched_dlc_points(cam_pickles, parent_directories, num_trials_to_match=5):
 

@@ -210,8 +210,11 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
         pickle_metadata.append(navigation_utilities.parse_dlc_output_pickle_name_optitrack(pickle_files[i_cam]))
         orig_vid_names.append(navigation_utilities.find_original_optitrack_videos(video_root_folder, pickle_metadata[i_cam]))
 
-    recal_E = skilled_reaching_calibration.refine_optitrack_calibration_from_dlc(pickle_metadata[0], parent_directories)
+    recal_E, recal_R, recal_Tunit = skilled_reaching_calibration.refine_optitrack_calibration_from_dlc(pickle_metadata[0], parent_directories)
     cal_data['recal_E'] = recal_E
+    cal_data['recal_F'] = np.linalg.inv(cal_data['mtx'][1].T) @ recal_E @ np.linalg.inv(cal_data['mtx'][0])
+    cal_data['recal_R'] = recal_R
+    cal_data['recal_Tunit'] = recal_Tunit
 
     # perform frame-by-frame reconstruction
     # set up numpy arrays to accept world points, measured points, dlc confidence values, reprojected points, and reprojection errors
@@ -244,7 +247,7 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
 
         # todo: working here... redo the calculations using the recalibrated E and F from dlc output
         frame_worldpoints_E, frame_reprojected_pts_E, frame_reproj_errors_E, frame_worldpoints_F, frame_reprojected_pts_F, frame_reproj_errors_F, frame_pts_ud = \
-            reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_metadata, i_frame, parent_directories)
+            reconstruct_one_frame_recal(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_metadata, i_frame, parent_directories)
         # at this point, worldpoints is still in units of checkerboards, needs to be scaled by the size of individual checkerboard squares
 
         reconstructed_data['frame_points'][i_frame, :, :, :] = frame_pts
@@ -259,6 +262,60 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
         reconstructed_data['bodyparts'] = dlc_metadata[0]['data']['DLC-model-config file']['all_joints_names']
 
     skilled_reaching_io.write_pickle(reconstruction3d_fname, reconstructed_data)
+
+
+def reconstruct_one_frame_recal(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories):
+    '''
+    perform 3D reconstruction on a single frame
+    :param frame_pts:
+    :param frame_conf: num_pts x num_cams numpy array with dlc confidence values for each point in each camera view
+    :param cal_data:
+    :return:
+    '''
+    num_cams = len(frame_pts)
+    num_bp = np.shape(frame_pts[0])[0]
+    mtx = cal_data['mtx']
+    dist = cal_data['dist']
+
+    frame_pts_ud = [cv2.undistortPoints(frame_pts[i_cam, :, :], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
+
+    projMatr1 = np.eye(3, 4)
+    projMatr2 = cvb.P_from_RT(cal_data['recal_E'], cal_data['recal_Tunit'])
+
+    points4D = cv2.triangulatePoints(projMatr1, projMatr2, frame_pts_ud[0], frame_pts_ud[1])
+    # points4D_E_corrected = cv2.triangulatePoints(projMatr1, projMatr2_E, new_frame_pts_ud[0], new_frame_pts_ud[1])
+    # points4D_F_corrected = cv2.triangulatePoints(projMatr1, projMatr2_F, new_frame_pts_ud[0], new_frame_pts_ud[1])
+    worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T)) * cal_data['checkerboard_square_size']
+
+    # worldpoints_E_corrected = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_E_corrected.T)) * cal_data['checkerboard_square_size']
+
+    #check that there was good reconstruction of individual points (i.e., the matched points were truly well-matched?)
+    frame_pts_ud_unnorm = np.zeros(np.shape(frame_pts))
+    for i_cam in range(num_cams):
+        frame_pts_ud_unnorm[i_cam, :, :] = cvb.unnormalize_points(np.squeeze(frame_pts_ud[i_cam]), mtx[i_cam])
+
+    cal_data['R'] = cal_data['recal_E']
+    cal_data['T'] = cal_data['recal_Tunit']
+    cal_data['F'] = cal_data['recal_F']
+    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts_ud_unnorm, cal_data, dlc_metadata,
+                                                             pickle_metadata, frame_num, parent_directories)
+    # reprojected_pts_E_corrected, reproj_errors_E_corrected = check_3d_reprojection(worldpoints_E_corrected, new_frame_pts_ud_unnorm, cal_data, dlc_metadata,
+    #                                                        pickle_metadata, frame_num, parent_directories)
+
+    # cal_data['R'] = cal_data['R_from_F']
+    # cal_data['T'] = cal_data['T_from_F']
+    # cal_data['F'] = cal_data['F_ffm']
+    # reprojected_pts_F, reproj_errors_F = check_3d_reprojection(worldpoints_F, frame_pts_ud_unnorm, cal_data, dlc_metadata,
+    #                                                        pickle_metadata, frame_num, parent_directories)
+    # reprojected_pts_F_corrected, reproj_errors_F_corrected = check_3d_reprojection(worldpoints_F_corrected, new_frame_pts_ud_unnorm, cal_data, dlc_metadata,
+    #                                                        pickle_metadata, frame_num, parent_directories)
+    #todo: check reprojected points and reproj_errors, look for mislabeled points
+    #also, consider looking across frames for jumps, and checking the dlc confidence values. Finally, need to check if
+    #pellet labels swapped between frames
+
+    # valid_frame_points = validate_frame_points(reproj_errors, frame_conf, max_reproj_error=20, min_conf=0.9)
+
+    return worldpoints, reprojected_pts, reproj_errors, frame_pts_ud_unnorm
 
 
 def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories):
@@ -462,7 +519,7 @@ def check_3d_reprojection(worldpoints, frame_pts_ud, cal_data, dlc_metadata, pic
     reproj_errors = np.zeros((pts_per_frame, num_cams))
     dist = [np.zeros((1, 5)) for ii in range(2)]   # triangulation was done on undistorted points, so distortion has already been taken care of
     dist = np.squeeze(dist)
-    projected_pts = reproject_points(worldpoints, cal_data['R'], cal_data['T'], cal_data['mtx'], dist, cal_data['checkerboard_square_size'])
+    projected_pts = reproject_points(worldpoints, cal_data['recal_R'], cal_data['recal_Tunit'], cal_data['mtx'], dist, cal_data['checkerboard_square_size'])
     # in current iteration, projected_pts should be in undistorted, unnormalized coordinates
 
     for i_cam in range(num_cams):
@@ -979,7 +1036,7 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
     mouseID = pickle_metadata[0]['mouseID']
     month_dir = mouseID + '_' + pickle_metadata[0]['trialtime'].strftime('%Y%m')
     day_dir = mouseID + '_' + pickle_metadata[0]['trialtime'].strftime('%Y%m%d')
-    orig_vid_folder = os.path.join(video_root_folder, mouseID, month_dir, day_dir)
+    orig_vid_folder = os.path.join(video_root_folder, mouseID, day_dir)
 
     cam_dirs = [day_dir + '_' + 'cam{:02d}'.format(pickle_metadata[i_cam]['cam_num']) for i_cam in range(2)]
 
@@ -1103,9 +1160,9 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
         # F_from_E = np.linalg.inv(mtx[1].T) @ E_new @ np.linalg.inv(mtx[0])
         # E_from_F = mtx[1].T @ F_new @ mtx[0]
 
-        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F_from_E'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='--')
+        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['recal_F'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='--')
         #
-        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F_ffm'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='dotted')
+        # draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F_ffm'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='dotted')
 
         # draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F'], im_size, bodyparts, axs[0][1 - i_cam],
         #                            linestyle='-')

@@ -110,14 +110,17 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
         print('{} already exists'.format(an_name))
         return True   # for now, only make one animation per folder just to get a look at if reconstruction looks good
 
-    jpg_folder_E = os.path.join(animation_folder, 'temp_E')
-    jpg_folder_F = os.path.join(animation_folder, 'temp_F')
-    if os.path.isdir(jpg_folder_E):
-        shutil.rmtree(jpg_folder_E)
-    os.mkdir(jpg_folder_E)
-    if os.path.isdir(jpg_folder_F):
-        shutil.rmtree(jpg_folder_F)
-    os.mkdir(jpg_folder_F)
+    # jpg_folder_E = os.path.join(animation_folder, 'temp_E')
+    # jpg_folder_F = os.path.join(animation_folder, 'temp_F')
+    jpg_folder_recal = os.path.join(animation_folder, 'temp_recal')
+    # if os.path.isdir(jpg_folder_E):
+    #     shutil.rmtree(jpg_folder_E)
+    # os.mkdir(jpg_folder_E)
+    # if os.path.isdir(jpg_folder_F):
+    #     shutil.rmtree(jpg_folder_F)
+    if os.path.isdir(jpg_folder_recal):
+        shutil.rmtree(jpg_folder_recal)
+    os.mkdir(jpg_folder_recal)
 
     num_cams = np.shape(r3d_data['frame_points'])[1]
     show_undistorted = r3d_data['cal_data']['use_undistorted_pts_for_stereo_cal']
@@ -126,10 +129,12 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
     im_size = r3d_data['cal_data']['im_size']
     fullframe_pts = [np.squeeze(r3d_data['frame_points'][:, i_cam, :, :]) for i_cam in range(num_cams)]
     fullframe_pts_ud = [np.squeeze(r3d_data['frame_points_ud'][:, i_cam, :, :]) for i_cam in range(num_cams)]
-    reprojected_pts_E = [np.squeeze(r3d_data['reprojected_points_E'][:, i_cam, :, :]) for i_cam in range(num_cams)]
-    reprojected_pts_F = [np.squeeze(r3d_data['reprojected_points_F'][:, i_cam, :, :]) for i_cam in range(num_cams)]
-    wpts_E = r3d_data['worldpoints_E']
-    wpts_F = r3d_data['worldpoints_F']
+    # reprojected_pts_E = [np.squeeze(r3d_data['reprojected_points_E'][:, i_cam, :, :]) for i_cam in range(num_cams)]
+    # reprojected_pts_F = [np.squeeze(r3d_data['reprojected_points_F'][:, i_cam, :, :]) for i_cam in range(num_cams)]
+    reprojected_pts_recal = [np.squeeze(r3d_data['reprojected_points_recal'][:, i_cam, :, :]) for i_cam in range(num_cams)]
+    # wpts_E = r3d_data['worldpoints_E']
+    # wpts_F = r3d_data['worldpoints_F']
+    wpts_recal = r3d_data['worldpoints_recal']
 
     bodyparts = r3d_data['bodyparts']
     num_frames = np.shape(r3d_data['frame_points'])[0]
@@ -161,25 +166,30 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
     for i_frame in range(num_frames):
         print('working on {}, frame {:04d}'.format(animation_name_only, i_frame))
 
-        fig_E, axs_E = create_vids_plus_3danimation_figure()  # todo: add in options to size image axes depending on vid size
-        fig_F, axs_F = create_vids_plus_3danimation_figure()
+        # fig_E, axs_E = create_vids_plus_3danimation_figure()  # todo: add in options to size image axes depending on vid size
+        # fig_F, axs_F = create_vids_plus_3danimation_figure()
+        fig_recal, axs_recal = create_vids_plus_3danimation_figure()
 
         fullframe_pts_forthisframe = [fullframe_pts[i_cam][i_frame, :, :] for i_cam in range(num_cams)]
         fullframe_pts_ud_forthisframe = [fullframe_pts_ud[i_cam][i_frame, :, :] for i_cam in range(num_cams)]
         valid_3dpoints = identify_valid_3dpts(fullframe_pts_forthisframe, crop_wins, im_sizes, isrotated)
 
-        jpg_name_E = os.path.join(jpg_folder_E, 'frame{:04d}.jpg'.format(i_frame))
-        jpg_name_F = os.path.join(jpg_folder_F, 'frame{:04d}.jpg'.format(i_frame))
+        # jpg_name_E = os.path.join(jpg_folder_E, 'frame{:04d}.jpg'.format(i_frame))
+        # jpg_name_F = os.path.join(jpg_folder_F, 'frame{:04d}.jpg'.format(i_frame))
+        jpg_name_recal = os.path.join(jpg_folder_recal, 'frame{:04d}.jpg'.format(i_frame))
         for i_cam in range(num_cams):
 
-            cur_fullframe_reproj_pts_E = reprojected_pts_E[i_cam][i_frame, :, :]
-            cur_fullframe_reproj_pts_F = reprojected_pts_F[i_cam][i_frame, :, :]
+            # cur_fullframe_reproj_pts_E = reprojected_pts_E[i_cam][i_frame, :, :]
+            # cur_fullframe_reproj_pts_F = reprojected_pts_F[i_cam][i_frame, :, :]
+            cur_fullframe_reproj_pts_recal = reprojected_pts_recal[i_cam][i_frame, :, :]
             cur_fullframe_pts = fullframe_pts_ud_forthisframe[i_cam]
             crop_params = cv_params[i_cam]['crop_window']
             translated_frame_points = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(cur_fullframe_pts, crop_params, im_size[i_cam], isrotated[i_cam])
-            translated_reproj_points_E = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(cur_fullframe_reproj_pts_E, crop_params, im_size[i_cam], isrotated[i_cam])
-            translated_reproj_points_F = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(
-                cur_fullframe_reproj_pts_F, crop_params, im_size[i_cam], isrotated[i_cam])
+            # translated_reproj_points_E = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(cur_fullframe_reproj_pts_E, crop_params, im_size[i_cam], isrotated[i_cam])
+            # translated_reproj_points_F = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(
+            #     cur_fullframe_reproj_pts_F, crop_params, im_size[i_cam], isrotated[i_cam])
+            translated_reproj_points_recal = reconstruct_3d_optitrack.optitrack_fullframe_to_cropped_coords(
+                cur_fullframe_reproj_pts_recal, crop_params, im_size[i_cam], isrotated[i_cam])
 
             vid_cap_objs[i_cam].set(cv2.CAP_PROP_POS_FRAMES, i_frame)
             ret, img = vid_cap_objs[i_cam].read()
@@ -196,23 +206,31 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
 
             # overlay points, check that they match with cropped vids
             cw = [0, np.shape(cropped_img)[1], 0, np.shape(cropped_img)[0]]
-            show_crop_frame_with_pts(cropped_img, cw, translated_frame_points, bodyparts, bpts2connect, valid_3dpoints, axs_E[i_cam], marker='o', s=6)
+            # show_crop_frame_with_pts(cropped_img, cw, translated_frame_points, bodyparts, bpts2connect, valid_3dpoints, axs_E[i_cam], marker='o', s=6)
+            # show_crop_frame_with_pts(cropped_img, cw, translated_frame_points, bodyparts, bpts2connect, valid_3dpoints,
+            #                          axs_F[i_cam], marker='o', s=6)
+            # show_crop_frame_with_pts(cropped_img, cw, translated_reproj_points_E, bodyparts, [], valid_3dpoints,
+            #                          axs_E[i_cam], marker='s', s=6)
+            # show_crop_frame_with_pts(cropped_img, cw, translated_reproj_points_F, bodyparts, [], valid_3dpoints,
+            #                          axs_F[i_cam], marker='s', s=6)
+
             show_crop_frame_with_pts(cropped_img, cw, translated_frame_points, bodyparts, bpts2connect, valid_3dpoints,
-                                     axs_F[i_cam], marker='o', s=6)
-            show_crop_frame_with_pts(cropped_img, cw, translated_reproj_points_E, bodyparts, [], valid_3dpoints,
-                                     axs_E[i_cam], marker='s', s=6)
-            show_crop_frame_with_pts(cropped_img, cw, translated_reproj_points_F, bodyparts, [], valid_3dpoints,
-                                     axs_F[i_cam], marker='s', s=6)
+                                     axs_recal[i_cam], marker='o', s=6)
+            show_crop_frame_with_pts(cropped_img, cw, translated_reproj_points_recal, bodyparts, [], valid_3dpoints,
+                                     axs_recal[i_cam], marker='s', s=6)
 
         # make the 3d plot
-        cur_wpts_E = np.squeeze(wpts_E[i_frame, :, :])
-        cur_wpts_F = np.squeeze(wpts_F[i_frame, :, :])
+        # cur_wpts_E = np.squeeze(wpts_E[i_frame, :, :])
+        # cur_wpts_F = np.squeeze(wpts_F[i_frame, :, :])
+        cur_wpts_recal = np.squeeze(wpts_recal[i_frame, :, :])
         bpts2connect_3d = mouse_sr_bodyparts2connect_3d()
-        plot_frame3d(cur_wpts_E, valid_3dpoints, bodyparts, bpts2connect_3d, axs_E[2])
-        plot_frame3d(cur_wpts_F, valid_3dpoints, bodyparts, bpts2connect_3d, axs_F[2])
+        # plot_frame3d(cur_wpts_E, valid_3dpoints, bodyparts, bpts2connect_3d, axs_E[2])
+        # plot_frame3d(cur_wpts_F, valid_3dpoints, bodyparts, bpts2connect_3d, axs_F[2])
+        plot_frame3d(cur_wpts_recal, valid_3dpoints, bodyparts, bpts2connect_3d, axs_recal[2])
 
-        fig_E.savefig(jpg_name_E)
-        fig_F.savefig(jpg_name_F)
+        # fig_E.savefig(jpg_name_E)
+        # fig_F.savefig(jpg_name_F)
+        fig_recal.savefig(jpg_name_F)
         plt.close('all')
         # plt.show()
 

@@ -221,43 +221,34 @@ def reconstruct3d_single_optitrack_video(calibration_file, pts_wrt_orig_img, dlc
     reconstructed_data = {
         'frame_points': np.zeros((num_frames, num_cams, pts_per_frame, 2)),
         'frame_points_ud': np.zeros((num_frames, num_cams, pts_per_frame, 2)),
-        'worldpoints_E': np.zeros((num_frames, pts_per_frame, 3)),
-        'worldpoints_recal_E': np.zeros((num_frames, pts_per_frame, 3)),
-        'reprojected_points_E': np.zeros((num_frames, num_cams, pts_per_frame, 2)),
-        'reprojected_points_recal_E': np.zeros((num_frames, pts_per_frame, 2)),
-        'reprojection_errors_E': np.zeros((num_frames, num_cams, pts_per_frame)),
-        'worldpoints_F': np.zeros((num_frames, pts_per_frame, 3)),
-        'worldpoints_recal_F': np.zeros((num_frames, pts_per_frame, 3)),
-        'reprojected_points_recal_F': np.zeros((num_frames, pts_per_frame, 2)),
-        'reprojected_points_F': np.zeros((num_frames, num_cams, pts_per_frame, 2)),
-        'reprojection_errors_F': np.zeros((num_frames, num_cams, pts_per_frame)),
+        'worldpoints_recal': np.zeros((num_frames, pts_per_frame, 3)),
+        'reprojected_points_recal': np.zeros((num_frames, num_cams, pts_per_frame, 2)),
+        'reprojection_errors_recal': np.zeros((num_frames, num_cams, pts_per_frame)),
         'frame_confidence': np.zeros((num_frames, num_cams, pts_per_frame)),
         'cal_data': cal_data
     }
     for i_frame in range(num_frames):
         print('triangulating frame {:04d} for {}, session number {:d} on {}, video {:03d}'.format(i_frame, mouseID, session_num, session_datestring, vid_num))
         frame_pts = np.zeros((num_cams, pts_per_frame, 2))
+        frame_pts_ud = np.zeros((num_cams, pts_per_frame, 2))
         frame_conf = np.zeros((num_cams, pts_per_frame))
         for i_cam in range(num_cams):
             frame_pts[i_cam, :, :] = pts_wrt_orig_img[i_cam][i_frame, :, :]
+            frame_pts_ud_norm = cv2.undistortPoints(frame_pts[i_cam, :, :], cal_data['mtx'][i_cam], cal_data['dist'][i_cam])
+            frame_pts_ud[i_cam, :, :] = cvb.unnormalize_points(frame_pts_ud_norm, cal_data['mtx'][i_cam])
             frame_conf[i_cam, :] = dlc_conf[i_cam][i_frame, :]
 
         # frame_pts are the original identified points translated/rotated into the original video image (but turned upright)
         # so... I'm pretty sure they're still distorted.
 
         # todo: working here... redo the calculations using the recalibrated E and F from dlc output
-        frame_worldpoints_E, frame_reprojected_pts_E, frame_reproj_errors_E, frame_worldpoints_F, frame_reprojected_pts_F, frame_reproj_errors_F, frame_pts_ud = \
-            reconstruct_one_frame_recal(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_metadata, i_frame, parent_directories)
-        # at this point, worldpoints is still in units of checkerboards, needs to be scaled by the size of individual checkerboard squares
+        frame_worldpoints_recal, frame_reprojected_pts_recal, frame_reproj_errors_recal = reconstruct_one_frame_recal(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_metadata, i_frame, parent_directories)
 
         reconstructed_data['frame_points'][i_frame, :, :, :] = frame_pts
         reconstructed_data['frame_points_ud'][i_frame, :, :, :] = np.squeeze(frame_pts_ud)
-        reconstructed_data['worldpoints_E'][i_frame, :, :] = frame_worldpoints_E
-        reconstructed_data['worldpoints_F'][i_frame, :, :] = frame_worldpoints_F
-        reconstructed_data['reprojected_points_E'][i_frame, :, :, :] = frame_reprojected_pts_E
-        reconstructed_data['reprojected_points_F'][i_frame, :, :, :] = frame_reprojected_pts_F
-        reconstructed_data['reprojection_errors_E'][i_frame, :, :] = frame_reproj_errors_E.T
-        reconstructed_data['reprojection_errors_F'][i_frame, :, :] = frame_reproj_errors_F.T
+        reconstructed_data['worldpoints_recal'][i_frame, :, :] = frame_worldpoints_recal
+        reconstructed_data['reprojected_points_recal'][i_frame, :, :, :] = frame_reprojected_pts_recal
+        reconstructed_data['reprojection_errors_recal'][i_frame, :, :] = frame_reproj_errors_recal.T
         reconstructed_data['frame_confidence'][i_frame, :, :] = frame_conf
         reconstructed_data['bodyparts'] = dlc_metadata[0]['data']['DLC-model-config file']['all_joints_names']
 
@@ -319,17 +310,17 @@ def reconstruct_one_frame_recal(frame_pts, frame_conf, cal_data, dlc_metadata, p
     # valid_frame_points = validate_frame_points(reproj_errors, frame_conf, max_reproj_error=20, min_conf=0.9)
 
     #todo: also plot the 3d coordinates (worldpoints)
-    fig = plt.figure()
-    ax = fig.add_subplot(1, 1, 1, projection='3d')
-    num_pts = np.shape(worldpoints)[0]
-    valid_3dpoints = np.ones((num_pts,1), dtype=bool)
-    bpts2connect_3d = sr_visualization.mouse_sr_bodyparts2connect_3d()
-    bodyparts = dlc_metadata[0]['data']['DLC-model-config file']['all_joints_names']
-    sr_visualization.plot_frame3d(worldpoints, valid_3dpoints, bodyparts, bpts2connect_3d, ax)
+    # fig = plt.figure()
+    # ax = fig.add_subplot(1, 1, 1, projection='3d')
+    # num_pts = np.shape(worldpoints)[0]
+    # valid_3dpoints = np.ones((num_pts,1), dtype=bool)
+    # bpts2connect_3d = sr_visualization.mouse_sr_bodyparts2connect_3d()
+    # bodyparts = dlc_metadata[0]['data']['DLC-model-config file']['all_joints_names']
+    # sr_visualization.plot_frame3d(worldpoints, valid_3dpoints, bodyparts, bpts2connect_3d, ax)
+    #
+    # plt.show()
 
-    plt.show()
-
-    return worldpoints, reprojected_pts, reproj_errors, frame_pts_ud_unnorm
+    return worldpoints, reprojected_pts, reproj_errors
 
 
 def reconstruct_one_frame(frame_pts, frame_conf, cal_data, dlc_metadata, pickle_metadata, frame_num, parent_directories):
@@ -549,8 +540,8 @@ def check_3d_reprojection(worldpoints, frame_pts_ud, cal_data, dlc_metadata, pic
         # overlay_pts_in_cropped_img(pickle_metadata[i_cam], frame_pts[i_cam], dlc_metadata[i_cam], frame_num, mtx, dist,
         #                            parent_directories, reprojected_pts=None, vid_type='.avi', plot_undistorted=False)
 
-    draw_epipolar_lines(cal_data, frame_pts_ud, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
-    plt.show()
+    # draw_epipolar_lines(cal_data, frame_pts_ud, projected_pts, dlc_metadata, pickle_metadata, frame_num, parent_directories, use_ffm=False, plot_undistorted=True)
+    # plt.show()
 
     return projected_pts, reproj_errors
 

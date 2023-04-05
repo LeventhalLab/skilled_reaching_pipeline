@@ -1753,9 +1753,9 @@ def create_3dreconstruction_folder(metadata, reconstruction3d_parent):
 
     month_string = trialtime.strftime('%Y%m')
     date_string = date_to_string_for_fname(trialtime)
-    month_folder_name = mouseID + '_' + month_string
+    # month_folder_name = mouseID + '_' + month_string
     date_folder_name = mouseID + '_' + date_string
-    full_path = os.path.join(reconstruction3d_parent, mouseID, month_folder_name, date_folder_name)
+    full_path = os.path.join(reconstruction3d_parent, mouseID, date_folder_name)
 
     return full_path
 
@@ -2203,12 +2203,12 @@ def mouse_animation_name(vid_metadata, reconstruct_3d_parent):
                       'animation.mp4'))
 
     mouse_folder = os.path.join(reconstruct_3d_parent, mouseID)
-    month_folder = '_'.join((mouseID,
-                             vid_metadata['triggertime'].strftime('%Y%m')))
-    month_folder = os.path.join(mouse_folder, month_folder)
+    # month_folder = '_'.join((mouseID,
+    #                          vid_metadata['triggertime'].strftime('%Y%m')))
+    # month_folder = os.path.join(mouse_folder, month_folder)
     date_folder = '_'.join((mouseID,
                             fname_date2string(vid_metadata['triggertime'])))
-    date_folder = os.path.join(month_folder, date_folder)
+    date_folder = os.path.join(mouse_folder, date_folder)
 
     fullpath = os.path.join(date_folder, fname)
 

@@ -162,8 +162,8 @@ def reconstruct_optitrack_3d(parent_directories):
     for i_dir, cam01_dir in enumerate(cam01_folders):
         cropped_folder_metadata = navigation_utilities.parse_cropped_optitrack_video_folder(cam01_dir)
 
-        if not(cropped_folder_metadata['mouseID'] == mouseID and session_date.date() == cropped_folder_metadata['session_date'].date()):
-            continue
+        # if not(cropped_folder_metadata['mouseID'] == mouseID and session_date.date() == cropped_folder_metadata['session_date'].date()):
+        #     continue
         # for debugging, let's look at the second session in the list
         # if i_dir < 38:
         #     continue

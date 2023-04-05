@@ -230,7 +230,7 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
 
         # fig_E.savefig(jpg_name_E)
         # fig_F.savefig(jpg_name_F)
-        fig_recal.savefig(jpg_name_F)
+        fig_recal.savefig(jpg_name_recal)
         plt.close('all')
         # plt.show()
 

@@ -334,9 +334,9 @@ def plot_frame3d(worldpoints, valid_3dpoints, bodyparts, bpts2connect, ax3d, **k
     ax3d.set_xlabel('x')
     ax3d.set_ylabel('y')
     ax3d.set_zlabel('z')
-    ax3d.set_xlim(20, 60)
-    ax3d.set_ylim(20, 60)
-    ax3d.set_zlim(100, 150)
+    # ax3d.set_xlim(20, 60)
+    # ax3d.set_ylim(20, 60)
+    # ax3d.set_zlim(100, 150)
     ax3d.invert_yaxis()
 
 

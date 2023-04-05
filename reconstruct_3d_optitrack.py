@@ -277,11 +277,14 @@ def reconstruct_one_frame_recal(frame_pts, frame_conf, cal_data, dlc_metadata, p
     mtx = cal_data['mtx']
     dist = cal_data['dist']
 
-    frame_pts_ud = [cv2.undistortPoints(frame_pts[i_cam, :, :], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
+    frame_pts_ud_norm = [cv2.undistortPoints(frame_pts[i_cam, :, :], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
+    frame_pts_ud = [cvb.unnormalize_points(frame_pts_ud_norm[i_cam], mtx[i_cam]) for i_cam in range(num_cams)]
 
-    projMatr1 = np.eye(3, 4)
-    projMatr2 = cvb.P_from_RT(cal_data['recal_E'], cal_data['recal_Tunit'])
+    projMatr1 = np.dot(mtx[0], np.eye(3, 4))
+    projMatr2 = np.dot(mtx[1], cvb.P_from_RT(cal_data['recal_R'], cal_data['recal_Tunit']))
 
+    # make sure frame_pts_ud arrays are n x 1 x 2 for cv2.triangulatePoints
+    frame_pts_ud = [np.reshape(np.squeeze(fpts_ud), (-1,1,2)) for fpts_ud in frame_pts_ud]
     points4D = cv2.triangulatePoints(projMatr1, projMatr2, frame_pts_ud[0], frame_pts_ud[1])
     # points4D_E_corrected = cv2.triangulatePoints(projMatr1, projMatr2_E, new_frame_pts_ud[0], new_frame_pts_ud[1])
     # points4D_F_corrected = cv2.triangulatePoints(projMatr1, projMatr2_F, new_frame_pts_ud[0], new_frame_pts_ud[1])
@@ -290,14 +293,14 @@ def reconstruct_one_frame_recal(frame_pts, frame_conf, cal_data, dlc_metadata, p
     # worldpoints_E_corrected = np.squeeze(cv2.convertPointsFromHomogeneous(points4D_E_corrected.T)) * cal_data['checkerboard_square_size']
 
     #check that there was good reconstruction of individual points (i.e., the matched points were truly well-matched?)
-    frame_pts_ud_unnorm = np.zeros(np.shape(frame_pts))
-    for i_cam in range(num_cams):
-        frame_pts_ud_unnorm[i_cam, :, :] = cvb.unnormalize_points(np.squeeze(frame_pts_ud[i_cam]), mtx[i_cam])
+    # frame_pts_ud_unnorm = np.zeros(np.shape(frame_pts))
+    # for i_cam in range(num_cams):
+    #     frame_pts_ud_unnorm[i_cam, :, :] = cvb.unnormalize_points(np.squeeze(frame_pts_ud[i_cam]), mtx[i_cam])
 
-    cal_data['R'] = cal_data['recal_E']
+    cal_data['R'] = cal_data['recal_R']
     cal_data['T'] = cal_data['recal_Tunit']
     cal_data['F'] = cal_data['recal_F']
-    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts_ud_unnorm, cal_data, dlc_metadata,
+    reprojected_pts, reproj_errors = check_3d_reprojection(worldpoints, frame_pts_ud, cal_data, dlc_metadata,
                                                              pickle_metadata, frame_num, parent_directories)
     # reprojected_pts_E_corrected, reproj_errors_E_corrected = check_3d_reprojection(worldpoints_E_corrected, new_frame_pts_ud_unnorm, cal_data, dlc_metadata,
     #                                                        pickle_metadata, frame_num, parent_directories)
@@ -309,11 +312,22 @@ def reconstruct_one_frame_recal(frame_pts, frame_conf, cal_data, dlc_metadata, p
     #                                                        pickle_metadata, frame_num, parent_directories)
     # reprojected_pts_F_corrected, reproj_errors_F_corrected = check_3d_reprojection(worldpoints_F_corrected, new_frame_pts_ud_unnorm, cal_data, dlc_metadata,
     #                                                        pickle_metadata, frame_num, parent_directories)
-    #todo: check reprojected points and reproj_errors, look for mislabeled points
+
     #also, consider looking across frames for jumps, and checking the dlc confidence values. Finally, need to check if
     #pellet labels swapped between frames
 
     # valid_frame_points = validate_frame_points(reproj_errors, frame_conf, max_reproj_error=20, min_conf=0.9)
+
+    #todo: also plot the 3d coordinates (worldpoints)
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1, projection='3d')
+    num_pts = np.shape(worldpoints)[0]
+    valid_3dpoints = np.ones((num_pts,1), dtype=bool)
+    bpts2connect_3d = sr_visualization.mouse_sr_bodyparts2connect_3d()
+    bodyparts = dlc_metadata[0]['data']['DLC-model-config file']['all_joints_names']
+    sr_visualization.plot_frame3d(worldpoints, valid_3dpoints, bodyparts, bpts2connect_3d, ax)
+
+    plt.show()
 
     return worldpoints, reprojected_pts, reproj_errors, frame_pts_ud_unnorm
 
@@ -519,7 +533,7 @@ def check_3d_reprojection(worldpoints, frame_pts_ud, cal_data, dlc_metadata, pic
     reproj_errors = np.zeros((pts_per_frame, num_cams))
     dist = [np.zeros((1, 5)) for ii in range(2)]   # triangulation was done on undistorted points, so distortion has already been taken care of
     dist = np.squeeze(dist)
-    projected_pts = reproject_points(worldpoints, cal_data['recal_R'], cal_data['recal_Tunit'], cal_data['mtx'], dist, cal_data['checkerboard_square_size'])
+    projected_pts = reproject_points(worldpoints, cal_data['R'], cal_data['T'], cal_data['mtx'], dist, cal_data['checkerboard_square_size'], unnormalize_points=True)
     # in current iteration, projected_pts should be in undistorted, unnormalized coordinates
 
     for i_cam in range(num_cams):
@@ -541,7 +555,7 @@ def check_3d_reprojection(worldpoints, frame_pts_ud, cal_data, dlc_metadata, pic
     return projected_pts, reproj_errors
 
 
-def reproject_points(worldpoints, R, T, mtx, dist, scale_factor):
+def reproject_points(worldpoints, R, T, mtx, dist, scale_factor, unnormalize_points=True):
     '''
 
     :param worldpoints:
@@ -577,8 +591,12 @@ def reproject_points(worldpoints, R, T, mtx, dist, scale_factor):
         ppts_direct_hom = C @ wp
         ppts_direct = cv2.convertPointsFromHomogeneous(ppts_direct_hom.T)
         ppts_direct = np.squeeze(ppts_direct)
-        ppts_direct_unnormalized = cvb.unnormalize_points(ppts_direct, cur_mtx)
-        projected_pts.append(ppts_direct_unnormalized)
+
+        if unnormalize_points:
+            ppts_direct_unnormalized = cvb.unnormalize_points(ppts_direct, cur_mtx)
+            projected_pts.append(ppts_direct_unnormalized)
+        else:
+            projected_pts.append(ppts_direct)
 
         # worldpoints = worldpoints / scale_factor
         # ppts, _ = cv2.projectPoints(worldpoints, rvec, tvec, np.identity(3), cur_dist)
@@ -1160,7 +1178,7 @@ def draw_epipolar_lines(cal_data, frame_pts, reproj_pts, dlc_metadata, pickle_me
         # F_from_E = np.linalg.inv(mtx[1].T) @ E_new @ np.linalg.inv(mtx[0])
         # E_from_F = mtx[1].T @ F_new @ mtx[0]
 
-        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['recal_F'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='--')
+        draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='--')
         #
         # draw_epipolar_lines_on_img(to_plot, 1 + i_cam, cal_data['F_ffm'], im_size, bodyparts, axs[0][1 - i_cam], linestyle='dotted')
 

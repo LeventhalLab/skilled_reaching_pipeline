@@ -49,26 +49,34 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, 
     all_pts, all_conf, valid_pts_bool = trialpts2allpts(matched_points, matched_conf, min_conf2match)
     valid_pts = [cam_pts[valid_pts_bool, :] for cam_pts in all_pts]
 
-    collect_cam_undistorted_points(valid_pts, cal_data)
+    # collect_cam_undistorted_points(valid_pts, cal_data)
+    stereo_ud, stereo_ud_norm = collect_cam_undistorted_points(valid_pts, cal_data)
 
     # matched_points is a num_trials x 2 list of lists. matched_points[i_cam]
-    recal_E, E_mask = cv2.findEssentialMat(valid_pts[0], valid_pts[1], cal_data['mtx'][0], None,
-                                     cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
-
-    # convert E_mask into a boolean vector for indexing
-    inlier_idx = np.squeeze(E_mask) != 0
-
-    inliers = [np.squeeze(cam_val_pts[inlier_idx, :]) for cam_val_pts in valid_pts]
-    stereo_ud, stereo_ud_norm = collect_cam_undistorted_points(inliers, cal_data)
+    # recal_E, E_mask = cv2.findEssentialMat(stereo_ud[0], stereo_ud[1], cal_data['mtx'][0], None,
+    #                                  cal_data['mtx'][1], None, cv2.FM_RANSAC, 0.999, 0.1)
+    #
+    # # convert E_mask into a boolean vector for indexing
+    # inlier_idx = np.squeeze(E_mask) != 0
+    #
+    # inliers = [np.squeeze(cam_val_pts[inlier_idx, :]) for cam_val_pts in stereo_ud]
 
     # calculate R and T based on the recalibrated essential matrix
     # select 2000 points at random for chirality check (using all the points takes a really long time)
-    num_pts = np.shape(stereo_ud[0])[0]
+    # num_pts = np.shape(stereo_ud[0])[0]
     # pt_idx = np.random.randint(0, num_pts, 2000)
     # _, R_from_E, T_Eunit, ffm_msk = cv2.recoverPose(E, stereo_ud[0][pt_idx, :], stereo_ud[1][pt_idx, :],
     #                                                 cal_data['mtx'][0])
-    _, R_from_E_recal, T_Eunit_recal, rp_msk = cv2.recoverPose(recal_E, stereo_ud[0], stereo_ud[1],
-                                                    cal_data['mtx'][0])
+    # _, R_from_E_recal, T_Eunit_recal, rp_msk = cv2.recoverPose(recal_E, inliers[0], inliers[1],
+    #                                                 cal_data['mtx'][0])
+    #
+    # R1, R2, T = cv2.decomposeEssentialMat(recal_E)
+    #
+    dist = np.zeros((1,5))
+    # _, E_in, R_in, T_in, msk = cv2.recoverPose(inliers[0], inliers[1], cal_data['mtx'][0], dist, cal_data['mtx'][1], dist,
+    #                                            method=cv2.FM_RANSAC, prob=0.999, threshold=0.1)
+    _, E_in, R_in, T_in, msk = cv2.recoverPose(stereo_ud[0], stereo_ud[1], cal_data['mtx'][0], dist, cal_data['mtx'][1], dist,
+                                               method=cv2.FM_RANSAC, prob=0.999, threshold=0.1)
 
     # matched_unnorm = []
     # for i_cam in range(2):
@@ -102,7 +110,7 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, 
     #
     # plt.show()
 
-    return recal_E, R_from_E_recal, T_Eunit_recal
+    return E_in, R_in, T_in
 
 
 def collect_cam_undistorted_points(distorted_pts, cal_data):

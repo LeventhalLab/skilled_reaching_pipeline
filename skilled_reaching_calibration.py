@@ -246,16 +246,16 @@ def trialpts2allpts(trials_pts, trials_conf, min_conf):
     num_cams = np.shape(trials_pts[0])[0]
     frames_per_trial = [[] for ii in range(num_cams)]
     for i_cam in range(num_cams):
-        frames_per_trial[i_cam].append([np.shape(trials_pts[i_trial][0])[0] for i_trial in range(num_trials)])
+        frames_per_trial[i_cam].append([np.shape(trials_pts[i_trial][i_cam])[0] for i_trial in range(num_trials)])
     frame_per_trial = np.squeeze(np.array(frames_per_trial))
     frame_per_trial = frame_per_trial.T
-    num_joints = np.shape(trials_pts[0])[1]
+    # num_joints = np.shape(trials_pts[0][0])[1]
 
     all_pts = [[] for ii in range(num_cams)]
     all_conf = [[] for ii in range(num_cams)]
     for i_trial in range(num_trials):
+        current_frames_to_match = min(frame_per_trial[i_trial, :])
         for i_cam in range(num_cams):
-            current_frames_to_match = min(frame_per_trial[i_trial, :])
             if i_trial == 0:
                 all_pts[i_cam] = np.reshape(trials_pts[i_trial][i_cam][:current_frames_to_match, :, :], (-1, 2))
                 all_conf[i_cam] = np.reshape(trials_conf[i_trial][i_cam][:current_frames_to_match], (-1))
@@ -263,7 +263,8 @@ def trialpts2allpts(trials_pts, trials_conf, min_conf):
                 all_pts[i_cam] = np.vstack((all_pts[i_cam], np.reshape(trials_pts[i_trial][i_cam][:current_frames_to_match, :], (-1, 2))))
                 all_conf[i_cam] = np.hstack((all_conf[i_cam], np.reshape(trials_conf[i_trial][i_cam][:current_frames_to_match], (-1))))
 
-    all_conf = np.array(all_conf).T
+    all_conf = np.array(all_conf).T   #np.hstack((all_conf[0].T, all_conf[0].T))
+
 
     # only consider points where confidence > threshold for both cameras
     valid_pts_bool = (all_conf > min_conf).all(axis=1)

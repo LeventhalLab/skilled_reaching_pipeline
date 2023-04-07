@@ -234,6 +234,28 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
         plt.close('all')
         # plt.show()
 
+    # # turn the cropped jpegs into a new movie
+    # jpg_names_E = os.path.join(jpg_folder_E, 'frame%04d.jpg')
+    # command = (
+    #     f"ffmpeg -i {jpg_names_E} "
+    #     f"-c:v copy {animation_name_E}"
+    # )
+    # subprocess.call(command, shell=True)
+    # 
+    # # delete the temp folder to hold frame jpegs
+    # shutil.rmtree(jpg_folder_E)
+
+    # turn the cropped jpegs into a new movie
+    # jpg_names_F = os.path.join(jpg_folder_F, 'frame%04d.jpg')
+    # command = (
+    #     f"ffmpeg -i {jpg_names_F} "
+    #     f"-c:v copy {animation_name_F}"
+    # )
+    # subprocess.call(command, shell=True)
+    # 
+    # # delete the temp folder to hold frame jpegs
+    # shutil.rmtree(jpg_folder_F)
+    
     # turn the cropped jpegs into a new movie
     jpg_names_E = os.path.join(jpg_folder_E, 'frame%04d.jpg')
     command = (
@@ -244,17 +266,6 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
 
     # delete the temp folder to hold frame jpegs
     shutil.rmtree(jpg_folder_E)
-
-    # turn the cropped jpegs into a new movie
-    jpg_names_F = os.path.join(jpg_folder_F, 'frame%04d.jpg')
-    command = (
-        f"ffmpeg -i {jpg_names_F} "
-        f"-c:v copy {animation_name_F}"
-    )
-    subprocess.call(command, shell=True)
-
-    # delete the temp folder to hold frame jpegs
-    shutil.rmtree(jpg_folder_F)
 
     return True
 

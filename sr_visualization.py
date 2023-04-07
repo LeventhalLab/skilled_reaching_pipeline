@@ -257,15 +257,15 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
     # shutil.rmtree(jpg_folder_F)
     
     # turn the cropped jpegs into a new movie
-    jpg_names_E = os.path.join(jpg_folder_E, 'frame%04d.jpg')
+    jpg_names_recal = os.path.join(jpg_folder_recal, 'frame%04d.jpg')
     command = (
-        f"ffmpeg -i {jpg_names_E} "
-        f"-c:v copy {animation_name_E}"
+        f"ffmpeg -i {jpg_names_recal} "
+        f"-c:v copy {animation_name_recal}"
     )
     subprocess.call(command, shell=True)
 
     # delete the temp folder to hold frame jpegs
-    shutil.rmtree(jpg_folder_E)
+    shutil.rmtree(jpg_folder_recal)
 
     return True
 

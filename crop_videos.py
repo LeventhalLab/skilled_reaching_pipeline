@@ -1,10 +1,12 @@
 import glob
+import os
 # from moviepy.editor import *
 import subprocess
 import cv2
 import shutil
 import pandas as pd
 from datetime import datetime
+from tqdm import tqdm
 import skilled_reaching_calibration
 import navigation_utilities
 
@@ -146,6 +148,8 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
     h = y2 - y1 + 1
     vid_root, vid_name = os.path.split(vid_path_out)
 
+    print('cropping {}'.format(vid_name))
+
     if filtertype == 'mjpeg2jpeg':
         jpg_temp_folder = os.path.join(vid_root, 'temp')
 
@@ -164,7 +168,7 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
 
         # find the list of jpg frames that were just made, crop them, and resave them
         jpg_list = glob.glob(os.path.join(jpg_temp_folder, '*.jpg'))
-        for jpg_name in jpg_list:
+        for jpg_name in tqdm(jpg_list):
             img = cv2.imread(jpg_name)
             cropped_img = img[y1-1:y2-1, x1-1:x2-1, :]
             if view_name == 'rightmirror':

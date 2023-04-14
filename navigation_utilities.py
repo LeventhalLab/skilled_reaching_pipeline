@@ -1036,6 +1036,24 @@ def find_calibration_vid_folders(calibration_parent):
     return box_folders
 
 
+def find_calibration_vid_folders_dLight(calibration_parent):
+    '''
+    find all calibration videos. assume directory structure:
+        calibration_parent-->calibration_videos__YYYY-->calibration_videos__YYYYMM-->calibration_videos__YYYYMM_boxZZ where
+        ZZ is the 2-digit box number
+    :param calibration_parent:
+    :return:
+    '''
+    month_folders = glob.glob(os.path.join(calibration_parent, 'calibration_videos_*'))
+
+    # for yf in year_folders:
+    #     month_folders.extend(glob.glob(os.path.join(yf, 'calibration_videos_*')))
+
+    month_folders = [mf for mf in month_folders if os.path.isdir(mf)]
+
+    return month_folders
+
+
 def create_cropped_calib_vid_name(full_calib_vid_name, crop_view, crop_params_dict):
     '''
 

@@ -132,7 +132,7 @@ def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, cr
     if vidtype[0] != '.':
         vidtype = '.' + vidtype
 
-    calib_vid_folders = navigation_utilities.find_calibration_vid_folders(calibration_vids_parent)
+    calib_vid_folders = navigation_utilities.find_calibration_vid_folders_dLight(calibration_vids_parent)
 
     for cf in calib_vid_folders:
         # crop the calibration videos
@@ -148,20 +148,21 @@ def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, cr
         # cropped_vid_names contains a list of lists; each individual list contains the names of 3 files, one each for
         # the direct, leftmirror, and rightmirror views
 
-        for i_calib_vid, cropped_vids_set in enumerate(cropped_vid_names):
-            # each cropped_vids_set should contain 3 video names for direct, left, right views
-
-            calibration_summary_name = navigation_utilities.create_calibration_summary_name(calib_vids[i_calib_vid], calibration_files_parent)
-
-            if os.path.isfile(calibration_summary_name):
-                calibration_data = skilled_reaching_io.read_pickle(calibration_summary_name)
-            else:
-                calibration_data = skilled_reaching_calibration.collect_cb_corners(cropped_vids_set, cb_size)
-                calibration_data['orig_im_size'] = orig_im_size[i_calib_vid]
-                skilled_reaching_io.write_pickle(calibration_summary_name, calibration_data)
-
-            # now perform the actual calibration
-            skilled_reaching_calibration.multi_mirror_calibration(calibration_data, calibration_summary_name)
+        # FOR NOW, JUST CROP THE VIDEOS. COMMENT THE CALIBRATION PART BACK IN LATER (HOPEFULLY CAN JUST RUN ANIPOSE HERE...
+        # for i_calib_vid, cropped_vids_set in enumerate(cropped_vid_names):
+        #     # each cropped_vids_set should contain 3 video names for direct, left, right views
+        #
+        #     calibration_summary_name = navigation_utilities.create_calibration_summary_name(calib_vids[i_calib_vid], calibration_files_parent)
+        #
+        #     if os.path.isfile(calibration_summary_name):
+        #         calibration_data = skilled_reaching_io.read_pickle(calibration_summary_name)
+        #     else:
+        #         calibration_data = skilled_reaching_calibration.collect_cb_corners(cropped_vids_set, cb_size)
+        #         calibration_data['orig_im_size'] = orig_im_size[i_calib_vid]
+        #         skilled_reaching_io.write_pickle(calibration_summary_name, calibration_data)
+        #
+        #     # now perform the actual calibration
+        #     skilled_reaching_calibration.multi_mirror_calibration(calibration_data, calibration_summary_name)
 
 
 if __name__ == '__main__':
@@ -177,7 +178,7 @@ if __name__ == '__main__':
     rat_database_name = '/home/levlab/Public/rat_SR_videos_to_analyze/SR_rat_database.csv'
     label_videos = True
 
-    rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
+    # rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
 
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
@@ -195,10 +196,14 @@ if __name__ == '__main__':
     }
     cropped_vid_type = '.avi'
 
-    videos_parent = '/home/levlab/Public/rat_SR_videos_to_analyze'   # on the lambda machine
+    # videos_parent = '/home/levlab/Public/rat_SR_videos_to_analyze'   # on the lambda machine
     # videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
     # videos_parent = '/Volumes/Untitled/videos_to_analyze'
-    video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
+
+    # for dLight experiments
+    videos_parent = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\dLight_Photometry'
+    # video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
+    video_root_folder = os.path.join(videos_parent, 'dLight_photometry_data')
     cropped_videos_parent = os.path.join(videos_parent, 'cropped_videos')
     marked_videos_parent = os.path.join(videos_parent, 'marked_videos')
     calibration_vids_parent = os.path.join(videos_parent, 'calibration_videos')
@@ -219,7 +224,7 @@ if __name__ == '__main__':
     crop_params_csv_path = os.path.join(video_root_folder, 'SR_video_crop_regions.csv')
     crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
 
-    # calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=cb_size)
+    calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=cb_size)
 
     # skilled_reaching_calibration.calibrate_camera_from_video(test_calibration_file, calibration_parent, cb_size=cb_size)
 
@@ -236,7 +241,7 @@ if __name__ == '__main__':
     # folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(cropped_videos_parent)
     # reconstruct_3d.reconstruct_folders(folders_to_reconstruct, parent_directories, rat_df)
 
-    reconstruct_3d.test_reconstruction(parent_directories, rat_df)
+    # reconstruct_3d.test_reconstruction(parent_directories, rat_df)
 
     #todo: complete the camera calibration algorithms
     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)

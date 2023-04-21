@@ -103,10 +103,16 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
     _, an_name = os.path.split(animation_name)
 
     animation_folder, animation_name_only = os.path.split(animation_name)
-    animation_name_E = animation_name.replace('animation', 'animation_E')
-    animation_name_F = animation_name.replace('animation', 'animation_F')
+    # animation_name_E = animation_name.replace('animation', 'animation_E')
+    # animation_name_F = animation_name.replace('animation', 'animation_F')
+
+    animation_name_recal = animation_name.replace('animation', 'animation_recal')
     # comment out to overwrite old videos
-    if os.path.exists(animation_name_E) and os.path.exists(animation_name_F):
+    # if os.path.exists(animation_name_E) and os.path.exists(animation_name_F):
+    #     print('{} already exists'.format(an_name))
+    #     return True   # for now, only make one animation per folder just to get a look at if reconstruction looks good
+
+    if os.path.exists(animation_name_recal):
         print('{} already exists'.format(an_name))
         return True   # for now, only make one animation per folder just to get a look at if reconstruction looks good
 

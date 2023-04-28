@@ -244,7 +244,7 @@ if __name__ == '__main__':
 
     # step 3 - run DLC on each cropped video
     # UNCOMMENT BELOW
-    folders_to_analyze = navigation_utilities.find_optitrack_folders_to_analyze(parent_directories, cam_list=cam_list)
+    # folders_to_analyze = navigation_utilities.find_optitrack_folders_to_analyze(parent_directories, cam_list=cam_list)
     # scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, parent_directories, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
     scorername = 'DLC_dlcrnetms5_mouse_headfixed_skilledreachingNov5shuffle1_100000'
 

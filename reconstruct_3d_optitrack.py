@@ -1631,8 +1631,8 @@ def test_singlefolder_optitrack_reconstruction(rd, parent_directories):
 
     for r3d_file in r3d_files:
         skip_folder = test_single_optitrack_trajectory(r3d_file, scoring_data, parent_directories)
-        if skip_folder == True:
-            break
+        # if skip_folder == True:
+        #     break
     # this is just to get a quick look at each reconstruction to see if it looks reasonable. Delete this line and
     # uncomment the lines above to loop through everything.
     # test_single_optitrack_trajectory(r3d_files[0], scoring_data, parent_directories)

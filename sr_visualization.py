@@ -159,7 +159,9 @@ def animate_optitrack_vids_plus3d(r3d_data, orig_videos, cropped_videos, parent_
         # todo: pull image from original video, then undistort, then crop images and overlay undistorted and unnormalized points
         # this should find the index of camera number i_cam + 1 (1 or 2) in the cv_cam_nums list to make sure the vid_cap_objs are in the same order as r3d_data
         # vid_cap_objs.append(cv2.VideoCapture(cropped_videos[cv_cam_nums.index(i_cam + 1)]))
+
         vid_cap_objs.append(cv2.VideoCapture(orig_videos[cv_cam_nums.index(i_cam + 1)]))
+
         w = vid_cap_objs[i_cam].get(cv2.CAP_PROP_FRAME_WIDTH)
         h = vid_cap_objs[i_cam].get(cv2.CAP_PROP_FRAME_HEIGHT)
         im_sizes.append((w, h))

@@ -2008,13 +2008,13 @@ def create_Burgess_cropped_video_destination_list(cropped_vids_parent, video_fol
         mouseID, session_date_str = parse_session_dir_name(session_dir)
         session_datetime = datetime.strptime(session_date_str, '%Y%m%d')
         session_month = session_datetime.strftime('%Y%m')
-        month_folder = mouseID + '_' + session_month
+        # month_folder = mouseID + '_' + session_month
 
         # create folders for cropped video for each camera
         for i_cam in range(num_cams):
             cam_name = 'cam{:02d}'.format(cam_list[i_cam])
             cropped_vid_dir = session_dir + '_cam{:02d}'.format(cam_list[i_cam])
-            cropped_video_directories[cam_name].append(os.path.join(cropped_vids_parent, mouseID, month_folder, session_dir, cropped_vid_dir))
+            cropped_video_directories[cam_name].append(os.path.join(cropped_vids_parent, mouseID, session_dir, cropped_vid_dir))
 
     return cropped_video_directories
 

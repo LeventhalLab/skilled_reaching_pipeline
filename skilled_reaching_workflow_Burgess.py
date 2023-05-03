@@ -21,8 +21,8 @@ def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, parent_dir
         deeplabcut.analyze_videos
     '''
 
-    mice_to_skip = ['BT32','BT33',
-                    'dLight24', 'dLight26', 'dLight28', 'dLight31', 'dLight36', 'dLight42', 'dLight49', 'dLight50', 'dLight53', 'dLight54',
+    mice_to_skip = ['BT32','BT33','dLight15',
+                    'dLight26', 'dLight28', 'dLight31', 'dLight36', 'dLight42', 'dLight49', 'dLight50', 'dLight53', 'dLight54',
                     'GFP3', 'GFP4', 'GFP5', 'GFP14']
     if cropped_vid_type[0]=='.':
         pass
@@ -186,8 +186,9 @@ if __name__ == '__main__':
     label_videos = True
     checkerboard_square_size = 7   # in mm
 
-    Burgess_DLC_config_path = '/home/dleventh/Public/mouse_skilledreaching/sr_hf-DanL-2021-11-05/config.yaml'
-
+    # Burgess_DLC_config_path = '/home/dleventh/Public/mouse_skilledreaching/sr_hf-DanL-2021-11-05/config.yaml'
+    Burgess_DLC_config_path = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\deeplabcut_projects\mouse_sr_dlc\sr_hf-DanL-2021-11-05\config.yaml'
+    # r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\dLight_Photometry'
     # mouse_reaching_parent = '/home/dleventh/SharedX/Neuro-Leventhal/data/hf_mouse/'   # on lambda
     mouse_reaching_parent = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\hf_mouse'  # on office desktop
     # mouse_reaching_parent = 'C:\\Users\\dklev\Dropbox (University of Michigan)\\MED-LeventhalLab\\Burgess_data\\hf_mouse'   # dropbox on laptop
@@ -244,8 +245,8 @@ if __name__ == '__main__':
 
     # step 3 - run DLC on each cropped video
     # UNCOMMENT BELOW
-    # folders_to_analyze = navigation_utilities.find_optitrack_folders_to_analyze(parent_directories, cam_list=cam_list)
-    # scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, parent_directories, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
+    folders_to_analyze = navigation_utilities.find_optitrack_folders_to_analyze(parent_directories, cam_list=cam_list)
+    scorername = analyze_cropped_optitrack_videos(folders_to_analyze, Burgess_DLC_config_path, parent_directories, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
     scorername = 'DLC_dlcrnetms5_mouse_headfixed_skilledreachingNov5shuffle1_100000'
 
     # UNCOMMENT BELOW

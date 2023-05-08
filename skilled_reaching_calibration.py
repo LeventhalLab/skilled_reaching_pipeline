@@ -180,7 +180,10 @@ def collect_matched_dlc_points(cam_pickles, parent_directories, num_trials_to_ma
         cam01_folder, cam01_pickle_name = os.path.split(cam01_pickle)
         print('matching points for {}'.format(cam01_pickle_name))
 
-        cam_pickle_files = navigation_utilities.find_other_optitrack_pickles(cam01_pickle, parent_directories)
+        cam_pickle_files, both_files_exist = navigation_utilities.find_other_optitrack_pickles(cam01_pickle, parent_directories)
+
+        if not both_files_exist:
+            continue
         # cam_pickle_files = []
         # # find corresponding pickle file for camera 2
         # session_folder, _ = os.path.split(cam01_folder)

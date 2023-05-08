@@ -812,7 +812,8 @@ def find_other_optitrack_pickles(pickle_file, parent_directories):
 
     camera_exists = True
     cam_pickle_files = []
-    while cur_cam <= len(cam_pickles):
+    both_files_exist = True
+    while cur_cam <= len(cam_pickles) and both_files_exist:
         if orig_cam == cur_cam:
             cam_pickle_files.append(pickle_file)
             cur_cam += 1
@@ -827,10 +828,12 @@ def find_other_optitrack_pickles(pickle_file, parent_directories):
             curcam_pickle = curcam_pickle[0]
             cam_pickle_files.append(curcam_pickle)
             cur_cam += 1
+            both_files_exist = True
         else:
             print('no matching camera {:d} pickle file for {}'.format(cur_cam, orig_pickle_name))
+            both_files_exist = False
 
-    return cam_pickle_files
+    return cam_pickle_files, both_files_exist
 
 
 def parse_dlc_output_pickle_name_optitrack(dlc_output_pickle_name):

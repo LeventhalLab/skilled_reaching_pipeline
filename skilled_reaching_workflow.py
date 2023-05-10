@@ -178,6 +178,8 @@ if __name__ == '__main__':
     rat_database_name = '/home/levlab/Public/rat_SR_videos_to_analyze/SR_rat_database.csv'
     label_videos = True
 
+    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474]
+
     # rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
 
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
@@ -203,9 +205,9 @@ if __name__ == '__main__':
     # for dLight experiments
     videos_parent = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\dLight_Photometry'
     # video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
-    video_root_folder = os.path.join(videos_parent, 'dLight_photometry_data')
-    cropped_videos_parent = os.path.join(videos_parent, 'cropped_videos')
-    marked_videos_parent = os.path.join(videos_parent, 'marked_videos')
+    video_root_folder = os.path.join(videos_parent, 'data')
+    cropped_videos_parent = os.path.join(videos_parent, 'cropped')
+    marked_videos_parent = os.path.join(videos_parent, 'marked')
     calibration_vids_parent = os.path.join(videos_parent, 'calibration_videos')
     calibration_files_parent = os.path.join(videos_parent, 'calibration_files')
     dlc_mat_output_parent = os.path.join(videos_parent, 'matlab_readable_dlc')
@@ -223,6 +225,9 @@ if __name__ == '__main__':
     }
     crop_params_csv_path = os.path.join(video_root_folder, 'SR_video_crop_regions.csv')
     crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
+
+    video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder, rats_to_analyze=rats_to_analyze)
+    cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi')
 
     calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=cb_size)
 

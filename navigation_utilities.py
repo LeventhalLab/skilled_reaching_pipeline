@@ -106,23 +106,78 @@ def sessions_in_optitrack_folder(vid_folder, vid_type='*.avi'):
     return session_nums
 
 
-def get_video_folders_to_crop(video_root_folder):
-    """
-    find all the lowest level directories within video_root_folder, which are presumably the lowest level folders that
-    contain the videos to be cropped
+# def get_video_folders_to_crop(video_root_folder, rats_to_analyze='all'):
+#     """
+#     find all the lowest level directories within video_root_folder, which are presumably the lowest level folders that
+#     contain the videos to be cropped
+#
+#     :param video_root_folder: root directory from which to extract the list of folders that contain videos to crop
+#     :return: crop_dirs - list of lowest level directories within video_root_folder
+#     """
+#
+#     crop_dirs = []
+#
+#     # assume that any directory that does not have a subdirectory contains videos to crop
+#     for root, dirs, files in os.walk(video_root_folder):
+#         if not dirs:
+#             crop_dirs.append(root)
+#
+#     return crop_dirs
 
-    :param video_root_folder: root directory from which to extract the list of folders that contain videos to crop
-    :return: crop_dirs - list of lowest level directories within video_root_folder
-    """
 
-    crop_dirs = []
+def isvalid_ratsessiondate(test_string):
 
-    # assume that any directory that does not have a subdirectory contains videos to crop
-    for root, dirs, files in os.walk(video_root_folder):
-        if not dirs:
-            crop_dirs.append(root)
+    if len(test_string) != 14:
+        return False
 
-    return crop_dirs
+    test_string_parts = test_string.split('_')
+    if len(test_string_parts) != 2:
+        return False
+
+    if is_valid_ratID(test_string_parts[0]) and test_string_parts[1].isdigit():
+        return True
+    else:
+        return False
+
+
+def is_valid_ratID(test_string):
+
+    if len(test_string) == 5 and test_string[1:].isdigit():
+        isvalid = True
+    else:
+        isvalid = False
+
+    return isvalid
+
+
+def get_video_folders_to_crop(video_root_folder, rats_to_analyze='all'):
+
+    rat_folders = glob.glob(os.path.join(video_root_folder, 'R*'))
+
+    vid_folders_to_crop = []
+    for rf in rat_folders:
+        if os.path.isdir(rf):
+            _, ratID = os.path.split(rf)
+            if is_valid_ratID(ratID):
+                rat_num = int(ratID[1:])
+                if rat_num in rats_to_analyze or rats_to_analyze == 'all':
+                    date_folders = glob.glob(os.path.join(rf, ratID + '*'))
+                    for df in date_folders:
+                        if os.path.isdir(df):
+                            _, session_name = os.path.split(df)
+                            if isvalid_ratsessiondate(session_name):
+                                # find valid skilled reaching sessions
+                                sr_folders = glob.glob(os.path.join(df, session_name + '_skilledreaching_*'))
+                                srchrim_folders = glob.glob(os.path.join(df, session_name + '_srchrimson_*'))
+                                for srf in sr_folders:
+                                    if os.path.isdir(srf):
+                                        vid_folders_to_crop.append(srf)
+                                for srchrimf in srchrim_folders:
+                                    if os.path.isdir(srchrimf):
+                                        vid_folders_to_crop.append(srchrimf)
+
+    return vid_folders_to_crop
+
 
 
 def find_traj_files(traj_directory):
@@ -1599,8 +1654,11 @@ def find_optitrack_calibration_data_name(cal_data_parent, session_datetime, max_
 
     if not bool(cal_data_datetimes):
         # still haven't found any calibration data; try looking forward in time
-        while not bool(cal_data_datetimes) and session_datetime + cur_datetime <= session_datetime + timedelta(max_days_to_look_back):
-            # look back max_days_to_look_back days before giving up
+        cur_datetime = session_datetime
+        session_month = session_datetime.month
+        cur_month = session_month
+        while not bool(cal_data_datetimes) and cur_datetime - session_datetime <= timedelta(max_days_to_look_back):
+            # look forward max_days_to_look_back days before giving up
             cur_datetime = cur_datetime - timedelta(1)
 
             cal_data_folder = create_optitrack_calibration_data_folder(cal_data_parent, cur_datetime)

@@ -257,7 +257,10 @@ def trialpts2allpts(trials_pts, trials_conf, min_conf):
     all_pts = [[] for ii in range(num_cams)]
     all_conf = [[] for ii in range(num_cams)]
     for i_trial in range(num_trials):
-        current_frames_to_match = min(frame_per_trial[i_trial, :])
+        if num_trials == 1:
+            current_frames_to_match = min(frame_per_trial)
+        else:
+            current_frames_to_match = min(frame_per_trial[i_trial, :])
         for i_cam in range(num_cams):
             if i_trial == 0:
                 all_pts[i_cam] = np.reshape(trials_pts[i_trial][i_cam][:current_frames_to_match, :, :], (-1, 2))

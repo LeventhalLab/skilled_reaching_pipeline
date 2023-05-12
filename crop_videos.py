@@ -185,7 +185,7 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
 
         # destroy the temp jpeg folder
         shutil.rmtree(jpg_temp_folder)
-    elif filtertype == '':
+    elif filtertype == 'h264':
         command = (
             f"ffmpeg -n -i {vid_path_in} "
             f"-filter:v crop={w}:{h}:{x1}:{y1} "
@@ -194,8 +194,8 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
         subprocess.call(command, shell=True)
 
 
-def preprocess_videos(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi'):
+def preprocess_videos(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi', filtertype='mjpeg2jpeg'):
 
-    cropped_video_directories = crop_folders(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi')
+    cropped_video_directories = crop_folders(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi', filtertype=filtertype)
 
     return cropped_video_directories

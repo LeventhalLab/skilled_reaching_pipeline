@@ -150,6 +150,47 @@ def is_valid_ratID(test_string):
     return isvalid
 
 
+def session_metadata_from_path(full_pathname):
+    '''
+
+    :param full_pathname:
+    :return:
+    '''
+
+    # if path is a folder, assume it is the lowest folder containing session data of the form
+    # ratID_YYYYMMDD_task_sessionXX where XX is a 2-digit integer
+    if os.path.isfile(full_pathname):
+        pname, fname = os.path.split(full_pathname)
+        fname_parts = fname.split('_')
+        if 'current' in fname_parts[-1]:
+            # current was specified at the end of the filename
+            current_value = int(fname_parts[-1][7:10]) / 1000
+        else:
+            current_value = 0.
+    else:
+        pname = full_pathname
+        current_value = 0.
+    _, session_folder = os.path.split(pname)
+
+    folder_parts = session_folder.split('_')
+    ratID = folder_parts[0]
+    rat_num = int(ratID[1:])
+
+    session_date = datetime_from_fname_string(folder_parts[1])
+
+    session_num = int(folder_parts[-1][-2:])
+    session_metadata = {
+                        'ratID': ratID,
+                        'rat_num': rat_num,
+                        'date': session_date,
+                        'task': folder_parts[2],
+                        'session_num': session_num,
+                        'current': current_value
+    }
+
+    return session_metadata
+
+
 def get_video_folders_to_crop(video_root_folder, rats_to_analyze='all'):
 
     rat_folders = glob.glob(os.path.join(video_root_folder, 'R*'))

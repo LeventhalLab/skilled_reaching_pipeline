@@ -12,7 +12,7 @@ from datetime import datetime
 
 def analyze_cropped_optitrack_videos(folders_to_analyze, config_path, parent_directories, cropped_vid_type='.avi', gputouse=0, save_as_csv=True):
     '''
-
+    loop through every folder of cropped videos and run the dlc network on them. DLC output gets stored in the cropped vids folder
     :param folders_to_analyze:
     :param view_config_paths:
     :param cropped_vid_type:

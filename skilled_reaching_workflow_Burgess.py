@@ -243,6 +243,18 @@ if __name__ == '__main__':
     # UNCOMMENT BELOW
     # cropped_video_directories = crop_Burgess_videos.preprocess_Burgess_videos(vid_folder_list, parent_directories, crop_params_df, cam_list, vidtype='avi')
 
+    # ADD CODE TO READ THE SR SCORING FILES, FIND THE CROPPED VIDEOS, TRIM THEM FOR ONLY VIDEOS WITH REACHES, THEN
+    # RUN THE DLC ANALYSIS ON THOSE VIDEOS, THEN REVIEW TO SEE WHERE THERE ARE PROBLEMS
+    # load in the manually scored data
+    ''' scripts to use '''
+    '''THIS IS THE BIT FOR ALEX'''
+    # # finds the manually scored data in an excel spreadsheet for each mouse
+    # scoring_file = navigation_utilities.find_manual_scoring_sheet(parent_directories, r3d_metadata['mouseID'])
+    # if scoring_file is None:
+    #     return
+    # scoring_data = navigation_utilities.import_scoring_xlsx(scoring_file)
+
+
     # step 3 - run DLC on each cropped video
     # UNCOMMENT BELOW
     folders_to_analyze = navigation_utilities.find_optitrack_folders_to_analyze(parent_directories, cam_list=cam_list)

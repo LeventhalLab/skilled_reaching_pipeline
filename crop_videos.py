@@ -186,12 +186,26 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
         # destroy the temp jpeg folder
         shutil.rmtree(jpg_temp_folder)
     elif filtertype == 'h264':
-        command = (
-            f"ffmpeg -n -i {vid_path_in} "
-            f"-filter:v crop={w}:{h}:{x1}:{y1} "
-            f"-c:v h264 -c:a copy {vid_path_out}"
-        )
-        subprocess.call(command, shell=True)
+        if view_name == 'rightmirror':
+            command = (
+                f"ffmpeg -n -i {vid_path_in} "
+                f'-filter:v "crop={w}:{h}:{x1}:{y1}, hflip" '
+                f"-c:v h264 -c:a copy {vid_path_out}"
+            )
+            subprocess.call(command, shell=True)
+            # command = (
+            #     f"ffmpeg -n -i {vid_path_out} "
+            #     f"-vf hflip "
+            #     f"-c:v h264 -c:a copy {vid_path_out}"
+            # )
+            # subprocess.call(command, shell=True)
+        else:
+            command = (
+                f"ffmpeg -n -i {vid_path_in} "
+                f"-filter:v crop={w}:{h}:{x1}:{y1} "
+                f"-c:v h264 -c:a copy {vid_path_out}"
+            )
+            subprocess.call(command, shell=True)
 
 
 def preprocess_videos(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi', filtertype='mjpeg2jpeg'):

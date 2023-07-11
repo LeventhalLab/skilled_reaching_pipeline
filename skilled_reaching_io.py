@@ -7,6 +7,24 @@ import navigation_utilities
 import os
 
 
+def read_rat_db(parent_directories, rat_db_fname):
+
+    fname = os.path.join(parent_directories['data'], rat_db_fname)
+
+    _, ext = os.path.splitext(fname)
+    if ext in ['.xls', '.xlsx']:
+        rat_df = pd.read_excel(fname)
+    elif ext == '.csv':
+        rat_df = pd.read_csv(fname)
+
+    # convert strings in "date" column into datetime objects
+    rat_df['birthdate'] = pd.to_datetime(rat_df['birthdate'], infer_datetime_format=True).dt.date
+    rat_df['virusdate'] = pd.to_datetime(rat_df['virusdate'], infer_datetime_format=True).dt.date
+    rat_df['fiberdate'] = pd.to_datetime(rat_df['fiberdate'], infer_datetime_format=True).dt.date
+
+    return rat_df
+
+
 def read_crop_params_csv(crop_params_filepath):
     '''
 

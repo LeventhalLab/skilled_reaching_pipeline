@@ -167,6 +167,28 @@ def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, cr
 
 if __name__ == '__main__':
 
+    # for dLight experiments
+    videos_parent = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\dLight_Photometry'
+    # video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
+    video_root_folder = os.path.join(videos_parent, 'data')
+    cropped_videos_parent = os.path.join(videos_parent, 'cropped')
+    marked_videos_parent = os.path.join(videos_parent, 'marked')
+    calibration_vids_parent = os.path.join(videos_parent, 'calibration_videos')
+    calibration_files_parent = os.path.join(videos_parent, 'calibration_files')
+    dlc_mat_output_parent = os.path.join(videos_parent, 'matlab_readable_dlc')
+    trajectories_parent = os.path.join(videos_parent, 'trajectory_files')
+
+    parent_directories = {'data': video_root_folder,
+                          'cropped': cropped_videos_parent,
+                          'marked': marked_videos_parent,
+                          'calibration_vids': calibration_vids_parent,
+                          'calibration_files': calibration_files_parent
+                          }
+
+    rat_db_fname = 'rat_dlight_SRdb.xlsx'
+    rat_db = skilled_reaching_io.read_rat_db(parent_directories, rat_db_fname)
+
+
     cb_size = (6, 9)
     # test_calibration_file = '/Volumes/Untitled/DLC_output/calibration_images/2020/202012_calibration/202012_calibration_files/SR_boxCalibration_box04_20201217.mat'
     # test_pickle_file = '/Users/dan/Documents/deeplabcut/cropped_vids/R0382/R0382_20201216c_direct/R0382_20201216_17-23-50_005_direct_700-1350-270-935DLC_resnet50_skilled_reaching_directOct19shuffle1_200000_full.pickle'
@@ -202,16 +224,7 @@ if __name__ == '__main__':
     # videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
     # videos_parent = '/Volumes/Untitled/videos_to_analyze'
 
-    # for dLight experiments
-    videos_parent = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\dLight_Photometry'
-    # video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
-    video_root_folder = os.path.join(videos_parent, 'data')
-    cropped_videos_parent = os.path.join(videos_parent, 'cropped')
-    marked_videos_parent = os.path.join(videos_parent, 'marked')
-    calibration_vids_parent = os.path.join(videos_parent, 'calibration_videos')
-    calibration_files_parent = os.path.join(videos_parent, 'calibration_files')
-    dlc_mat_output_parent = os.path.join(videos_parent, 'matlab_readable_dlc')
-    trajectories_parent = os.path.join(videos_parent, 'trajectory_files')
+
 
     parent_directories = {
         'videos_parent': videos_parent,

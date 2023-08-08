@@ -200,7 +200,7 @@ if __name__ == '__main__':
     rat_database_name = '/home/levlab/Public/rat_SR_videos_to_analyze/SR_rat_database.csv'
     label_videos = True
 
-    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474]
+    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 484]
 
     # rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
 

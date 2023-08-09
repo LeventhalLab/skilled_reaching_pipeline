@@ -167,27 +167,29 @@ def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, cr
 
 if __name__ == '__main__':
 
+    experiment_list = ['dLightPhotometry', 'sr6OHDA']
+    data_root_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching'
     # for dLight experiments
-    videos_parent = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\dLight_Photometry'
+    videos_parents = {expt: os.path.join(data_root_folder, expt) for expt in experiment_list}
+    video_root_folders = {expt: os.path.join(videos_parents[expt], 'data') for expt in experiment_list}
+    cropped_videos_parents = {expt: os.path.join(videos_parents[expt], 'cropped') for expt in experiment_list}
+    marked_videos_parents = {expt: os.path.join(videos_parents[expt], 'marked') for expt in experiment_list}
+    calibration_vids_parents = {expt: os.path.join(videos_parents[expt], 'calibration_videos') for expt in experiment_list}
+    calibration_files_parents = {expt: os.path.join(videos_parents[expt], 'calibration_files') for expt in experiment_list}
+    dlc_mat_output_parents = {expt: os.path.join(videos_parents[expt], 'matlab_readable_dlc') for expt in experiment_list}
+    trajectories_parents = {expt: os.path.join(videos_parents[expt], 'trajectory_files') for expt in experiment_list}
+    # videos_parents = [r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\dLight_Photometry',
+    #                   r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\SR_6OHDA']
     # video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
-    video_root_folder = os.path.join(videos_parent, 'data')
-    cropped_videos_parent = os.path.join(videos_parent, 'cropped')
-    marked_videos_parent = os.path.join(videos_parent, 'marked')
-    calibration_vids_parent = os.path.join(videos_parent, 'calibration_videos')
-    calibration_files_parent = os.path.join(videos_parent, 'calibration_files')
-    dlc_mat_output_parent = os.path.join(videos_parent, 'matlab_readable_dlc')
-    trajectories_parent = os.path.join(videos_parent, 'trajectory_files')
+    # video_root_folder = os.path.join(videos_parent, 'data')
+    # cropped_videos_parents = os.path.join(videos_parent, 'cropped')
+    # marked_videos_parent = os.path.join(videos_parent, 'marked')
+    # calibration_vids_parent = os.path.join(videos_parent, 'calibration_videos')
+    # calibration_files_parent = os.path.join(videos_parent, 'calibration_files')
+    # dlc_mat_output_parent = os.path.join(videos_parent, 'matlab_readable_dlc')
+    # trajectories_parent = os.path.join(videos_parent, 'trajectory_files')
 
-    parent_directories = {'data': video_root_folder,
-                          'cropped': cropped_videos_parent,
-                          'marked': marked_videos_parent,
-                          'calibration_vids': calibration_vids_parent,
-                          'calibration_files': calibration_files_parent
-                          }
-
-    rat_db_fname = 'rat_dlight_SRdb.xlsx'
-    rat_db = skilled_reaching_io.read_rat_db(parent_directories, rat_db_fname)
-
+    rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
 
     cb_size = (6, 9)
     # test_calibration_file = '/Volumes/Untitled/DLC_output/calibration_images/2020/202012_calibration/202012_calibration_files/SR_boxCalibration_box04_20201217.mat'
@@ -196,8 +198,8 @@ if __name__ == '__main__':
     # pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name(test_pickle_file)
     # test_video_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/videos_to_crop/R0382/R0382_20201216c/R0382_box02_20201216_17-31-47_010.avi'
     # test_calibration_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/calibration_files/2021/202102_calibration/camera_calibration_videos_202102/CameraCalibration_box02_20210211_14-33-25.avi'
-    rat_database_name = '/Users/dan/Documents/deeplabcut/videos_to_analyze/SR_rat_database.csv'
-    rat_database_name = '/home/levlab/Public/rat_SR_videos_to_analyze/SR_rat_database.csv'
+    # rat_database_name = '/Users/dan/Documents/deeplabcut/videos_to_analyze/SR_rat_database.csv'
+    # rat_database_name = '/home/levlab/Public/rat_SR_videos_to_analyze/SR_rat_database.csv'
     label_videos = True
 
     rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 484]
@@ -212,6 +214,7 @@ if __name__ == '__main__':
     # step 1: preprocess videos to extract left mirror, right mirror, and direct views
 
     view_list = ('direct', 'leftmirror', 'rightmirror')
+
     # parameters for cropping
     crop_params_dict = {
         view_list[0]: [700, 1350, 270, 935],
@@ -226,24 +229,29 @@ if __name__ == '__main__':
 
 
 
-    parent_directories = {
-        'videos_parent': videos_parent,
-        'videos_root_folder': video_root_folder,
-        'cropped_videos_parent': cropped_videos_parent,
-        'marked_videos_parent': marked_videos_parent,
-        'calibration_vids_parent': calibration_vids_parent,
-        'calibration_files_parent': calibration_files_parent,
-        'dlc_mat_output_parent': dlc_mat_output_parent,
-        'trajectories_parent': trajectories_parent
-    }
-    crop_params_csv_path = os.path.join(video_root_folder, 'SR_video_crop_regions.csv')
-    crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
-    crop_filtertype = 'h264'  # currently choices are 'h264' or 'mjpeg2jpeg'. Python based vid conversion (vs labview) should use h264
+    parent_directories = {expt: {
+                                'videos_parent': videos_parents[expt],
+                                'videos_root_folder': video_root_folders[expt],
+                                'cropped_videos_parent': cropped_videos_parents[expt],
+                                'marked_videos_parent': marked_videos_parents[expt],
+                                'calibration_vids_parent': calibration_vids_parents[expt],
+                                'calibration_files_parent': calibration_files_parents[expt],
+                                'dlc_mat_output_parent': dlc_mat_output_parents[expt],
+                                'trajectories_parent': trajectories_parents[expt]
+                            }
+                            for expt in experiment_list}
 
-    video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder, rats_to_analyze=rats_to_analyze)
-    cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi', filtertype=crop_filtertype)
+    for expt in experiment_list:
+        rat_db = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
 
-    calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=cb_size)
+        crop_params_csv_path = os.path.join(video_root_folders[expt], 'SR_video_crop_regions.csv')
+        crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
+        crop_filtertype = 'h264'  # currently choices are 'h264' or 'mjpeg2jpeg'. Python based vid conversion (vs labview) should use h264
+
+        video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder, rats_to_analyze=rats_to_analyze)
+        cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi', filtertype=crop_filtertype)
+
+        calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=cb_size)
 
     # skilled_reaching_calibration.calibrate_camera_from_video(test_calibration_file, calibration_parent, cb_size=cb_size)
 

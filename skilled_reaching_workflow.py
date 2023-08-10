@@ -248,8 +248,8 @@ if __name__ == '__main__':
         crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
         crop_filtertype = 'h264'  # currently choices are 'h264' or 'mjpeg2jpeg'. Python based vid conversion (vs labview) should use h264
 
-        video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder, rats_to_analyze=rats_to_analyze)
-        cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi', filtertype=crop_filtertype)
+        video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folders[expt], rats_to_analyze=rats_to_analyze)
+        cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parents[expt], crop_params_df, view_list, vidtype='avi', filtertype=crop_filtertype)
 
         calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=cb_size)
 

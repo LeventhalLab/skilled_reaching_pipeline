@@ -9,7 +9,7 @@ import os
 
 def read_rat_db(parent_directories, rat_db_fname):
 
-    fname = os.path.join(parent_directories['data'], rat_db_fname)
+    fname = os.path.join(parent_directories['videos_root_folder'], rat_db_fname)
 
     _, ext = os.path.splitext(fname)
     if ext in ['.xls', '.xlsx']:

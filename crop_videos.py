@@ -99,7 +99,8 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
 
                 # if video was already cropped, skip it
                 if os.path.exists(dest_name):
-                    print(dest_name + ' already exists, skipping')
+                    _, dest_fname = os.path.split(dest_name)
+                    print(dest_fname + ' already exists, skipping')
                     continue
                 else:
                     crop_video(full_vid_path, dest_name, current_crop_params, view_name, filtertype=filtertype)

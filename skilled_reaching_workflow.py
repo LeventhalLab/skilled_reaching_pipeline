@@ -202,7 +202,7 @@ if __name__ == '__main__':
     # rat_database_name = '/home/levlab/Public/rat_SR_videos_to_analyze/SR_rat_database.csv'
     label_videos = True
 
-    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 484]
+    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 484, 497, 498, 499, 500, 501, 502]
 
     # rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
 
@@ -251,7 +251,7 @@ if __name__ == '__main__':
         video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folders[expt], rats_to_analyze=rats_to_analyze)
         cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parents[expt], crop_params_df, view_list, vidtype='avi', filtertype=crop_filtertype)
 
-        calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=cb_size)
+        # calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=cb_size)
 
     # skilled_reaching_calibration.calibrate_camera_from_video(test_calibration_file, calibration_parent, cb_size=cb_size)
 

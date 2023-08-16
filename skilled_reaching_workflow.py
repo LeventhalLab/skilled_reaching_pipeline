@@ -196,16 +196,9 @@ def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, cr
 if __name__ == '__main__':
 
     experiment_list = ['dLightPhotometry', 'sr6OHDA']
-    data_root_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching'
-    # for dLight experiments
-    videos_parents = {expt: os.path.join(data_root_folder, expt) for expt in experiment_list}
-    video_root_folders = {expt: os.path.join(videos_parents[expt], 'data') for expt in experiment_list}
-    cropped_videos_parents = {expt: os.path.join(videos_parents[expt], 'cropped') for expt in experiment_list}
-    marked_videos_parents = {expt: os.path.join(videos_parents[expt], 'marked') for expt in experiment_list}
-    calibration_vids_parents = {expt: os.path.join(videos_parents[expt], 'calibration_videos') for expt in experiment_list}
-    calibration_files_parents = {expt: os.path.join(videos_parents[expt], 'calibration_files') for expt in experiment_list}
-    dlc_mat_output_parents = {expt: os.path.join(videos_parents[expt], 'matlab_readable_dlc') for expt in experiment_list}
-    trajectories_parents = {expt: os.path.join(videos_parents[expt], 'trajectory_files') for expt in experiment_list}
+    rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
+    session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
+
     # videos_parents = [r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\dLight_Photometry',
     #                   r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\SR_6OHDA']
     # video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
@@ -217,8 +210,7 @@ if __name__ == '__main__':
     # dlc_mat_output_parent = os.path.join(videos_parent, 'matlab_readable_dlc')
     # trajectories_parent = os.path.join(videos_parent, 'trajectory_files')
 
-    rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
-    session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
+
 
     cb_size = (6, 9)
     # test_calibration_file = '/Volumes/Untitled/DLC_output/calibration_images/2020/202012_calibration/202012_calibration_files/SR_boxCalibration_box04_20201217.mat'
@@ -239,7 +231,7 @@ if __name__ == '__main__':
     skipdirectlabel = False
     skipmirrorlabel = False
 
-    gputouse = 2
+    gputouse = 3
     # step 1: preprocess videos to extract left mirror, right mirror, and direct views
 
     view_list = ('direct', 'leftmirror', 'rightmirror')
@@ -280,9 +272,21 @@ if __name__ == '__main__':
     if sys.platform in ['win32']:
         # assume DKL computer
         DLC_top_folder = r'C:\Users\dleventh\Documents\deeplabcut_projects'
+        data_root_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching'
     elif sys.platform in ['linux']:
         # lambda computer
-        DLC_top_folder = '/home/levlab/'
+        DLC_top_folder = '/home/dleventh/Documents/DLC_projects'
+        data_root_folder = '/home/dleventh/SharedX/Neuro-Leventhal/data/skilled_reaching'
+
+    # for dLight experiments
+    videos_parents = {expt: os.path.join(data_root_folder, expt) for expt in experiment_list}
+    video_root_folders = {expt: os.path.join(videos_parents[expt], 'data') for expt in experiment_list}
+    cropped_videos_parents = {expt: os.path.join(videos_parents[expt], 'cropped') for expt in experiment_list}
+    marked_videos_parents = {expt: os.path.join(videos_parents[expt], 'marked') for expt in experiment_list}
+    calibration_vids_parents = {expt: os.path.join(videos_parents[expt], 'calibration_videos') for expt in experiment_list}
+    calibration_files_parents = {expt: os.path.join(videos_parents[expt], 'calibration_files') for expt in experiment_list}
+    dlc_mat_output_parents = {expt: os.path.join(videos_parents[expt], 'matlab_readable_dlc') for expt in experiment_list}
+    trajectories_parents = {expt: os.path.join(videos_parents[expt], 'trajectory_files') for expt in experiment_list}
 
     view_keys = list(DLC_folder_names.keys())
     view_config_paths = {view_key: os.path.join(DLC_top_folder, DLC_folder_names[view_key], 'config.yaml') for view_key in view_keys}
@@ -291,7 +295,6 @@ if __name__ == '__main__':
     #     'nearpaw': r'C:\Users\dleventh\Documents\deeplabcut_projects\ratnearpawmirrorsr-DanLeventhal-2023-06-19/config.yaml',
     #     'farpaw': r'C:\Users\dleventh\Documents\deeplabcut_projects\ratfarpawmirrorsr-DanLeventhal-2023-07-03/config.yaml'
     # }
-
 
     parent_directories = {expt: {
                                 'videos_parent': videos_parents[expt],

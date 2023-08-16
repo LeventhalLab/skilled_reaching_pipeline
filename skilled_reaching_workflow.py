@@ -9,10 +9,11 @@ import os
 import shutil
 import pandas as pd
 import cv2
+import sys
 import deeplabcut
 
 
-def analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_vids_parent, cropped_vid_type='.avi', gputouse=0, save_as_csv=True):
+def analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_vids_parent, rat_df, cropped_vid_type='.avi', gputouse=0, save_as_csv=True):
     '''
 
     :param folders_to_analyze:
@@ -24,20 +25,47 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_vids_pa
     '''
 
     view_list = folders_to_analyze.keys()
-    scorernames = {'direct': '', 'mirror': ''}
+    scorernames = dict.fromkeys(view_config_paths.keys())
     for view in view_list:
-        if 'direct' in view:
-            dlc_network = 'direct'
-        elif 'mirror' in view:
-            dlc_network = 'mirror'
-        else:
-            print(view + ' does not contain the keyword "direct" or "mirror"')
-            continue
+        # if 'direct' in view:
+        #     dlc_network = 'direct'
+        # elif 'mirror' in view:
+        #     dlc_network = 'mirror'
+        # else:
+        #     print(view + ' does not contain the keyword "direct" or "mirror"')
+        #     continue
 
-        config_path = view_config_paths[dlc_network]
+
         current_view_folders = folders_to_analyze[view]
 
         for current_folder in current_view_folders:
+            ratID, session_name = navigation_utilities.parse_session_dir_name(current_folder)
+
+            # find the row of the rat dataframe for this ratID, extract a paw preference series, take the first element as this rat's paw preference
+            paw_pref = rat_df['pawpref'][rat_df['ratid'] == ratID].values[0]
+            if 'direct' in view:
+                dlc_network = 'direct'
+            elif 'leftmirror' in view:
+                if paw_pref.lower() in ('r', 'right'):
+                    # left mirror view is the near paw view for a right-pawed rat
+                    dlc_network = 'nearpaw'
+                elif paw_pref.lower() in ('l', 'left'):
+                    # left mirror view is the far paw view for a left-pawed rat
+                    dlc_network = 'farpaw'
+                else:
+                    print('paw preference not correctly specified for {}'.format(ratID))
+            elif 'rightmirror' in view:
+                if paw_pref.lower() in ('r', 'right'):
+                    # right mirror view is the far paw view for a right-pawed rat
+                    dlc_network = 'farpaw'
+                elif paw_pref.lower() in ('l', 'left'):
+                    # right mirror view is the near paw view for a left-pawed rat
+                    dlc_network = 'nearpaw'
+            else:
+                print(view + ' does not contain the keyword "direct", "leftmirror", or "rightmirror"')
+                continue
+            config_path = view_config_paths[dlc_network]
+
             cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
             #todo: skip if analysis already done and stored in the _marked folder
             scorername = deeplabcut.analyze_videos(config_path,
@@ -228,6 +256,41 @@ if __name__ == '__main__':
     # videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
     # videos_parent = '/Volumes/Untitled/videos_to_analyze'
 
+    # view_config_paths = {
+    #     'direct': '/home/levlab/Public/skilled_reaching_direct-Dan_Leventhal-2020-10-19/config.yaml',
+    #     'mirror': '/home/levlab/Public/skilled_reaching_mirror-Dan_Leventhal-2020-10-19/config.yaml'
+    # }
+
+    # for lambda computer
+    view_config_paths = {
+        'direct': '/home/levlab/deeplabcut_projects/ratdirectsr-DanLeventhal-2023-06-07/config.yaml',
+        'nearpaw': '/home/levlab/deeplabcut_projects/ratnearpawmirrorsr-DanLeventhal-2023-06-19/config.yaml',
+        'farpaw': '/home/levlab/deeplabcut_projects/ratfarpawmirrorsr-DanLeventhal-2023-07-03/config.yaml'
+    }
+
+    # for DKL computer
+    # view_config_paths = {
+    #     'direct': '/home/levlab/Public/skilled_reaching_direct-Dan_Leventhal-2020-10-19/config.yaml',
+    #     'mirror': '/home/levlab/Public/skilled_reaching_mirror-Dan_Leventhal-2020-10-19/config.yaml'
+    # }
+    DLC_folder_names = {'direct': 'ratdirectsr-DanLeventhal-2023-06-07',
+                        'nearpaw': 'ratnearpawmirrorsr-DanLeventhal-2023-06-19',
+                        'farpaw': 'ratfarpawmirrorsr-DanLeventhal-2023-07-03'}
+
+    if sys.platform in ['win32']:
+        # assume DKL computer
+        DLC_top_folder = r'C:\Users\dleventh\Documents\deeplabcut_projects'
+    elif sys.platform in ['linux']:
+        # lambda computer
+        DLC_top_folder = '/home/levlab/'
+
+    view_keys = list(DLC_folder_names.keys())
+    view_config_paths = {view_key: os.path.join(DLC_top_folder, DLC_folder_names[view_key], 'config.yaml') for view_key in view_keys}
+    # view_config_paths = {
+    #     'direct': r'C:\Users\dleventh\Documents\deeplabcut_projects\ratdirectsr-DanLeventhal-2023-06-07/config.yaml',
+    #     'nearpaw': r'C:\Users\dleventh\Documents\deeplabcut_projects\ratnearpawmirrorsr-DanLeventhal-2023-06-19/config.yaml',
+    #     'farpaw': r'C:\Users\dleventh\Documents\deeplabcut_projects\ratfarpawmirrorsr-DanLeventhal-2023-07-03/config.yaml'
+    # }
 
 
     parent_directories = {expt: {
@@ -243,7 +306,11 @@ if __name__ == '__main__':
                             for expt in experiment_list}
 
     for expt in experiment_list:
-        rat_db = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
+        rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
+        folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parents[expt], view_list=view_list)
+
+        scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_videos_parents[expt], rat_df, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
+
 
         crop_params_csv_path = os.path.join(video_root_folders[expt], 'SR_video_crop_regions.csv')
         crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
@@ -274,15 +341,13 @@ if __name__ == '__main__':
     # step 2: run the vids through DLC
     # parameters for running DLC
     # need to update these paths when moved to the lambda machine
-    view_config_paths = {
-        'direct': '/home/levlab/Public/skilled_reaching_direct-Dan_Leventhal-2020-10-19/config.yaml',
-        'mirror': '/home/levlab/Public/skilled_reaching_mirror-Dan_Leventhal-2020-10-19/config.yaml'
-    }
+
 
     for expt in experiment_list:
+        rat_db = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
         folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parents[expt], view_list=view_list)
 
-        scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_videos_parents[expt], cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
+        scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_videos_parents[expt], rat_db, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
 
         if label_videos:
             create_labeled_videos(cropped_videos_parent,

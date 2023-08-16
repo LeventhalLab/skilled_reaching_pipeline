@@ -17,10 +17,17 @@ def read_rat_db(parent_directories, rat_db_fname):
     elif ext == '.csv':
         rat_df = pd.read_csv(fname)
 
+    # convert to all lowercase column headers
+    for col_header in rat_df.columns:
+        rat_df = rat_df.rename(columns={col_header: col_header.lower()})
+
     # convert strings in "date" column into datetime objects
-    rat_df['birthdate'] = pd.to_datetime(rat_df['birthdate'], infer_datetime_format=True).dt.date
-    rat_df['virusdate'] = pd.to_datetime(rat_df['virusdate'], infer_datetime_format=True).dt.date
-    rat_df['fiberdate'] = pd.to_datetime(rat_df['fiberdate'], infer_datetime_format=True).dt.date
+    if 'birthdate' in rat_df.columns:
+        rat_df['birthdate'] = pd.to_datetime(rat_df['birthdate'], format='%m/%d/%Y').dt.date
+    if 'virusdate' in rat_df.columns:
+        rat_df['virusdate'] = pd.to_datetime(rat_df['virusdate'], format='%m/%d/%Y').dt.date
+    if 'fiberdate' in rat_df.columns:
+        rat_df['fiberdate'] = pd.to_datetime(rat_df['fiberdate'], format='%m/%d/%Y').dt.date
 
     return rat_df
 

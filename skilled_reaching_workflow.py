@@ -190,6 +190,7 @@ if __name__ == '__main__':
     # trajectories_parent = os.path.join(videos_parent, 'trajectory_files')
 
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
+    session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
 
     cb_size = (6, 9)
     # test_calibration_file = '/Volumes/Untitled/DLC_output/calibration_images/2020/202012_calibration/202012_calibration_files/SR_boxCalibration_box04_20201217.mat'
@@ -202,7 +203,7 @@ if __name__ == '__main__':
     # rat_database_name = '/home/levlab/Public/rat_SR_videos_to_analyze/SR_rat_database.csv'
     label_videos = True
 
-    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 484, 497, 498, 499, 500, 501, 502]
+    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 484, 485, 497, 498, 499, 500, 501, 502]
 
     # rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
 
@@ -270,10 +271,6 @@ if __name__ == '__main__':
 
     # reconstruct_3d.test_reconstruction(parent_directories, rat_df)
 
-    #todo: complete the camera calibration algorithms
-    video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folder)
-    cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, crop_params_df, view_list, vidtype='avi')
-
     # step 2: run the vids through DLC
     # parameters for running DLC
     # need to update these paths when moved to the lambda machine
@@ -281,19 +278,21 @@ if __name__ == '__main__':
         'direct': '/home/levlab/Public/skilled_reaching_direct-Dan_Leventhal-2020-10-19/config.yaml',
         'mirror': '/home/levlab/Public/skilled_reaching_mirror-Dan_Leventhal-2020-10-19/config.yaml'
     }
-    folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent, view_list=view_list)
 
-    scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_videos_parent, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
+    for expt in experiment_list:
+        folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parents[expt], view_list=view_list)
 
-    if label_videos:
-        create_labeled_videos(cropped_videos_parent,
-                              marked_videos_parent,
-                              view_config_paths,
-                              scorernames,
-                              cropped_vid_type=cropped_vid_type,
-                              skipdirect=skipdirectlabel,
-                              skipmirror=skipmirrorlabel,
-                              view_list=view_list)
+        scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_videos_parents[expt], cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
+
+        if label_videos:
+            create_labeled_videos(cropped_videos_parent,
+                                  marked_videos_parent,
+                                  view_config_paths,
+                                  scorernames,
+                                  cropped_vid_type=cropped_vid_type,
+                                  skipdirect=skipdirectlabel,
+                                  skipmirror=skipmirrorlabel,
+                                  view_list=view_list)
 
     # step 3: make sure calibration has been run for these sessions
     # find list of all analyzed videos; extract dates and boxes for each session

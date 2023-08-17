@@ -13,16 +13,19 @@ import sys
 import deeplabcut
 
 
-def analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_vids_parent, rat_df, cropped_vid_type='.avi', gputouse=0, save_as_csv=True):
+def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_dirs, rat_df, cropped_vid_type='.avi', gputouse=0, save_as_csv=True, create_marked_vids=True):
     '''
-
     :param folders_to_analyze:
     :param view_config_paths:
+    :param expt_parent_dirs:
     :param cropped_vid_type:
     :param gputouse:
     :return: scorernames - dictionary with keys 'direct' and 'mirror' containing the scorername strings returned by
         deeplabcut.analyze_videos
     '''
+
+    marked_vids_parent = expt_parent_dirs['marked_videos_parent']
+    cropped_vids_parent = expt_parent_dirs['cropped_videos_parent']
 
     view_list = folders_to_analyze.keys()
     scorernames = dict.fromkeys(view_config_paths.keys())
@@ -67,22 +70,47 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_vids_pa
             config_path = view_config_paths[dlc_network]
 
             cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
-            #todo: skip if analysis already done and stored in the _marked folder
-            scorername = deeplabcut.analyze_videos(config_path,
-                                      cropped_video_list,
-                                      videotype=cropped_vid_type,
-                                      gputouse=gputouse,
-                                      save_as_csv=save_as_csv)
+            vids_to_analyze = []
+            for cropped_vid in cropped_video_list:
+                cv_path, vid_name = os.path.split(cropped_vid)
+                vid_name, vid_ext = os.path.splitext(vid_name)
+
+                test_pickle_name = os.path.join(cv_path, vid_name + 'DLC*.pickle')
+
+                # have pickle files already been created for this video?
+                test_pickle_list = glob.glob(test_pickle_name)
+
+                if len(test_pickle_list) == 0:
+                    # if the pickle files for this video don't already exist, analyze this video
+                    vids_to_analyze.append(cropped_vid)
+
+            if len(vids_to_analyze) > 0:
+                scorername = deeplabcut.analyze_videos(config_path,
+                                          [cropped_video_list[0]],
+                                          videotype=cropped_vid_type,
+                                          gputouse=gputouse,
+                                          save_as_csv=save_as_csv)
+            else:
+                scorername = navigation_utilities.scorername_from_fname(test_pickle_list[0])
+
             scorernames[dlc_network] = scorername
 
-            new_dir = navigation_utilities.create_marked_vids_folder(current_folder, cropped_videos_parent,
-                                                                     marked_vids_parent)
-            pickle_list = glob.glob(os.path.join(current_folder, '*.pickle'))
-            for pickle_file in pickle_list:
-                # if the file already exists in the marked_vid directory, don't move it
-                _, pickle_name = os.path.split(pickle_file)
-                if not os.path.isfile(os.path.join(new_dir, pickle_name)):
-                    shutil.copy(pickle_file, new_dir)
+            if create_marked_vids:
+                new_dir = navigation_utilities.create_marked_vids_folder(current_folder, cropped_vids_parent,
+                                                                         marked_vids_parent)
+
+                # do the pickles need to be copied to the marked vids folder? I don't think so...
+                pickle_list = glob.glob(os.path.join(current_folder, '*.pickle'))
+                for pickle_file in pickle_list:
+                    # if the file already exists in the marked_vid directory, don't move it
+                    _, pickle_name = os.path.split(pickle_file)
+                    if not os.path.isfile(os.path.join(new_dir, pickle_name)):
+                        shutil.copy(pickle_file, new_dir)
+
+                # cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
+                deeplabcut.create_video_with_all_detections(config_path, cropped_video_list, scorername)
+
+                # todo: move marked videos to marked vids folder
 
     return scorernames
 
@@ -198,6 +226,7 @@ if __name__ == '__main__':
     experiment_list = ['dLightPhotometry', 'sr6OHDA']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
+    create_marked_vids = True
 
     # videos_parents = [r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\dLight_Photometry',
     #                   r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\SR_6OHDA']
@@ -312,7 +341,11 @@ if __name__ == '__main__':
         rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
         folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parents[expt], view_list=view_list)
 
-        scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_videos_parents[expt], rat_df, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
+        scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, parent_directories[expt], rat_df,
+                                             cropped_vid_type=cropped_vid_type,
+                                             gputouse=gputouse,
+                                             save_as_csv=True,
+                                             create_marked_vids=create_marked_vids)
 
 
         crop_params_csv_path = os.path.join(video_root_folders[expt], 'SR_video_crop_regions.csv')

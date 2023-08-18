@@ -69,7 +69,7 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
                 continue
             config_path = view_config_paths[dlc_network]
 
-            cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
+            cropped_video_list = glob.glob(current_folder + '/{}_*'.format(ratID) + cropped_vid_type)
             vids_to_analyze = []
             for cropped_vid in cropped_video_list:
                 cv_path, vid_name = os.path.split(cropped_vid)
@@ -96,21 +96,40 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
             scorernames[dlc_network] = scorername
 
             if create_marked_vids:
-                new_dir = navigation_utilities.create_marked_vids_folder(current_folder, cropped_vids_parent,
+                marked_vids_dir = navigation_utilities.create_marked_vids_folder(current_folder, cropped_vids_parent,
                                                                          marked_vids_parent)
 
                 # do the pickles need to be copied to the marked vids folder? I don't think so...
-                pickle_list = glob.glob(os.path.join(current_folder, '*.pickle'))
-                for pickle_file in pickle_list:
-                    # if the file already exists in the marked_vid directory, don't move it
-                    _, pickle_name = os.path.split(pickle_file)
-                    if not os.path.isfile(os.path.join(new_dir, pickle_name)):
-                        shutil.copy(pickle_file, new_dir)
+                # pickle_list = glob.glob(os.path.join(current_folder, '*.pickle'))
+                # for pickle_file in pickle_list:
+                #     # if the file already exists in the marked_vid directory, don't move it
+                #     _, pickle_name = os.path.split(pickle_file)
+                #     if not os.path.isfile(os.path.join(new_dir, pickle_name)):
+                #         shutil.copy(pickle_file, new_dir)
 
                 # cropped_video_list = glob.glob(current_folder + '/*' + cropped_vid_type)
-                deeplabcut.create_video_with_all_detections(config_path, cropped_video_list, scorername)
 
-                # todo: move marked videos to marked vids folder
+                # figure out if there are already marked videos in the new folder
+                vids_to_mark = []
+                for cropped_vid in cropped_video_list:
+                    cv_path, cropped_vid_name = os.path.split(cropped_vid)
+                    cropped_vid_name, ext = os.path.splitext(cropped_vid_name)
+                    test_marked_name = os.path.join(marked_vids_dir, '{}*_full.mp4'.format(cropped_vid_name))
+                    marked_vids = glob.glob(test_marked_name)
+
+                    if len(marked_vids) == 0:
+                        # the marked video hasn't been made yet
+                        vids_to_mark.append(cropped_vid)
+
+                deeplabcut.create_video_with_all_detections(config_path, vids_to_mark, videotype='.avi')
+
+                test_marked_name = os.path.join(current_folder, '{}_*{}_full.mp4'.format(ratID, scorername))
+                marked_vid_names = glob.glob(test_marked_name)
+
+                for marked_vid in marked_vid_names:
+                    mv_path, mv_name = os.path.split(marked_vid)
+                    dest_name = os.path.join(marked_vids_dir, mv_name)
+                    shutil.move(marked_vid, dest_name)
 
     return scorernames
 

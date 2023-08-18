@@ -86,7 +86,7 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
 
             if len(vids_to_analyze) > 0:
                 scorername = deeplabcut.analyze_videos(config_path,
-                                          [cropped_video_list[0]],
+                                          vids_to_analyze,
                                           videotype=cropped_vid_type,
                                           gputouse=gputouse,
                                           save_as_csv=save_as_csv)

@@ -90,6 +90,9 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
                                           videotype=cropped_vid_type,
                                           gputouse=gputouse,
                                           save_as_csv=save_as_csv)
+                # todo: might want to add additional options to these commands
+                deeplabcut.convert_detections2tracklets(config_path, vids_to_analyze, videotype=cropped_vid_type)
+                deeplabcut.filterpredictions(config_path, vids_to_analyze, videotype=cropped_vid_type)
             else:
                 scorername = navigation_utilities.scorername_from_fname(test_pickle_list[0])
 
@@ -114,16 +117,17 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
                 for cropped_vid in cropped_video_list:
                     cv_path, cropped_vid_name = os.path.split(cropped_vid)
                     cropped_vid_name, ext = os.path.splitext(cropped_vid_name)
-                    test_marked_name = os.path.join(marked_vids_dir, '{}*_full.mp4'.format(cropped_vid_name))
+                    test_marked_name = os.path.join(marked_vids_dir, '{}*_labeled.mp4'.format(cropped_vid_name))
                     marked_vids = glob.glob(test_marked_name)
 
                     if len(marked_vids) == 0:
                         # the marked video hasn't been made yet
                         vids_to_mark.append(cropped_vid)
 
-                deeplabcut.create_video_with_all_detections(config_path, vids_to_mark, videotype='.avi')
+                deeplabcut.create_labeled_video(config_path, vids_to_mark, color_by='bodypart', filtered=True, videotype=cropped_vid_type)
+                # deeplabcut.create_video_with_all_detections(config_path, vids_to_mark, videotype=cropped_vid_type)
 
-                test_marked_name = os.path.join(current_folder, '{}_*{}_full.mp4'.format(ratID, scorername))
+                test_marked_name = os.path.join(current_folder, '{}_*{}_labeled.mp4'.format(ratID, scorername))
                 marked_vid_names = glob.glob(test_marked_name)
 
                 for marked_vid in marked_vid_names:

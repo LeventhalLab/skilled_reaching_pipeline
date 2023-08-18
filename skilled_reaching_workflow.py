@@ -198,7 +198,7 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
                            shutil.move(pickle_file, new_dir)
 
 
-def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=(6, 9), vidtype='.avi'):
+def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, calibration_metadata_df, vidtype='.avi'):
     '''
     loop through all folders containing calibration videos and store calibration parameters
     :param calibration_vids_parent:
@@ -211,7 +211,7 @@ def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, cr
     if vidtype[0] != '.':
         vidtype = '.' + vidtype
 
-    calib_vid_folders = navigation_utilities.find_calibration_vid_folders_dLight(calibration_vids_parent)
+    calib_vid_folders = navigation_utilities.find_calibration_vid_folders(calibration_vids_parent)
 
     for cf in calib_vid_folders:
         # crop the calibration videos
@@ -220,25 +220,31 @@ def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, cr
         orig_im_size = []
         cropped_vid_names = []
         for calib_vid in calib_vids:
-            cropped_vid_names.append(skilled_reaching_calibration.crop_calibration_video(calib_vid, crop_params_df))
+            cropped_vid_names.append(skilled_reaching_calibration.crop_calibration_video(calib_vid, calibration_metadata_df))
             vid_obj = cv2.VideoCapture(calib_vid)
             orig_im_size.append((int(vid_obj.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_obj.get(cv2.CAP_PROP_FRAME_WIDTH))))
             vid_obj.release()
         # cropped_vid_names contains a list of lists; each individual list contains the names of 3 files, one each for
         # the direct, leftmirror, and rightmirror views
 
-        # FOR NOW, JUST CROP THE VIDEOS. COMMENT THE CALIBRATION PART BACK IN LATER (HOPEFULLY CAN JUST RUN ANIPOSE HERE...
-        # for i_calib_vid, cropped_vids_set in enumerate(cropped_vid_names):
+        # FOR NOW, JUST CROP THE VIDEOS. COMMENT THE CALIBRATION PART BACK IN LATER (HOPEFULLY CAN JUST RUN ANIPOSE HERE...)
+        for i_calib_vid, cropped_vids_set in enumerate(cropped_vid_names):
         #     # each cropped_vids_set should contain 3 video names for direct, left, right views
         #
-        #     calibration_summary_name = navigation_utilities.create_calibration_summary_name(calib_vids[i_calib_vid], calibration_files_parent)
+            session_metadata = navigation_utilities.parse_camera_calibration_video_name(cropped_vids_set[0])
+            calibration_summary_name = navigation_utilities.create_calibration_summary_name(calib_vids[i_calib_vid], calibration_files_parent)
         #
-        #     if os.path.isfile(calibration_summary_name):
-        #         calibration_data = skilled_reaching_io.read_pickle(calibration_summary_name)
-        #     else:
-        #         calibration_data = skilled_reaching_calibration.collect_cb_corners(cropped_vids_set, cb_size)
-        #         calibration_data['orig_im_size'] = orig_im_size[i_calib_vid]
-        #         skilled_reaching_io.write_pickle(calibration_summary_name, calibration_data)
+            if os.path.isfile(calibration_summary_name):
+                calibration_data = skilled_reaching_io.read_pickle(calibration_summary_name)
+            else:
+                calibration_metadata = skilled_reaching_calibration.calibration_metadata_from_df(session_metadata, calibration_metadata_df)
+                crop_params_dict = crop_videos.crop_params_dict_from_df(calibration_metadata_df, session_metadata['time'].date(),
+                                                                        session_metadata['boxnum'])
+                cam_names = list(crop_params_dict.keys())
+                skilled_reaching_calibration.anipose_calibrate(cropped_vids_set, cam_names, calibration_metadata)
+                # calibration_data = skilled_reaching_calibration.collect_cb_corners(cropped_vids_set, cb_size)
+                calibration_data['orig_im_size'] = orig_im_size[i_calib_vid]
+                skilled_reaching_io.write_pickle(calibration_summary_name, calibration_data)
         #
         #     # now perform the actual calibration
         #     skilled_reaching_calibration.multi_mirror_calibration(calibration_data, calibration_summary_name)
@@ -264,7 +270,7 @@ if __name__ == '__main__':
 
 
 
-    cb_size = (6, 9)
+    # cb_size = (6, 9)
     # test_calibration_file = '/Volumes/Untitled/DLC_output/calibration_images/2020/202012_calibration/202012_calibration_files/SR_boxCalibration_box04_20201217.mat'
     # test_pickle_file = '/Users/dan/Documents/deeplabcut/cropped_vids/R0382/R0382_20201216c_direct/R0382_20201216_17-23-50_005_direct_700-1350-270-935DLC_resnet50_skilled_reaching_directOct19shuffle1_200000_full.pickle'
     # skilled_reaching_calibration.read_matlab_calibration(test_calibration_file)
@@ -359,6 +365,11 @@ if __name__ == '__main__':
                                 'trajectories_parent': trajectories_parents[expt]
                             }
                             for expt in experiment_list}
+
+    for expt in experiment_list:
+        calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
+        calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
+        calibrate_all_sessions(calibration_vids_parents[expt], calibration_files_parents[expt], calibration_metadata_df)
 
     for expt in experiment_list:
         rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])

@@ -1115,27 +1115,27 @@ def create_mat_cal_filename(calibration_metadata, basename='SR_boxCalibration'):
     return mat_cal_filename
 
 
+# def find_calibration_vid_folders(calibration_parent):
+#     '''
+#     find all calibration videos. assume directory structure:
+#         calibration_parent-->calibration_videos__YYYY-->calibration_videos__YYYYMM-->calibration_videos__YYYYMM_boxZZ where
+#         ZZ is the 2-digit box number
+#     :param calibration_parent:
+#     :return:
+#     '''
+#     year_folders = glob.glob(os.path.join(calibration_parent, 'calibration_videos_*'))
+#     month_folders = []
+#     # for yf in year_folders:
+#     #     month_folders.extend(glob.glob(os.path.join(yf, 'calibration_videos_*')))
+#     [month_folders.extend(glob.glob(os.path.join(yf, 'calibration_videos_*'))) for yf in year_folders]
+#
+#     box_folders = []
+#     [box_folders.extend(glob.glob(os.path.join(mf, 'calibration_videos_*'))) for mf in month_folders]
+#
+#     return box_folders
+
+
 def find_calibration_vid_folders(calibration_parent):
-    '''
-    find all calibration videos. assume directory structure:
-        calibration_parent-->calibration_videos__YYYY-->calibration_videos__YYYYMM-->calibration_videos__YYYYMM_boxZZ where
-        ZZ is the 2-digit box number
-    :param calibration_parent:
-    :return:
-    '''
-    year_folders = glob.glob(os.path.join(calibration_parent, 'calibration_videos_*'))
-    month_folders = []
-    # for yf in year_folders:
-    #     month_folders.extend(glob.glob(os.path.join(yf, 'calibration_videos_*')))
-    [month_folders.extend(glob.glob(os.path.join(yf, 'calibration_videos_*'))) for yf in year_folders]
-
-    box_folders = []
-    [box_folders.extend(glob.glob(os.path.join(mf, 'calibration_videos_*'))) for mf in month_folders]
-
-    return box_folders
-
-
-def find_calibration_vid_folders_dLight(calibration_parent):
     '''
     find all calibration videos. assume directory structure:
         calibration_parent-->calibration_videos__YYYY-->calibration_videos__YYYYMM-->calibration_videos__YYYYMM_boxZZ where

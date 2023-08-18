@@ -16,9 +16,77 @@ import cv2
 import glob
 import computer_vision_basics as cvb
 import skilled_reaching_io
+from aniposelib.boards import CharucoBoard, Checkerboard
+from aniposelib.cameras import Camera, CameraGroup
+from aniposelib.utils import load_pose2d_fnames
 from random import randint
 import matplotlib
 matplotlib.use('TKAgg')
+
+
+def calibration_metadata_from_df(session_metadata, calibration_metadata_df):
+    '''
+
+    :param session_metadata: dictionary with keys 'time' and 'boxnum'
+    :param calibration_metadata_df: dataframe with columns 'nrows', 'ncols', 'date', 'box_num', 'calib_type'
+        calib_type can be 'chessboard'
+    :return:
+    '''
+
+    calibration_metadata = {'nrows': 0,
+                            'ncols': 0,
+                            'square_length': 0,
+                            'marker_length': 0,
+                            'board_type': 'none'}
+
+    session_row = calibration_metadata_df[(calibration_metadata_df['box_num'] == session_metadata['boxnum']) &
+                                          (calibration_metadata_df['date'] == session_metadata['time'].date())]
+
+    if len(session_row) == 1:
+        calibration_metadata['nrows'] = int(session_row['nrows'].values[0])
+        calibration_metadata['ncols'] = int(session_row['ncols'].values[0])
+        calibration_metadata['square_length'] = session_row['square_length'].values[0]
+        calibration_metadata['marker_length'] = session_row['marker_length'].values[0]
+        calibration_metadata['board_type'] = session_row['calib_type'].values[0]
+    elif len(session_num) > 1:
+        print('ambiguous session metadata')
+    elif len(session_num) == 0:
+        print('no calibration metadata for this session')
+
+    return calibration_metadata
+
+
+def anipose_calibrate(vid_list, cam_names, calibration_metadata):
+    '''
+
+    :param vid_list:
+    :param calibration_metadata: dictionary with the following keys:
+        'nrows' - number of rows in the chessboard/charuco board
+        'ncols' - number of columns in the chessboard/charuco board
+        'square_length' - length of each chessboard square (usually in mm)
+        'marker_length' - length of each Aruco marker (usually in mm - should be same units as square_length for sure)
+        'calib_type' - 'chessboard' or 'charuco'
+    :return:
+    '''
+
+    calibration_path, _ = os.path.split(vid_list[0])
+
+    if calibration_metadata['board_type'].lower() in ['chessboard', 'checkerboard']:
+        board = Checkerboard(calibration_metadata['nrows'], calibration_metadata['ncols'],square_length=calibration_metadata['square_length'])
+    elif calibration_metadata['board_type'].lower() in ['charuco']:
+        board = CharucoBoard(calibration_metadata['nrows'], calibration_metadata['ncols'],
+                             square_length=calibration_metadata['square_length'], marker_length=calibration_metadata['marker_length'])
+
+    ncams = len(vid_list)
+    cgroup = CameraGroup.from_names(cam_names)
+
+    cgroup.calibrate_videos(vid_list, board)
+
+    cal_name = os.path.join(calibration_path, 'calibration.toml')
+    cgroup.dump(cal_name)
+
+    pass
+
 
 
 def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, min_conf2match=0.98):
@@ -799,12 +867,12 @@ def verify_checkerboard_points(calibration_vids, calibration_data):
         vid_obj.release()
 
 
-def crop_calibration_video(calib_vid, crop_params_df, calib_crop_top=100, filtertype=''):
+def crop_calibration_video(calib_vid, calibration_metadata_df, calib_crop_top=100, filtertype=''):
 
     cc_metadata = navigation_utilities.parse_camera_calibration_video_name(calib_vid)
 
     session_date = cc_metadata['time'].date()
-    crop_params_dict = crop_videos.crop_params_dict_from_df(crop_params_df, session_date, cc_metadata['boxnum'])
+    crop_params_dict = crop_videos.crop_params_dict_from_df(calibration_metadata_df, session_date, cc_metadata['boxnum'])
 
     cropped_vid_names = []
     if crop_params_dict:

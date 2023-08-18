@@ -52,6 +52,26 @@ def read_crop_params_csv(crop_params_filepath):
     return crop_params_df
 
 
+def read_calibration_metadata_csv(calibration_metadata_csv_path):
+    '''
+
+    :param crop_params_filepath: full path to a .csv file containing cropping regions
+    :return:
+    crop_params_df - pandas dateframe with the following columns:
+        date - date in datetime.date format
+        direct_left, direct_right, direct_top, direct_bottom - left, right, top, bottom borders of direct view
+        leftmirror_left, leftmirror_right, leftmirror_top, leftmirror_bottom - left, right, top, bottom borders of left mirror view
+        rightmirror_left, rightmirror_right, rightmirror_top, rightmirror_bottom - left, right, top, bottom borders of right mirror view
+        NOTE - these border coordinates start counting at 1 instead of 0, so should subtract 1 when extracting regions from images
+    '''
+    calibration_metadata_df = pd.read_csv(calibration_metadata_csv_path)
+
+    # convert strings in "date" column into datetime objects
+    calibration_metadata_df['date'] = pd.to_datetime(calibration_metadata_df['date'], infer_datetime_format=True).dt.date
+
+    return calibration_metadata_df
+
+
 def read_pickle(filename):
     """ Read the pickle file """
     with open(filename, "rb") as handle:

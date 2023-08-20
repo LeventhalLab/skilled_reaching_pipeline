@@ -95,6 +95,8 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
                 os.makedirs(dest_folder)
 
             for full_vid_path in vids_list:
+                # todo: calibrate the camera and undistort the videos prior to cropping, then don't allow calculation of distortion
+                # coefficients, etc. during calibration with anipose
                 dest_name = cropped_vid_name(full_vid_path, dest_folder, view_name, current_crop_params)
 
                 # if video was already cropped, skip it
@@ -139,8 +141,16 @@ def cropped_vid_name(full_vid_path, dest_folder, view_name, crop_params):
     return full_dest_name
 
 
-def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mjpeg2jpeg'):
+def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mjpeg2jpeg', fliplr=False):
+    '''
 
+    :param vid_path_in:
+    :param vid_path_out:
+    :param crop_params:
+    :param view_name:
+    :param filtertype:
+    :return:
+    '''
     # crop videos losslessly. Note that the trick of converting the video into a series of jpegs, cropping them, and
     # re-encoding is a trick that only works because our videos are encoded as mjpegs (which apparently is an old format)
 
@@ -172,8 +182,9 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
         for jpg_name in tqdm(jpg_list):
             img = cv2.imread(jpg_name)
             cropped_img = img[y1-1:y2-1, x1-1:x2-1, :]
-            if view_name == 'rightmirror':
+            if view_name == 'rightmirror' or fliplr==True:
                 # flip the image left to right so it can be run through a single "side mirror" DLC network
+                # or, if this is a calibration video, both mirror views should be flipped
                 cropped_img = cv2.flip(cropped_img, 1)   # 2nd argument flipCode > 0 indicates flip horizontally
             cv2.imwrite(jpg_name, cropped_img)
 
@@ -187,7 +198,9 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
         # destroy the temp jpeg folder
         shutil.rmtree(jpg_temp_folder)
     elif filtertype == 'h264':
-        if view_name == 'rightmirror':
+        if view_name == 'rightmirror' or fliplr==True:
+            # flip the image left to right so it can be run through a single "side mirror" DLC network
+            # or, if this is a calibration video, both mirror views should be flipped
             command = (
                 f"ffmpeg -n -i {vid_path_in} "
                 f'-filter:v "crop={w}:{h}:{x1}:{y1}, hflip" '

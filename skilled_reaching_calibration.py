@@ -56,7 +56,7 @@ def calibration_metadata_from_df(session_metadata, calibration_metadata_df):
     return calibration_metadata
 
 
-def anipose_calibrate(vid_list, cam_names, calibration_metadata):
+def anipose_calibrate(vid_list, cam_names, calibration_metadata, manual_verify=False):
     '''
 
     :param vid_list:
@@ -72,10 +72,10 @@ def anipose_calibrate(vid_list, cam_names, calibration_metadata):
     calibration_path, _ = os.path.split(vid_list[0])
 
     if calibration_metadata['board_type'].lower() in ['chessboard', 'checkerboard']:
-        board = Checkerboard(calibration_metadata['nrows'], calibration_metadata['ncols'],square_length=calibration_metadata['square_length'])
+        board = Checkerboard(calibration_metadata['nrows'], calibration_metadata['ncols'], square_length=calibration_metadata['square_length'], manually_verify=manual_verify)
     elif calibration_metadata['board_type'].lower() in ['charuco']:
         board = CharucoBoard(calibration_metadata['nrows'], calibration_metadata['ncols'],
-                             square_length=calibration_metadata['square_length'], marker_length=calibration_metadata['marker_length'])
+                             square_length=calibration_metadata['square_length'], marker_length=calibration_metadata['marker_length'], manually_verify=manual_verify)
 
     ncams = len(vid_list)
     cgroup = CameraGroup.from_names(cam_names)
@@ -876,6 +876,9 @@ def crop_calibration_video(calib_vid, calibration_metadata_df, calib_crop_top=10
     cc_metadata = navigation_utilities.parse_camera_calibration_video_name(calib_vid)
 
     session_date = cc_metadata['time'].date()
+
+    # todo: calibrate the camera and undistort the videos prior to cropping, then don't allow calculation of distortion
+    # coefficients, etc. during calibration with anipose
     crop_params_dict = crop_videos.crop_params_dict_from_df(calibration_metadata_df, session_date, cc_metadata['boxnum'])
 
     cropped_vid_names = []
@@ -886,6 +889,11 @@ def crop_calibration_video(calib_vid, calibration_metadata_df, calib_crop_top=10
         calibration_crop_params_dict = crop_params_dict
 
         for key in calibration_crop_params_dict:
+            if 'mirror' in key:
+                # if this is one of the mirror views, the cropped video should be flipped left to right
+                fliplr = True
+            else:
+                fliplr = False
             calibration_crop_params_dict[key][2] = calib_crop_top
 
             full_cropped_vid_name = navigation_utilities.create_cropped_calib_vid_name(calib_vid, key, calibration_crop_params_dict)
@@ -894,7 +902,12 @@ def crop_calibration_video(calib_vid, calibration_metadata_df, calib_crop_top=10
                 # skip if already cropped
                 continue
 
-            crop_videos.crop_video(calib_vid, full_cropped_vid_name, calibration_crop_params_dict[key], key, filtertype=filtertype)
+            crop_videos.crop_video(calib_vid,
+                                   full_cropped_vid_name,
+                                   calibration_crop_params_dict[key],
+                                   key,
+                                   filtertype=filtertype,
+                                   fliplr=fliplr)
 
     return cropped_vid_names
 

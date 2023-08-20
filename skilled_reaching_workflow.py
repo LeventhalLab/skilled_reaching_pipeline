@@ -198,7 +198,12 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
                            shutil.move(pickle_file, new_dir)
 
 
-def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, calibration_metadata_df, vidtype='.avi'):
+def calibrate_all_sessions(calibration_vids_parent,
+                           calibration_files_parent,
+                           calibration_metadata_df,
+                           vidtype='.avi',
+                           view_list=['direct', 'leftmirror', 'rightmirror'],
+                           filtertype='h264'):
     '''
     loop through all folders containing calibration videos and store calibration parameters
     :param calibration_vids_parent:
@@ -220,7 +225,9 @@ def calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, ca
         orig_im_size = []
         cropped_vid_names = []
         for calib_vid in calib_vids:
-            cropped_vid_names.append(skilled_reaching_calibration.crop_calibration_video(calib_vid, calibration_metadata_df))
+            current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(calib_vid, calibration_metadata_df, filtertype=filtertype)
+
+            cropped_vid_names.append(current_cropped_calibration_vids)
             vid_obj = cv2.VideoCapture(calib_vid)
             orig_im_size.append((int(vid_obj.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_obj.get(cv2.CAP_PROP_FRAME_WIDTH))))
             vid_obj.release()
@@ -293,6 +300,7 @@ if __name__ == '__main__':
     # step 1: preprocess videos to extract left mirror, right mirror, and direct views
 
     view_list = ('direct', 'leftmirror', 'rightmirror')
+    filtertype = 'h264'
 
     # parameters for cropping
     crop_params_dict = {
@@ -369,7 +377,11 @@ if __name__ == '__main__':
     for expt in experiment_list:
         calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
         calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
-        calibrate_all_sessions(calibration_vids_parents[expt], calibration_files_parents[expt], calibration_metadata_df)
+        calibrate_all_sessions(calibration_vids_parents[expt],
+                               calibration_files_parents[expt],
+                               calibration_metadata_df,
+                               view_list=view_list,
+                               filtertype=filtertype)
 
     for expt in experiment_list:
         rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])

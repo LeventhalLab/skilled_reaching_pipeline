@@ -1153,7 +1153,7 @@ def find_calibration_vid_folders(calibration_parent):
     return month_folders
 
 
-def create_cropped_calib_vid_name(full_calib_vid_name, crop_view, crop_params_dict):
+def create_cropped_calib_vid_name(full_calib_vid_name, crop_view, crop_params_dict, fliplr):
     '''
 
     :param full_calib_vid_name: full name of calibration video
@@ -1171,7 +1171,11 @@ def create_cropped_calib_vid_name(full_calib_vid_name, crop_view, crop_params_di
 
     cp_strings = [str(cp) for cp in crop_params_dict[crop_view]]
     cp_joined = '-'.join(cp_strings)
-    cropped_vid_name = vid_name + '_' + crop_view + '_' + cp_joined + ext
+
+    cropped_vid_name = vid_name + '_' + crop_view + '_' + cp_joined
+    if fliplr:
+        cropped_vid_name = cropped_vid_name + '_fliplr'
+    cropped_vid_name = cropped_vid_name + ext
 
     full_cropped_vid_name = os.path.join(full_cropped_path, cropped_vid_name)
 

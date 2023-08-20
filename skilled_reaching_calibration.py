@@ -896,7 +896,7 @@ def crop_calibration_video(calib_vid, calibration_metadata_df, calib_crop_top=10
                 fliplr = False
             calibration_crop_params_dict[key][2] = calib_crop_top
 
-            full_cropped_vid_name = navigation_utilities.create_cropped_calib_vid_name(calib_vid, key, calibration_crop_params_dict)
+            full_cropped_vid_name = navigation_utilities.create_cropped_calib_vid_name(calib_vid, key, calibration_crop_params_dict, fliplr)
             cropped_vid_names.append(full_cropped_vid_name)
             if os.path.isfile(full_cropped_vid_name):
                 # skip if already cropped

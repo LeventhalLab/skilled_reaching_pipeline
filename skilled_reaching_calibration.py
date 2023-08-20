@@ -71,6 +71,12 @@ def anipose_calibrate(vid_list, cam_names, calibration_metadata, manual_verify=F
 
     calibration_path, _ = os.path.split(vid_list[0])
 
+
+    cal_name = '_'.join(['calibration',
+                         'box{:02d}'.format(calibration_metadata['boxnum']),
+                         '{}.toml'.format(calibration_metdata['time'].strftime('%Y%m%d-%H-%M-%S'))])
+    cal_name = os.path.join(calibration_path, cal_name)
+
     if calibration_metadata['board_type'].lower() in ['chessboard', 'checkerboard']:
         board = Checkerboard(calibration_metadata['nrows'], calibration_metadata['ncols'], square_length=calibration_metadata['square_length'], manually_verify=manual_verify)
     elif calibration_metadata['board_type'].lower() in ['charuco']:
@@ -86,7 +92,6 @@ def anipose_calibrate(vid_list, cam_names, calibration_metadata, manual_verify=F
         vid_list = [[vid_name] for vid_name in vid_list]
     cgroup.calibrate_videos(vid_list, board)
 
-    cal_name = os.path.join(calibration_path, 'calibration.toml')
     cgroup.dump(cal_name)
 
     pass

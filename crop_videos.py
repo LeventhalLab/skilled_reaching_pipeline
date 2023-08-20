@@ -89,6 +89,11 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
             continue
 
         for i_view, view_name in enumerate(view_list):
+            if 'rightmirror' in view_name:
+                fliplr = True
+            else:
+                fliplr = False
+
             current_crop_params = crop_params_dict[view_name]
             dest_folder = cropped_video_directories[i_view][i_path]
             if not os.path.isdir(dest_folder):
@@ -97,7 +102,7 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
             for full_vid_path in vids_list:
                 # todo: calibrate the camera and undistort the videos prior to cropping, then don't allow calculation of distortion
                 # coefficients, etc. during calibration with anipose
-                dest_name = cropped_vid_name(full_vid_path, dest_folder, view_name, current_crop_params)
+                dest_name = cropped_vid_name(full_vid_path, dest_folder, view_name, current_crop_params, fliplr=fliplr)
 
                 # if video was already cropped, skip it
                 if os.path.exists(dest_name):
@@ -105,12 +110,12 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
                     print(dest_fname + ' already exists, skipping')
                     continue
                 else:
-                    crop_video(full_vid_path, dest_name, current_crop_params, view_name, filtertype=filtertype)
+                    crop_video(full_vid_path, dest_name, current_crop_params, view_name, filtertype=filtertype, fliplr=fliplr)
 
     return cropped_video_directories
 
 
-def cropped_vid_name(full_vid_path, dest_folder, view_name, crop_params):
+def cropped_vid_name(full_vid_path, dest_folder, view_name, crop_params, fliplr=False):
     """
     function to return the name to be used for the cropped video
     :param full_vid_path:
@@ -134,7 +139,10 @@ def cropped_vid_name(full_vid_path, dest_folder, view_name, crop_params):
     if not os.path.isdir(dest_folder):
         os.makedirs(dest_folder)
 
-    dest_name = vid_name + '_' + view_name + '_' + crop_params_str + vid_ext
+    dest_name = vid_name + '_' + view_name + '_' + crop_params_str
+    if fliplr:
+        dest_name = dest_name + '_fliplr'
+    dest_name = dest_name + vid_ext
 
     full_dest_name = os.path.join(dest_folder, dest_name)
 

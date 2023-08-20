@@ -80,6 +80,10 @@ def anipose_calibrate(vid_list, cam_names, calibration_metadata):
     ncams = len(vid_list)
     cgroup = CameraGroup.from_names(cam_names)
 
+    # weird thing about anipose - they want a list of lists of videos (i.e., vid_list = [[vid1], [vid2], vid3], ...],
+    # NOT vid_list = [vid1, vid2, vid3,...]
+    if isinstance(vid_list[0], str):
+        vid_list = [[vid_name] for vid_name in vid_list]
     cgroup.calibrate_videos(vid_list, board)
 
     cal_name = os.path.join(calibration_path, 'calibration.toml')

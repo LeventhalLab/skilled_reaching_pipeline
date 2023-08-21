@@ -43,7 +43,10 @@ def calibration_metadata_from_df(session_metadata, calibration_metadata_df):
                                           (calibration_metadata_df['date'] == session_metadata['time'].date())]
 
     if len(session_row) == 1:
-        calibration_metadata['nrows'] = int(session_row['nrows'].values[0])
+        try:
+            calibration_metadata['nrows'] = int(session_row['nrows'].values[0])
+        except:
+            pass
         calibration_metadata['ncols'] = int(session_row['ncols'].values[0])
         calibration_metadata['square_length'] = session_row['square_length'].values[0]
         calibration_metadata['marker_length'] = session_row['marker_length'].values[0]

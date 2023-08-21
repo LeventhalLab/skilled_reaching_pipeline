@@ -52,6 +52,13 @@ def read_crop_params_csv(crop_params_filepath):
     return crop_params_df
 
 
+def read_session_metadata_xlsx(session_metadata_xlsx_path):
+
+    calibration_metadata_df = pd.read_excel(session_metadata_xlsx_path)
+
+    pass
+
+
 def read_calibration_metadata_csv(calibration_metadata_csv_path):
     '''
 

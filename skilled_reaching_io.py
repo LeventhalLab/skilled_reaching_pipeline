@@ -54,9 +54,17 @@ def read_crop_params_csv(crop_params_filepath):
 
 def read_session_metadata_xlsx(session_metadata_xlsx_path):
 
-    calibration_metadata_df = pd.read_excel(session_metadata_xlsx_path)
+    xl = pd.ExcelFile(session_metadata_xlsx_path)
+    sheet_names = xl.sheet_names
+    # the sheet names should be 'R0XXX' - should all be in the format of rat IDs; if it's not, ignore it
+    xl_ratIDs = [sn for sn in sheet_names if sn[0] == 'R' and len(sn) == 5]
 
-    pass
+    cal_metadata = dict.fromkeys(xl_ratIDs)
+
+    for ratID in xl_ratIDs:
+        cal_metadata[ratID] = pd.read_excel(session_metadata_xlsx_path, sheet_name=ratID)
+
+    return cal_metadata
 
 
 def read_calibration_metadata_csv(calibration_metadata_csv_path):

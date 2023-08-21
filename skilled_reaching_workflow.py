@@ -226,7 +226,10 @@ def calibrate_all_sessions(calibration_vids_parent,
         cropped_vid_names = []
         for calib_vid in calib_vids:
             current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(calib_vid, calibration_metadata_df, filtertype=filtertype)
-
+            if current_cropped_calibration_vids is None:
+                # crop_calibration_video returns None if there isn't an associated rat session for the calibration video
+                continue
+                
             cropped_vid_names.append(current_cropped_calibration_vids)
             vid_obj = cv2.VideoCapture(calib_vid)
             orig_im_size.append((int(vid_obj.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_obj.get(cv2.CAP_PROP_FRAME_WIDTH))))
@@ -375,9 +378,9 @@ if __name__ == '__main__':
                             for expt in experiment_list}
 
     for expt in experiment_list:
-        calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
+        # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
         session_metadata_xlsx_path = os.path.join(video_root_folders[expt], 'SR_video_session_metadata.xlsx')
-        calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
+        # calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
         calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
         calibrate_all_sessions(calibration_vids_parents[expt],
                                calibration_files_parents[expt],

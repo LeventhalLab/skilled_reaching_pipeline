@@ -879,7 +879,46 @@ def verify_checkerboard_points(calibration_vids, calibration_data):
         vid_obj.release()
 
 
-def crop_calibration_video(calib_vid, calibration_metadata_df, calib_crop_top=100, filtertype=''):
+def crop_params_dict_from_ratcal_metadata(cal_vid_path, ratcal_metadata, view_list=['direct', 'leftmirror', 'rightmirror']):
+
+    # find the calibration video name in the table of sessions
+    ratIDs = list(ratcal_metadata.keys())
+    _, cal_vid_name = os.path.split(cal_vid_path)
+
+    crop_params_dict = None
+
+    for ratID in ratIDs:
+        # loop through each rat database. If the calibration video is used for this rat, use the same cropping coordinates
+        # as we will use for the rat videos for this session
+        current_df = ratcal_metadata[ratID]
+
+        session_row = current_df[(current_df['cal_vid_name'] == cal_vid_name)]
+
+        if session_row.shape[0] == 1:
+            crop_params_dict = dict.fromkeys(view_list, None)
+            for view in view_list:
+                left_edge = session_row[view + '_left'].values[0]
+                right_edge = session_row[view + '_right'].values[0]
+                top_edge = session_row[view + '_top'].values[0]
+                bot_edge = session_row[view + '_bottom'].values[0]
+
+                if any([pd.isna(left_edge), pd.isna(right_edge), pd.isna(top_edge), pd.isna(bot_edge)]):
+                    crop_params_dict = {}
+                    break
+                else:
+                    crop_params_dict[view] = [left_edge,
+                                              right_edge,
+                                              top_edge,
+                                              bot_edge]
+
+    return crop_params_dict
+
+
+def crop_calibration_video(calib_vid,
+                           calibration_metadata_df,
+                           calib_crop_top=100,
+                           filtertype='',
+                           view_list=['direct', 'leftmirror', 'rightmirror']):
 
     cc_metadata = navigation_utilities.parse_camera_calibration_video_name(calib_vid)
 
@@ -887,6 +926,11 @@ def crop_calibration_video(calib_vid, calibration_metadata_df, calib_crop_top=10
 
     # todo: calibrate the camera and undistort the videos prior to cropping, then don't allow calculation of distortion
     # coefficients, etc. during calibration with anipose
+    crop_params_dict = crop_params_dict_from_ratcal_metadata(calib_vid, calibration_metadata_df, view_list=view_list)
+
+    if crop_params_dict is None:
+        return None
+
     crop_params_dict = crop_videos.crop_params_dict_from_df(calibration_metadata_df, session_date, cc_metadata['boxnum'])
 
     cropped_vid_names = []

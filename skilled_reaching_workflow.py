@@ -229,7 +229,7 @@ def calibrate_all_sessions(calibration_vids_parent,
             if current_cropped_calibration_vids is None:
                 # crop_calibration_video returns None if there isn't an associated rat session for the calibration video
                 continue
-                
+
             cropped_vid_names.append(current_cropped_calibration_vids)
             vid_obj = cv2.VideoCapture(calib_vid)
             orig_im_size.append((int(vid_obj.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_obj.get(cv2.CAP_PROP_FRAME_WIDTH))))

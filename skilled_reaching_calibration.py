@@ -20,6 +20,7 @@ from aniposelib.boards import CharucoBoard, Checkerboard
 from aniposelib.cameras import Camera, CameraGroup
 from aniposelib.utils import load_pose2d_fnames
 from random import randint
+import pandas as pd
 import matplotlib
 matplotlib.use('TKAgg')
 

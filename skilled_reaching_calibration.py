@@ -14,6 +14,7 @@ import numpy as np
 import random
 import cv2
 import glob
+from tqdm import trange
 import computer_vision_basics as cvb
 import skilled_reaching_io
 from boards import CharucoBoard, Checkerboard
@@ -1417,8 +1418,8 @@ def detect_video_pts(calibration_video, board, skip=20, progress=True):
         if framenum % skip != 0 and go <= 0:
             continue
 
-            detect_markers(frame, board)
-            corners, ids = detect_image(frame)
+        detect_markers(frame, board)
+        corners, ids = detect_image(frame)
 
 
 def detect_image(image, board, subpix=True):

@@ -262,7 +262,7 @@ def calibrate_all_sessions(calibration_vids_parent,
 
 if __name__ == '__main__':
 
-    board = skilled_reaching_calibration.create_charuco(5,4,12,8)
+
     experiment_list = ['dLightPhotometry', 'sr6OHDA']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
@@ -378,7 +378,14 @@ if __name__ == '__main__':
                             }
                             for expt in experiment_list}
 
-    skilled_reaching_calibration.write_charuco_image(board, 300, calibration_vids_parents['dLightPhotometry'])
+    # use the function below to write a charuco board to a file
+    # 12 columns, 6 rows, square_length=20, marker_length=15
+    board = skilled_reaching_calibration.create_charuco(12,6,20,15)
+    # skilled_reaching_calibration.write_charuco_image(board, 600, calibration_vids_parents['dLightPhotometry'])
+
+    test_cal_vid = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\test_calibration\GridCalibration_box01_20230822_14-08-47.avi'
+
+    skilled_reaching_calibration.calibrate_single_camera(test_cal_vid, board)
 
     for expt in experiment_list:
         # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')

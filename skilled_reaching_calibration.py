@@ -60,7 +60,7 @@ def calibration_metadata_from_df(session_metadata, calibration_metadata_df):
     return calibration_metadata
 
 
-def anipose_calibrate(vid_list, cam_names, calibration_metadata, manual_verify=False):
+def anipose_calibrate_3d(vid_list, cam_names, calibration_metadata, manual_verify=False):
     '''
 
     :param vid_list:
@@ -941,21 +941,23 @@ def write_charuco_image(board, dpi, calib_dir, units='mm'):
                       '{:d}'.format(board.marker_length),
                       'DICT',
                       '{:d}x{:d}'.format(marker_bits, marker_bits),
-                      '{:d}.tiff'.format(dict_size)])
+                      '{:d}'.format(dict_size),
+                      '{:d}dpi.tiff'.format(dpi)])
     fname = os.path.join(calib_dir, fname)
 
-    if units.lower == 'mm':
+    if units.lower() == 'mm':
         cf = 25.4
-    elif units.lower == 'cm':
+    elif units.lower() == 'cm':
         cf = 2.54
-    elif units.lower in ['inch', 'inches']:
+    elif units.lower() in ['inch', 'inches']:
         cf = 1.
 
-    xpixels = dpi * x_total / cf
-    ypixels = dpi * y_total / cf
+    xpixels = round(dpi * x_total / cf)
+    ypixels = round(dpi * y_total / cf)
 
     img = board.board.generateImage((xpixels,ypixels))
 
+    cv2.imwrite(fname, img)
     pass
 
 
@@ -1378,6 +1380,73 @@ def create_cal_frame_figure(width, height, ax3d=None, scale=1.0, dpi=100, nrows=
         axs.append(ax_row)
 
     return fig, axs
+
+
+def calibrate_single_camera(cal_vid, board, skip=20):
+
+    detect_video_pts(cal_vid, board, skip=skip)
+    rows = board.detect_video(cal_vid, prefix=None, skip=skip, progress=True)
+
+    pass
+
+
+def detect_video_pts(calibration_video, board, skip=20, progress=True):
+    # adapted from anipose
+    cap = cv2.VideoCapture(calibration_video)
+
+    if not cap.isOpened():
+        raise FileNotFoundError(f'missing video file "{calibration_video}"')
+
+    length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if length < 10:
+        length = int(1e9)
+        progress = False
+    rows = []
+
+    go = int(skip / 2)
+
+    if progress:
+        it = trange(length, ncols=70)
+    else:
+        it = range(length)
+
+    for framenum in it:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        if framenum % skip != 0 and go <= 0:
+            continue
+
+            detect_markers(frame, board)
+            corners, ids = detect_image(frame)
+
+
+def detect_image(image, board, subpix=True):
+    # adapted from anipose
+    if len(image.shape) == 3:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = image
+
+    size = (board.squaresX, board.squaresY)
+
+    pattern_was_found, corners = cv2.findChessboardCorners(gray, size, self.DETECT_PARAMS)
+
+    if corners is not None:
+
+        if subpix:
+            corners = cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), self.SUBPIX_CRITERIA)
+
+def detect_markers(image, board, camera=None, refine=True):
+    if len(image.shape) == 3:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = image
+
+    params = aruco.DectectorParameters()
+
+    pass
+
 
 
 def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directories, num_frames_for_intrinsics=50, min_frames_for_intrinsics=10, num_frames_for_stereo=20, min_frames_for_stereo=5, use_undistorted_pts_for_stereo_cal=True):

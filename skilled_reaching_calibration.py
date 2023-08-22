@@ -13,6 +13,7 @@ import csv
 import numpy as np
 import random
 import cv2
+from cv2 import aruco
 import glob
 from tqdm import trange
 import computer_vision_basics as cvb

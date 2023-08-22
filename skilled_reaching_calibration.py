@@ -1445,8 +1445,19 @@ def detect_markers(image, board, camera=None, refine=True):
     else:
         gray = image
 
-    params = aruco.DectectorParameters()
 
+    params = aruco.DetectorParameters()
+
+    # values taken from anipose detect_markers function in board class
+    params.cornerRefinementMethod = aruco.CORNER_REFINE_CONTOUR
+    params.adaptiveThreshWinSizeMin = 100
+    params.adaptiveThreshWinSizeMax = 700
+    params.adaptiveThreshWinSizeStep = 50
+    params.adaptiveThreshConstant = 0
+
+    detector = aruco.ArucoDetector(board.dictionary, params)
+
+    corners, ids, rejectedImgPoints = detector.detectMarkers(gray)
     pass
 
 

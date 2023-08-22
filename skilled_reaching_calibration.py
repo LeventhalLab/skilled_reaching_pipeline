@@ -16,7 +16,7 @@ import cv2
 import glob
 import computer_vision_basics as cvb
 import skilled_reaching_io
-from aniposelib.boards import CharucoBoard, Checkerboard
+from boards import CharucoBoard, Checkerboard
 from aniposelib.cameras import Camera, CameraGroup
 from aniposelib.utils import load_pose2d_fnames
 from random import randint
@@ -914,6 +914,50 @@ def crop_params_dict_from_ratcal_metadata(cal_vid_path, ratcal_metadata, view_li
 
     return crop_params_dict
 
+def create_charuco(squaresX, squaresY, square_length, marker_length, marker_bits=4, dict_size=50, aruco_dict=None, manually_verify=False):
+
+    board = CharucoBoard(squaresX, squaresY, square_length, marker_length,
+                         marker_bits=marker_bits,
+                         dict_size=dict_size,
+                         aruco_dict=aruco_dict,
+                         manually_verify=manually_verify)
+
+    return board
+
+
+def write_charuco_image(board, dpi, calib_dir, units='mm'):
+
+    x_total = int(board.squaresX * board.square_length)
+    y_total = int(board.squaresY * board.square_length)
+
+    board_dict = board.board.getDictionary()
+    dict_size = board_dict.bytesList.shape[0]
+    marker_bits = board_dict.markerSize
+
+    fname = '_'.join(['charuco',
+                      '{:d}x{:d}'.format(y_total, x_total),
+                      '{:d}x{:d}'.format(board.squaresY, board.squaresX),
+                      '{:d}'.format(board.square_length),
+                      '{:d}'.format(board.marker_length),
+                      'DICT',
+                      '{:d}x{:d}'.format(marker_bits, marker_bits),
+                      '{:d}.tiff'.format(dict_size)])
+    fname = os.path.join(calib_dir, fname)
+
+    if units.lower == 'mm':
+        cf = 25.4
+    elif units.lower == 'cm':
+        cf = 2.54
+    elif units.lower in ['inch', 'inches']:
+        cf = 1.
+
+    xpixels = dpi * x_total / cf
+    ypixels = dpi * y_total / cf
+
+    img = board.board.generateImage((xpixels,ypixels))
+
+    pass
+
 
 def crop_calibration_video(calib_vid,
                            calibration_metadata_df,
@@ -932,7 +976,7 @@ def crop_calibration_video(calib_vid,
     if crop_params_dict is None:
         return None
 
-    crop_params_dict = crop_videos.crop_params_dict_from_df(calibration_metadata_df, session_date, cc_metadata['boxnum'])
+    # crop_params_dict = crop_videos.crop_params_dict_from_df(calibration_metadata_df, session_date, cc_metadata['boxnum'])
 
     cropped_vid_names = []
     if crop_params_dict:

@@ -262,6 +262,7 @@ def calibrate_all_sessions(calibration_vids_parent,
 
 if __name__ == '__main__':
 
+    board = skilled_reaching_calibration.create_charuco(5,4,12,8)
     experiment_list = ['dLightPhotometry', 'sr6OHDA']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
@@ -376,6 +377,8 @@ if __name__ == '__main__':
                                 'trajectories_parent': trajectories_parents[expt]
                             }
                             for expt in experiment_list}
+
+    skilled_reaching_calibration.write_charuco_image(board, 300, calibration_vids_parents['dLightPhotometry'])
 
     for expt in experiment_list:
         # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')

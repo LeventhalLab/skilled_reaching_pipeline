@@ -1469,7 +1469,9 @@ def detect_markers(image, board, camera=None, refine=True):
     ch_detector = aruco.CharucoDetector(board.board)
     ar_detector = aruco.ArucoDetector(board.board.getDictionary())
 
+    markerCorners, markerIds, rejectedImgPoints = ar_detector.detectMarkers(gray, markerCorners=markerCorners, markerIds=markerIds)
     # corners, ids, rejectedImgPoints = detector.detectMarkers(gray)
+
     charucoCorners, charucoIds, markerCorners, markerIds  = ch_detector.detectBoard(gray)
     charuco_img = aruco.drawDetectedCornersCharuco(gray, charucoCorners, charucoIds, (255, 0, 0))
     if refine:

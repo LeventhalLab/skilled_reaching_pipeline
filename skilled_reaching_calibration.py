@@ -1439,6 +1439,16 @@ def detect_image(image, board, subpix=True):
         if subpix:
             corners = cv2.cornerSubPix(gray, corners, (3, 3), (-1, -1), self.SUBPIX_CRITERIA)
 
+def CharucoBoardObject_from_AniposeBoard(board):
+    # to create a CharucoDetector object need an aruco.CharucoBoard object
+    ch_board = aruco.CharucoBoard((board.squaresX, board.squaresY),
+                                   board.square_length,
+                                   board.marker_length,
+                                   board.dictionary)
+
+    return ch_board
+
+
 def detect_markers(image, board, camera=None, refine=True):
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -1455,9 +1465,24 @@ def detect_markers(image, board, camera=None, refine=True):
     params.adaptiveThreshWinSizeStep = 50
     params.adaptiveThreshConstant = 0
 
-    detector = aruco.ArucoDetector(board.dictionary, params)
+    # ch_board = CharucoBoardObject_from_AniposeBoard(board)
+    ch_detector = aruco.CharucoDetector(board.board)
+    ar_detector = aruco.ArucoDetector(board.board.getDictionary())
 
-    corners, ids, rejectedImgPoints = detector.detectMarkers(gray)
+    # corners, ids, rejectedImgPoints = detector.detectMarkers(gray)
+    charucoCorners, charucoIds, markerCorners, markerIds  = ch_detector.detectBoard(gray)
+    charuco_img = aruco.drawDetectedCornersCharuco(gray, charucoCorners, charucoIds, (255, 0, 0))
+    if refine:
+        # detectedCorners, detectedIds, rejectedCorners, recoveredIdxs = \
+        #     aruco.refineDetectedMarkers(gray, board.board, charucoCorners, charucoIds,
+        #                                 rejectedImgPoints,
+        #                                 K, D,
+        #                                 parameters=params)
+        detectedCorners, detectedIds, rejectedCorners = ar_detector.refineDetectedMarkers(gray, board.board, charucoCorners, charucoIds)
+    else:
+        detectedCorners, detectedIds = corners, ids
+
+    return detectedCorners, detectedIds
     pass
 
 

@@ -380,7 +380,7 @@ if __name__ == '__main__':
 
     # use the function below to write a charuco board to a file
     # 12 columns, 6 rows, square_length=20, marker_length=15
-    board = skilled_reaching_calibration.create_charuco(12,6,20,15)
+    board = skilled_reaching_calibration.create_charuco(6,12,20,15)
     # skilled_reaching_calibration.write_charuco_image(board, 600, calibration_vids_parents['dLightPhotometry'])
 
     test_cal_vid = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\test_calibration\GridCalibration_box01_20230822_14-08-47.avi'

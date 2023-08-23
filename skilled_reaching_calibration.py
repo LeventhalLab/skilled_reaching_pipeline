@@ -1392,7 +1392,7 @@ def calibrate_single_camera(cal_vid, board, skip=20):
     pass
 
 
-def detect_video_pts(calibration_video, board, skip=20, progress=True):
+def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=True):
     # adapted from anipose
     cap = cv2.VideoCapture(calibration_video)
 
@@ -1419,8 +1419,25 @@ def detect_video_pts(calibration_video, board, skip=20, progress=True):
         if framenum % skip != 0 and go <= 0:
             continue
 
-        detect_markers(frame, board)
-        corners, ids = detect_image(frame)
+        charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame, board)
+
+        if charucoCorners is not None and len(charucoCorners) > 0:
+            if prefix is None:
+                key = framenum
+            else:
+                key = (prefix, framenum)
+            go = int(skip / 2)
+            row = {'framenum': key, 'corners': charucoCorners, 'ids': charucoIds}
+            rows.append(row)
+
+        go = max(0, go - 1)
+
+    cap.release()
+
+    for row in rows:
+        row['filled'] = self.fill_points(row['corners'], row['ids'])
+
+
 
 
 def detect_image(image, board, subpix=True):
@@ -1465,27 +1482,27 @@ def detect_markers(image, board, camera=None, refine=True):
     params.adaptiveThreshWinSizeStep = 50
     params.adaptiveThreshConstant = 0
 
-    # ch_board = CharucoBoardObject_from_AniposeBoard(board)
     ch_detector = aruco.CharucoDetector(board.board)
     ar_detector = aruco.ArucoDetector(board.board.getDictionary())
 
-    markerCorners, markerIds, rejectedImgPoints = ar_detector.detectMarkers(gray, markerCorners=markerCorners, markerIds=markerIds)
-    # corners, ids, rejectedImgPoints = detector.detectMarkers(gray)
+    markerCorners, markerIds, rejectedImgPoints = ar_detector.detectMarkers(gray)
 
-    charucoCorners, charucoIds, markerCorners, markerIds  = ch_detector.detectBoard(gray)
-    charuco_img = aruco.drawDetectedCornersCharuco(gray, charucoCorners, charucoIds, (255, 0, 0))
+    # marker_img = aruco.drawDetectedMarkers(gray, markerCorners, markerIds)
+
     if refine:
         # detectedCorners, detectedIds, rejectedCorners, recoveredIdxs = \
         #     aruco.refineDetectedMarkers(gray, board.board, charucoCorners, charucoIds,
         #                                 rejectedImgPoints,
         #                                 K, D,
         #                                 parameters=params)
-        detectedCorners, detectedIds, rejectedCorners = ar_detector.refineDetectedMarkers(gray, board.board, charucoCorners, charucoIds)
+        detectedCorners, detectedIds, rejectedCorners, recoveredIdxs = ar_detector.refineDetectedMarkers(gray, board.board, markerCorners, markerIds, rejectedImgPoints)
     else:
-        detectedCorners, detectedIds = corners, ids
+        detectedCorners, detectedIds = markerCorners, markerIds
 
-    return detectedCorners, detectedIds
-    pass
+    charucoCorners, charucoIds, markerCorners, markerIds  = ch_detector.detectBoard(gray, markerCorners=markerCorners, markerIds=markerIds)
+    # charuco_img = aruco.drawDetectedCornersCharuco(gray, charucoCorners, charucoIds, (255, 0, 0))
+
+    return charucoCorners, charucoIds, markerCorners, markerIds
 
 
 

@@ -5,6 +5,7 @@ import numpy as np
 import scipy.io as sio
 import navigation_utilities
 import os
+import toml
 
 
 def read_rat_db(parent_directories, rat_db_fname):
@@ -85,6 +86,11 @@ def read_calibration_metadata_csv(calibration_metadata_csv_path):
     calibration_metadata_df['date'] = pd.to_datetime(calibration_metadata_df['date'], infer_datetime_format=True).dt.date
 
     return calibration_metadata_df
+
+
+def write_toml(filename, data):
+    with open(filename, 'w') as f:
+        toml.dump(data, f)
 
 
 def read_pickle(filename):

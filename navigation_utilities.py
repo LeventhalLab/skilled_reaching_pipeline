@@ -1153,6 +1153,25 @@ def find_calibration_vid_folders(calibration_parent):
     return month_folders
 
 
+def create_cam_cal_toml_name(cam_cal_vid_name, parent_directories):
+
+    _, vid_name = os.path.split(cam_cal_vid_name)
+    vid_name, _ = os.path.splitext(vid_name)
+    toml_name = vid_name + '.toml'
+
+    full_toml_path = os.path.join(parent_directories)
+
+def find_camera_calibration_file(cam_cal_vid_name, parent_directories):
+
+    cal_metadata = parse_camera_calibration_video_name(cam_cal_vid_name)
+    full_cam_cal_vid_name = os.path.join(parent_directories['calibration_vids_parent'], cam_cal_vid_name)
+
+    if not os.path.exists(full_cam_cal_vid_name):
+        return None
+
+    return full_cam_cal_vid_name
+
+
 def create_cropped_calib_vid_name(full_calib_vid_name, crop_view, crop_params_dict, fliplr):
     '''
 

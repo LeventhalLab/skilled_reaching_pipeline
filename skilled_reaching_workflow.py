@@ -198,25 +198,45 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
                            shutil.move(pickle_file, new_dir)
 
 
-def calibrate_all_sessions(calibration_vids_parent,
-                           calibration_files_parent,
+def calibrate_all_sessions(parent_directories,
                            calibration_metadata_df,
                            vidtype='.avi',
                            view_list=['direct', 'leftmirror', 'rightmirror'],
                            filtertype='h264'):
     '''
     loop through all folders containing calibration videos and store calibration parameters
-    :param calibration_vids_parent:
-    :param calibration_files_parent:
+    :param parent_directories:
     :param crop_params_df: dataframe containing cropping parameters for each box-date
     :param cb_size:
     :return:
     '''
 
+    calibration_vids_parent = parent_directories['calibration_vids_parent']
+    calibration_files_parent = parent_directories['calibration_files_parent']
+
     if vidtype[0] != '.':
         vidtype = '.' + vidtype
 
     calib_vid_folders = navigation_utilities.find_calibration_vid_folders(calibration_vids_parent)
+
+    ratIDs = list(calibration_metadata_df.keys())
+
+    for ratID in ratIDs:
+        rat_metadata_df = calibration_metadata_df[ratID]
+
+        num_sessions = len(rat_metadata_df)
+
+        for i_session in range(num_sessions):
+            session_row = rat_metadata_df.iloc[[i_session]]
+
+            # calibrate the camera for this session
+            cam_cal_vid_name = session_row['cal_vid_name_camera'].values[0]
+            full_cam_cal_vid_path = navigation_utilities.find_camera_calibration_file(cam_cal_vid_name,
+                                                                                      parent_directories)
+            cam_cal_toml = navigation_utilities.create_cam_cal_toml_name(cam_cal_vid_name, parent_directories)
+            full_cam_cal_vid_path = navigation_utilities.find_camera_calibration_file(cam_cal_vid_name, parent_directories)
+
+        pass
 
     for cf in calib_vid_folders:
         # crop the calibration videos
@@ -383,17 +403,20 @@ if __name__ == '__main__':
     board = skilled_reaching_calibration.create_charuco(6,12,20,15)
     # skilled_reaching_calibration.write_charuco_image(board, 600, calibration_vids_parents['dLightPhotometry'])
 
-    test_cal_vid = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\test_calibration\GridCalibration_box01_20230823_18-40-45.avi'
-
-    ret, mtx, dist = skilled_reaching_calibration.calibrate_single_camera(test_cal_vid, board)
+    # test_cal_vid = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\test_calibration\GridCalibration_box01_20230823_18-40-45.avi'
+    #
+    # ret, mtx, dist = skilled_reaching_calibration.calibrate_single_camera(test_cal_vid, board)
 
     for expt in experiment_list:
+
+        # first, calibrate the cameras and write results into a .toml file
+
         # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
-        session_metadata_xlsx_path = os.path.join(video_root_folders[expt], 'SR_video_session_metadata.xlsx')
+        session_metadata_xlsx_path = os.path.join(video_root_folders[expt], 'SR_{}_video_session_metadata.xlsx'.format(expt))
         # calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
         calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
-        calibrate_all_sessions(calibration_vids_parents[expt],
-                               calibration_files_parents[expt],
+
+        calibrate_all_sessions(parent_directories[expt],
                                calibration_metadata_df,
                                view_list=view_list,
                                filtertype=filtertype)

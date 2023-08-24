@@ -618,7 +618,7 @@ def select_correct_essential_matrix():
 
 
 def calibrate_camera_from_video(camera_calibration_vid_name, calibration_parent, cb_size=(6, 9)):
-    criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+    CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO
 
     video_object = cv2.VideoCapture(camera_calibration_vid_name)
 
@@ -1385,11 +1385,20 @@ def create_cal_frame_figure(width, height, ax3d=None, scale=1.0, dpi=100, nrows=
 
 
 def calibrate_single_camera(cal_vid, board, skip=20):
+    CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO
 
-    detect_video_pts(cal_vid, board, skip=skip)
-    rows = board.detect_video(cal_vid, prefix=None, skip=skip, progress=True)
+    rows, size = detect_video_pts(cal_vid, board, skip=skip)
+    # size is (w, h)
+    # rows = board.detect_video(cal_vid, prefix=None, skip=skip, progress=True)
 
-    pass
+    objp, imgp = board.get_all_calibration_points(rows)
+    mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= 7]
+    objp, imgp = zip(*mixed)
+
+    # matrix = cv2.initCameraMatrix2D(objp, imgp, tuple(size))
+    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp, imgp, size, None, None, flags=CALIBRATION_FLAGS)
+
+    return ret, mtx, dist
 
 
 def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=True):
@@ -1400,6 +1409,10 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
         raise FileNotFoundError(f'missing video file "{calibration_video}"')
 
     length = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    size = (w, h)
+
     if length < 10:
         length = int(1e9)
         progress = False
@@ -1434,10 +1447,9 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
 
     cap.release()
 
-    for row in rows:
-        row['filled'] = self.fill_points(row['corners'], row['ids'])
+    rows = board.fill_points_rows(rows)
 
-
+    return rows, size
 
 
 def detect_image(image, board, subpix=True):

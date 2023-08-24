@@ -385,7 +385,7 @@ if __name__ == '__main__':
 
     test_cal_vid = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\test_calibration\GridCalibration_box01_20230823_18-40-45.avi'
 
-    skilled_reaching_calibration.calibrate_single_camera(test_cal_vid, board)
+    ret, mtx, dist = skilled_reaching_calibration.calibrate_single_camera(test_cal_vid, board)
 
     for expt in experiment_list:
         # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')

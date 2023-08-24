@@ -233,12 +233,21 @@ def calibrate_all_sessions(parent_directories,
             cam_cal_vid_name = session_row['cal_vid_name_camera'].values[0]
 
             cam_cal_toml = navigation_utilities.create_cam_cal_toml_name(cam_cal_vid_name, parent_directories)
+            if os.path.exists(cam_cal_toml):
+                continue
+
             cam_cal_toml_folder, _ = os.path.split(cam_cal_toml)
             if not os.path.exists(cam_cal_toml_folder):
                 os.makedirs(cam_cal_toml_folder)
             full_cam_cal_vid_path = navigation_utilities.find_camera_calibration_video(cam_cal_vid_name,
                                                                                        parent_directories)
 
+            board = skilled_reaching_calibration.camera_board_from_df(session_row)
+
+            ret, mtx, dist = skilled_reaching_calibration.calibrate_single_camera(full_cam_cal_vid_path, board)
+
+            # todo: write the results to a .toml file for use later, then change the cropping functions to undistort images first;
+            # alternatively, undistort after identifying points, which may be faster
             pass
 
         pass
@@ -405,7 +414,7 @@ if __name__ == '__main__':
 
     # use the function below to write a charuco board to a file
     # 12 columns, 6 rows, square_length=20, marker_length=15
-    board = skilled_reaching_calibration.create_charuco(6,12,20,15)
+    # board = skilled_reaching_calibration.create_charuco(6,12,20,15)
     # skilled_reaching_calibration.write_charuco_image(board, 600, calibration_vids_parents['dLightPhotometry'])
 
     # test_cal_vid = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\test_calibration\GridCalibration_box01_20230823_18-40-45.avi'

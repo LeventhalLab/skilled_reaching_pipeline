@@ -231,10 +231,15 @@ def calibrate_all_sessions(parent_directories,
 
             # calibrate the camera for this session
             cam_cal_vid_name = session_row['cal_vid_name_camera'].values[0]
-            full_cam_cal_vid_path = navigation_utilities.find_camera_calibration_file(cam_cal_vid_name,
-                                                                                      parent_directories)
+
             cam_cal_toml = navigation_utilities.create_cam_cal_toml_name(cam_cal_vid_name, parent_directories)
-            full_cam_cal_vid_path = navigation_utilities.find_camera_calibration_file(cam_cal_vid_name, parent_directories)
+            cam_cal_toml_folder, _ = os.path.split(cam_cal_toml)
+            if not os.path.exists(cam_cal_toml_folder):
+                os.makedirs(cam_cal_toml_folder)
+            full_cam_cal_vid_path = navigation_utilities.find_camera_calibration_video(cam_cal_vid_name,
+                                                                                       parent_directories)
+
+            pass
 
         pass
 

@@ -1155,16 +1155,31 @@ def find_calibration_vid_folders(calibration_parent):
 
 def create_cam_cal_toml_name(cam_cal_vid_name, parent_directories):
 
+    cal_metadata = parse_camera_calibration_video_name(cam_cal_vid_name)
+
     _, vid_name = os.path.split(cam_cal_vid_name)
     vid_name, _ = os.path.splitext(vid_name)
     toml_name = vid_name + '.toml'
 
-    full_toml_path = os.path.join(parent_directories)
+    month_folder = 'calibration_files_{}'.format(cal_metadata['time'].strftime('%Y%m'))
+    month_folder = os.path.join(parent_directories['calibration_files_parent'], month_folder)
+    single_cam_folder = 'single_camera_calibration_{}'.format(cal_metadata['time'].strftime('%Y%m'))
+    single_cam_folder = os.path.join(month_folder, single_cam_folder)
 
-def find_camera_calibration_file(cam_cal_vid_name, parent_directories):
+    full_toml_path = os.path.join(single_cam_folder, toml_name)
+
+    return full_toml_path
+
+
+def find_camera_calibration_video(cam_cal_vid_name, parent_directories):
 
     cal_metadata = parse_camera_calibration_video_name(cam_cal_vid_name)
-    full_cam_cal_vid_name = os.path.join(parent_directories['calibration_vids_parent'], cam_cal_vid_name)
+    month_folder = 'calibration_videos_{}'.format(cal_metadata['time'].strftime('%Y%m'))
+    month_folder = os.path.join(parent_directories['calibration_vids_parent'], month_folder)
+    single_cam_folder = 'single_camera_calibration_{}'.format(cal_metadata['time'].strftime('%Y%m'))
+    single_cam_folder = os.path.join(month_folder, single_cam_folder)
+
+    full_cam_cal_vid_name = os.path.join(single_cam_folder, cam_cal_vid_name)
 
     if not os.path.exists(full_cam_cal_vid_name):
         return None
@@ -1367,41 +1382,41 @@ def create_trajectory_filename(video_metadata):
     return trajectory_name
 
 
-def find_camera_calibration_video(video_metadata, calibration_parent):
-    """
-
-    :param video_metadata:
-    :param calibration_parent:
-    :return:
-    """
-    date_string = video_metadata['triggertime'].strftime('%Y%m%d')
-    year_folder = os.path.join(calibration_parent, date_string[0:4])
-    month_folder = os.path.join(year_folder, date_string[0:6] + '_calibration')
-    calibration_video_folder = os.path.join(month_folder, 'camera_calibration_videos_' + date_string[0:6])
-
-    test_name = 'CameraCalibration_box{:02d}_{}_*.mat'.format(video_metadata['boxnum'], date_string)
-    test_name = os.path.join(calibration_video_folder, test_name)
-
-    calibration_video_list = glob.glob(test_name)
-
-    if len(calibration_video_list) == 0:
-        sys.exit('No camera calibration video found for ' + video_metadata['video_name'])
-
-    if len(calibration_video_list) == 1:
-        return calibration_video_list[0]
-
-    # more than one potential video was found
-    # find the last relevant calibration video collected before the current reaching video
-    vid_times = []
-    for cal_vid in calibration_video_list:
-        cam_cal_md = parse_camera_calibration_video_name(cal_vid)
-        vid_times.append(cam_cal_md['time'])
-
-    last_time_prior_to_video = max(d for d in vid_times if d < video_metadata['triggertime'])
-
-    calibration_video_name = calibration_video_list[vid_times.index(last_time_prior_to_video)]
-
-    return calibration_video_name
+# def find_camera_calibration_video(video_metadata, calibration_parent):
+#     """
+#
+#     :param video_metadata:
+#     :param calibration_parent:
+#     :return:
+#     """
+#     date_string = video_metadata['triggertime'].strftime('%Y%m%d')
+#     year_folder = os.path.join(calibration_parent, date_string[0:4])
+#     month_folder = os.path.join(year_folder, date_string[0:6] + '_calibration')
+#     calibration_video_folder = os.path.join(month_folder, 'camera_calibration_videos_' + date_string[0:6])
+#
+#     test_name = 'CameraCalibration_box{:02d}_{}_*.mat'.format(video_metadata['boxnum'], date_string)
+#     test_name = os.path.join(calibration_video_folder, test_name)
+#
+#     calibration_video_list = glob.glob(test_name)
+#
+#     if len(calibration_video_list) == 0:
+#         sys.exit('No camera calibration video found for ' + video_metadata['video_name'])
+#
+#     if len(calibration_video_list) == 1:
+#         return calibration_video_list[0]
+#
+#     # more than one potential video was found
+#     # find the last relevant calibration video collected before the current reaching video
+#     vid_times = []
+#     for cal_vid in calibration_video_list:
+#         cam_cal_md = parse_camera_calibration_video_name(cal_vid)
+#         vid_times.append(cam_cal_md['time'])
+#
+#     last_time_prior_to_video = max(d for d in vid_times if d < video_metadata['triggertime'])
+#
+#     calibration_video_name = calibration_video_list[vid_times.index(last_time_prior_to_video)]
+#
+#     return calibration_video_name
 
 
 def parse_camera_calibration_video_name(calibration_video_name):

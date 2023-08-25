@@ -895,7 +895,7 @@ def crop_params_dict_from_ratcal_metadata(cal_vid_path, ratcal_metadata, view_li
         # as we will use for the rat videos for this session
         current_df = ratcal_metadata[ratID]
 
-        session_row = current_df[(current_df['cal_vid_name'] == cal_vid_name)]
+        session_row = current_df[(current_df['cal_vid_name_mirrors'] == cal_vid_name)]
 
         if session_row.shape[0] == 1:
             crop_params_dict = dict.fromkeys(view_list, None)
@@ -985,7 +985,6 @@ def write_charuco_image(board, dpi, calib_dir, units='mm'):
     img = board.board.generateImage((xpixels,ypixels))
 
     cv2.imwrite(fname, img)
-    pass
 
 
 def crop_calibration_video(calib_vid,

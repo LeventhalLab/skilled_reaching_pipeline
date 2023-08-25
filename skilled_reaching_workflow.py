@@ -221,6 +221,7 @@ def calibrate_all_sessions(parent_directories,
 
     ratIDs = list(calibration_metadata_df.keys())
 
+    # make sure all cameras have been calibrated
     for ratID in ratIDs:
         rat_metadata_df = calibration_metadata_df[ratID]
 
@@ -234,7 +235,8 @@ def calibrate_all_sessions(parent_directories,
 
             cam_cal_toml = navigation_utilities.create_cam_cal_toml_name(cam_cal_vid_name, parent_directories)
             if os.path.exists(cam_cal_toml):
-                continue
+                cam_intrinsics = skilled_reaching_io.read_toml(cam_cal_toml)
+                pass
 
             cam_cal_toml_folder, _ = os.path.split(cam_cal_toml)
             if not os.path.exists(cam_cal_toml_folder):
@@ -245,12 +247,12 @@ def calibrate_all_sessions(parent_directories,
             board = skilled_reaching_calibration.camera_board_from_df(session_row)
 
             ret, mtx, dist = skilled_reaching_calibration.calibrate_single_camera(full_cam_cal_vid_path, board)
+            cam_intrinsics = {'ret': ret, 'mtx': mtx, 'dist': dist}
 
             # todo: write the results to a .toml file for use later, then change the cropping functions to undistort images first;
             # alternatively, undistort after identifying points, which may be faster
-            pass
+            skilled_reaching_io.write_toml(cam_cal_toml, cam_intrinsics)
 
-        pass
 
     for cf in calib_vid_folders:
         # crop the calibration videos

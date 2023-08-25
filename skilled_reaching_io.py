@@ -93,6 +93,13 @@ def write_toml(filename, data):
         toml.dump(data, f)
 
 
+def read_toml(filename):
+    with open(filename, 'w') as f:
+        toml_dict = toml.load(f)
+
+    return toml_dict
+
+
 def read_pickle(filename):
     """ Read the pickle file """
     with open(filename, "rb") as handle:

@@ -929,10 +929,9 @@ def camera_board_from_df(session_row):
         marker_length = float(session_row['marker_length_camera'].values[0])
         board = create_charuco(nrows, ncols, square_length, marker_length)
     elif board_type.lower() in ['chessboard', 'checkerboard']:
-        pass
+        board = create_checkerboard(nrows, ncols, square_length)
 
     return board
-
 
 
 def create_charuco(squaresX, squaresY, square_length, marker_length, marker_bits=4, dict_size=50, aruco_dict=None, manually_verify=False):
@@ -942,6 +941,13 @@ def create_charuco(squaresX, squaresY, square_length, marker_length, marker_bits
                          dict_size=dict_size,
                          aruco_dict=aruco_dict,
                          manually_verify=manually_verify)
+
+    return board
+
+
+def create_checkerboard(squaresX, squaresY, square_length, manually_verify=False):
+
+    board = Checkerboard(squaresX, squaresY, square_length, manually_verify=manually_verify)
 
     return board
 

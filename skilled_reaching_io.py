@@ -94,7 +94,7 @@ def write_toml(filename, data):
 
 
 def read_toml(filename):
-    with open(filename, 'w') as f:
+    with open(filename, 'r') as f:
         toml_dict = toml.load(f)
 
     return toml_dict

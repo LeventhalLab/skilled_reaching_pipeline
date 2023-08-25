@@ -233,25 +233,24 @@ def calibrate_all_sessions(parent_directories,
             # calibrate the camera for this session
             cam_cal_vid_name = session_row['cal_vid_name_camera'].values[0]
 
-            cam_cal_toml = navigation_utilities.create_cam_cal_toml_name(cam_cal_vid_name, parent_directories)
-            if os.path.exists(cam_cal_toml):
-                cam_intrinsics = skilled_reaching_io.read_toml(cam_cal_toml)
+            cam_cal_pickle = navigation_utilities.create_cam_cal_pickle_name(cam_cal_vid_name, parent_directories)
+            if os.path.exists(cam_cal_pickle):
+                cam_intrinsics = skilled_reaching_io.read_pickle(cam_cal_pickle)
                 pass
 
-            cam_cal_toml_folder, _ = os.path.split(cam_cal_toml)
-            if not os.path.exists(cam_cal_toml_folder):
-                os.makedirs(cam_cal_toml_folder)
+            cam_cal_pickle_folder, _ = os.path.split(cam_cal_pickle)
+            if not os.path.exists(cam_cal_pickle_folder):
+                os.makedirs(cam_cal_pickle_folder)
             full_cam_cal_vid_path = navigation_utilities.find_camera_calibration_video(cam_cal_vid_name,
                                                                                        parent_directories)
-
             board = skilled_reaching_calibration.camera_board_from_df(session_row)
 
-            ret, mtx, dist = skilled_reaching_calibration.calibrate_single_camera(full_cam_cal_vid_path, board)
-            cam_intrinsics = {'ret': ret, 'mtx': mtx, 'dist': dist}
+            cam_intrinsics = skilled_reaching_calibration.calibrate_single_camera(full_cam_cal_vid_path, board)
+
 
             # todo: write the results to a .toml file for use later, then change the cropping functions to undistort images first;
             # alternatively, undistort after identifying points, which may be faster
-            skilled_reaching_io.write_toml(cam_cal_toml, cam_intrinsics)
+            skilled_reaching_io.write_pickle(cam_cal_pickle, cam_intrinsics)
 
 
     for cf in calib_vid_folders:

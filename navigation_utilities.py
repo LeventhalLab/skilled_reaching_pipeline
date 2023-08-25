@@ -1171,6 +1171,24 @@ def create_cam_cal_toml_name(cam_cal_vid_name, parent_directories):
     return full_toml_path
 
 
+def create_cam_cal_pickle_name(cam_cal_vid_name, parent_directories):
+
+    cal_metadata = parse_camera_calibration_video_name(cam_cal_vid_name)
+
+    _, vid_name = os.path.split(cam_cal_vid_name)
+    vid_name, _ = os.path.splitext(vid_name)
+    pickle_name = vid_name + '.pickle'
+
+    month_folder = 'calibration_files_{}'.format(cal_metadata['time'].strftime('%Y%m'))
+    month_folder = os.path.join(parent_directories['calibration_files_parent'], month_folder)
+    single_cam_folder = 'single_camera_calibration_{}'.format(cal_metadata['time'].strftime('%Y%m'))
+    single_cam_folder = os.path.join(month_folder, single_cam_folder)
+
+    full_pickle_path = os.path.join(single_cam_folder, pickle_name)
+
+    return full_pickle_path
+
+
 def find_camera_calibration_video(cam_cal_vid_name, parent_directories):
 
     cal_metadata = parse_camera_calibration_video_name(cam_cal_vid_name)

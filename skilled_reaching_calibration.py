@@ -1409,7 +1409,7 @@ def create_cal_frame_figure(width, height, ax3d=None, scale=1.0, dpi=100, nrows=
     return fig, axs
 
 
-def calibrate_single_camera(cal_vid, board, skip=20):
+def calibrate_single_camera(cal_vid, board, num_frames2use=20):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO
 
     rows, size = detect_video_pts(cal_vid, board)
@@ -1418,18 +1418,33 @@ def calibrate_single_camera(cal_vid, board, skip=20):
 
     objp, imgp = board.get_all_calibration_points(rows)
 
+    skip = int(len(objp) / num_frames2use)
+
     #
     mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= 7]
+    valid_frames = [ii for ii, o in enumerate(objp) if len(o) >= 7]
+
     objp, imgp = zip(*mixed)
 
     # matrix = cv2.initCameraMatrix2D(objp, imgp, tuple(size))
     num_frames = len(objp)
     frames_to_use = list(range(0, num_frames, skip))
-    objp_to_use = [objp[ii] for ii in range(0, num_frames, skip)]
-    imgp_to_use = [imgp[ii] for ii in range(0, num_frames, skip)]
+    objp_to_use = [objp[ii] for ii in frames_to_use]
+    imgp_to_use = [imgp[ii] for ii in frames_to_use]
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp_to_use, imgp_to_use, size, None, None, flags=CALIBRATION_FLAGS)
 
-    return ret, mtx, dist
+    cam_intrinsic_data = {'ret': ret,
+                          'mtx': mtx,
+                          'dist': dist,
+                          'rvecs': rvecs,
+                          'tvecs': tvecs,
+                          'obj': objp,
+                          'valid_frames': valid_frames,
+                          'frames_used': frames_to_use}
+    # valid_frames are frames in which >= 7 valid points were detected (frame numbers in the actual movie)
+    # frames_used are the indices of the valid_frames used for calibration
+
+    return cam_intrinsic_data
 
 
 def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=True):

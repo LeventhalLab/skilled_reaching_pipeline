@@ -1205,6 +1205,20 @@ def find_camera_calibration_video(cam_cal_vid_name, parent_directories):
     return full_cam_cal_vid_name
 
 
+def find_mirror_calibration_video(mirror_cal_vid_name, parent_directories):
+
+    cal_metadata = parse_camera_calibration_video_name(mirror_cal_vid_name)
+    month_folder = 'calibration_videos_{}'.format(cal_metadata['time'].strftime('%Y%m'))
+    month_folder = os.path.join(parent_directories['calibration_vids_parent'], month_folder)
+
+    full_mirror_cal_vid_name = os.path.join(month_folder, mirror_cal_vid_name)
+
+    if not os.path.exists(full_mirror_cal_vid_name):
+        return None
+
+    return full_mirror_cal_vid_name
+
+
 def create_cropped_calib_vid_name(full_calib_vid_name, crop_view, crop_params_dict, fliplr):
     '''
 

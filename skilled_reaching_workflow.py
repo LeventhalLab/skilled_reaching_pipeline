@@ -252,6 +252,16 @@ def calibrate_all_sessions(parent_directories,
                 skilled_reaching_io.write_pickle(cam_cal_pickle, cam_intrinsics)
 
             # now have the camera intrinsics; use these to undistort points to calibrate the mirror views
+            # first, crop the calibration video
+            mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
+            full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
+                                                                                     parent_directories)
+            current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(full_calib_vid_name,
+                                                                                                   session_row,
+                                                                                                   filtertype=filtertype)
+
+            # now identify the points, undistort them
+            pass
 
 
     for cf in calib_vid_folders:

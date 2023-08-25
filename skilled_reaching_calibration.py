@@ -882,6 +882,26 @@ def verify_checkerboard_points(calibration_vids, calibration_data):
         vid_obj.release()
 
 
+def crop_params_dict_from_sessionrow(cal_vid_path, session_row, view_list=['direct', 'leftmirror', 'rightmirror']):
+    crop_params_dict = dict.fromkeys(view_list, None)
+    for view in view_list:
+        left_edge = session_row[view + '_left'].values[0]
+        right_edge = session_row[view + '_right'].values[0]
+        top_edge = session_row[view + '_top'].values[0]
+        bot_edge = session_row[view + '_bottom'].values[0]
+
+        if any([pd.isna(left_edge), pd.isna(right_edge), pd.isna(top_edge), pd.isna(bot_edge)]):
+            crop_params_dict = {}
+            break
+        else:
+            crop_params_dict[view] = [left_edge,
+                                      right_edge,
+                                      top_edge,
+                                      bot_edge]
+
+    return crop_params_dict
+
+
 def crop_params_dict_from_ratcal_metadata(cal_vid_path, ratcal_metadata, view_list=['direct', 'leftmirror', 'rightmirror']):
 
     # find the calibration video name in the table of sessions
@@ -988,7 +1008,7 @@ def write_charuco_image(board, dpi, calib_dir, units='mm'):
 
 
 def crop_calibration_video(calib_vid,
-                           calibration_metadata_df,
+                           session_row,
                            calib_crop_top=100,
                            filtertype='',
                            view_list=['direct', 'leftmirror', 'rightmirror']):
@@ -999,7 +1019,7 @@ def crop_calibration_video(calib_vid,
 
     # todo: calibrate the camera and undistort the videos prior to cropping, then don't allow calculation of distortion
     # coefficients, etc. during calibration with anipose
-    crop_params_dict = crop_params_dict_from_ratcal_metadata(calib_vid, calibration_metadata_df, view_list=view_list)
+    crop_params_dict = crop_params_dict_from_sessionrow(calib_vid, session_row, view_list=view_list)
 
     if crop_params_dict is None:
         return None
@@ -1016,7 +1036,8 @@ def crop_calibration_video(calib_vid,
         for key in calibration_crop_params_dict:
             if 'mirror' in key:
                 # if this is one of the mirror views, the cropped video should be flipped left to right
-                fliplr = True
+                fliplr = False
+                # I think we don't want to flip them for now, will flip them left to right after undistortion
             else:
                 fliplr = False
             calibration_crop_params_dict[key][2] = calib_crop_top

@@ -242,9 +242,9 @@ def calibrate_all_sessions(parent_directories,
                     os.makedirs(cam_cal_pickle_folder)
                 full_cam_cal_vid_path = navigation_utilities.find_camera_calibration_video(cam_cal_vid_name,
                                                                                            parent_directories)
-                board = skilled_reaching_calibration.camera_board_from_df(session_row)
+                cam_board = skilled_reaching_calibration.camera_board_from_df(session_row)
 
-                cam_intrinsics = skilled_reaching_calibration.calibrate_single_camera(full_cam_cal_vid_path, board)
+                cam_intrinsics = skilled_reaching_calibration.calibrate_single_camera(full_cam_cal_vid_path, cam_board)
 
 
                 # todo: write the results to a .pickle file for use later, then change the cropping functions to undistort images first;
@@ -261,6 +261,8 @@ def calibrate_all_sessions(parent_directories,
                                                                                                    filtertype=filtertype)
 
             # now identify the points, undistort them
+            mirror_board = skilled_reaching_calibration.mirror_board_from_df(session_row)
+            skilled_reaching_calibration.write_charuco_image(mirror_board, 600, parent_directories['calibration_vids_parent'])
             pass
 
 

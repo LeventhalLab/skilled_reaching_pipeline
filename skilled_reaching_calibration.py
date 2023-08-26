@@ -947,11 +947,32 @@ def camera_board_from_df(session_row):
 
     if board_type.lower() == 'charuco':
         marker_length = float(session_row['marker_length_camera'].values[0])
-        board = create_charuco(nrows, ncols, square_length, marker_length)
+        cam_board = create_charuco(nrows, ncols, square_length, marker_length)
     elif board_type.lower() in ['chessboard', 'checkerboard']:
-        board = create_checkerboard(nrows, ncols, square_length)
+        cam_board = create_checkerboard(nrows, ncols, square_length)
 
-    return board
+    return cam_board
+
+
+def mirror_board_from_df(session_row):
+
+    square_length = float(session_row['square_length_mirrors'].values[0])
+    nrows = session_row['nrows_mirrors'].values[0]
+    ncols = session_row['ncols_mirrors'].values[0]
+
+    board_type = session_row['board_type_mirrors'].values[0]
+
+    if board_type.lower() == 'charuco':
+        marker_length = float(session_row['marker_length_mirrors'].values[0])
+        mirror_board = create_charuco(nrows, ncols, square_length, marker_length)
+    elif board_type.lower() in ['chessboard', 'checkerboard']:
+        mirror_board = create_checkerboard(nrows, ncols, square_length)
+
+    # test to make sure this board matches the calibration board
+
+
+    return mirror_board
+
 
 
 def create_charuco(squaresX, squaresY, square_length, marker_length, marker_bits=4, dict_size=50, aruco_dict=None, manually_verify=False):

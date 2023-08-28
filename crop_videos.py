@@ -117,20 +117,23 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
 
 def write_video_frames(vid_name, img_type='.jpg', dest_folder=None):
 
-    vid_path, vid_filename = os.path.split(vid_name)
-    if dest_folder is None:
-        dest_folder = vid_path
-
     if img_type[0] != '.':
         img_type = '.' + img_type
 
+    vid_path, vid_filename = os.path.split(vid_name)
     vid_filename, _ = os.path.splitext(vid_filename)
+
+    if dest_folder is None:
+        dest_folder = navigation_utilities.cal_frames_folder_from_cal_vids_name(vid_name)
+        # dest_folder = os.path.join(vid_path, vid_filename + '_frames')
+    if not os.path.exists(dest_folder):
+        os.makedirs(dest_folder)
 
     full_jpg_path = os.path.join(dest_folder, '{}_frame_%d{}'.format(vid_filename, img_type))
 
     command = (
-        f"ffmpeg -i {vid_path_in} "
-        f"-c:v copy -bsf:v mjpeg2jpeg {full_jpg_path} "
+        f"ffmpeg -i {vid_name} "
+        f"-f image2 {full_jpg_path} "
     )
     subprocess.call(command, shell=True)
 

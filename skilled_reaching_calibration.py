@@ -1488,11 +1488,33 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
     return cam_intrinsic_data
 
 
-def calibrate_mirror_views(cropped_vids, board):
+def calibrate_mirror_views(cropped_vids, cam_intrinsics, board):
 
     all_rows = []
     for cropped_vid in cropped_vids:
         rows, size = detect_video_pts(cropped_vid, board)
+
+        cropped_vid_metadata = navigation_utilities.parse_cropped_calibration_video_name(cropped_vid)
+        #tooo: undistort the points in the rows list, and flip them left-right if from a mirror view
+
+        # translate points back to full frame, then undistort, unnormalize, translate back into cropped frame, and fliplr if in a mirror view
+        for row in rows:
+            orig_coord_x = row['corners'][:,:,0] + cropped_vid_metadata['crop_params'][0]
+            orig_coord_y = row['corners'][:,:,1] + cropped_vid_metadata['crop_params'][2]
+            # todo: check that these are the right indices by plotting over a frame from the original video
+            
+        rows_ud_norm = [cv2.undistortPoints(row['corners'], cam_intrinsics['mtx'], cam_intrinsics['dist']) for row in rows]
+        rows_ud = [cvb.unnormalize_points(fpts_ud_norm, mtx[i_cam]) for fpts_ud_norm in framepts_ud_norm]
+
+        # cam_intrinsic_data = {'ret': ret,
+        #                       'mtx': mtx,
+        #                       'dist': dist,
+        #                       'rvecs': rvecs,
+        #                       'tvecs': tvecs,
+        #                       'obj': objp,
+        #                       'valid_frames': valid_frames,
+        #                       'frames_used': frames_to_use}
+        pass
 
 
 
@@ -1572,9 +1594,11 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
 
     rows = board.fill_points_rows(rows)
 
-    #todo: if not enough rows, save images for manual point extraction
+    # if not enough rows, save frames for manual point extraction
     if len(rows) < min_rows_detected:
+        # todo: check to see if the board corners have already been manually identified
         crop_videos.write_video_frames(calibration_video, img_type='.jpg')
+
     return rows, size
 
 

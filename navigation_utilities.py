@@ -1205,6 +1205,33 @@ def find_camera_calibration_video(cam_cal_vid_name, parent_directories):
     return full_cam_cal_vid_name
 
 
+def cal_frames_folder_from_cal_vids_name(cal_vid_name):
+
+    cal_vid_path, cal_vid_name = os.path.split(cal_vid_name)
+    cal_metadata = parse_camera_calibration_video_name(cal_vid_name)
+    cal_vid_name, _ = os.path.splitext(cal_vid_name)
+
+    if cal_vid_path[-7:] == 'cropped':
+        month_cal_directory, _ = os.path.split(cal_vid_path)
+    else:
+        month_cal_directory = cal_vid_path
+
+    cal_vid_directory, _ = os.path.split(month_cal_directory)
+    parent_directory, _ = os.path.split(cal_vid_directory)
+
+    frames_root = os.path.join(parent_directory, 'calibration_frames')
+    month_frames_dir = os.path.join(frames_root, 'calibration_frames_{}'.format(cal_metadata['time'].strftime('%Y%m')))
+
+    name_parts = cal_vid_name.split('_')
+    cal_frames_foldername = '_'.join(name_parts[:5])
+    cal_frames_folder = os.path.join(month_frames_dir, cal_frames_foldername)
+
+    if not os.path.exists(cal_frames_folder):
+        os.makedirs(cal_frames_folder)
+
+    return cal_frames_folder
+
+
 def find_mirror_calibration_video(mirror_cal_vid_name, parent_directories):
 
     cal_metadata = parse_camera_calibration_video_name(mirror_cal_vid_name)

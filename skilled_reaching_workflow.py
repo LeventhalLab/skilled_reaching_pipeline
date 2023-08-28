@@ -262,7 +262,13 @@ def calibrate_all_sessions(parent_directories,
 
             # now identify the points, undistort them
             mirror_board = skilled_reaching_calibration.mirror_board_from_df(session_row)
-            skilled_reaching_calibration.write_charuco_image(mirror_board, 600, parent_directories['calibration_vids_parent'])
+            # skilled_reaching_calibration.write_charuco_image(mirror_board, 600, parent_directories['calibration_vids_parent'])
+
+            # todo: test if chessboard detection is sufficient for the old boards
+            for cropped_vid in current_cropped_calibration_vids:
+                skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, mirror_board)
+                pass
+
             pass
 
 

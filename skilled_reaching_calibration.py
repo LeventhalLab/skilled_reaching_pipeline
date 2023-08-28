@@ -964,7 +964,7 @@ def mirror_board_from_df(session_row):
 
     if board_type.lower() == 'charuco':
         marker_length = float(session_row['marker_length_mirrors'].values[0])
-        mirror_board = create_charuco(nrows, ncols, square_length, marker_length)
+        mirror_board = create_charuco(nrows, ncols, square_length, marker_length, dict_size=250)
     elif board_type.lower() in ['chessboard', 'checkerboard']:
         mirror_board = create_checkerboard(nrows, ncols, square_length)
 
@@ -1005,8 +1005,8 @@ def write_charuco_image(board, dpi, calib_dir, units='mm'):
     fname = '_'.join(['charuco',
                       '{:d}x{:d}'.format(y_total, x_total),
                       '{:d}x{:d}'.format(board.squaresY, board.squaresX),
-                      '{:d}'.format(board.square_length),
-                      '{:d}'.format(board.marker_length),
+                      '{:d}'.format(int(board.square_length)),
+                      '{:d}'.format(int(board.marker_length)),
                       'DICT',
                       '{:d}x{:d}'.format(marker_bits, marker_bits),
                       '{:d}'.format(dict_size),
@@ -1488,6 +1488,28 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
     return cam_intrinsic_data
 
 
+def calibrate_mirror_views(cropped_vids, board):
+
+    all_rows = []
+    for cropped_vid in cropped_vids:
+        rows, size = detect_video_pts(cropped_vid, board)
+
+
+
+    # all_rows = []
+    #
+    # for cix, (cam, cam_videos) in enumerate(zip(self.cameras, videos)):
+    #     rows_cam = []
+    #     for vnum, vidname in enumerate(cam_videos):
+    #         if verbose: print(vidname)
+    #         rows = board.detect_video(vidname, prefix=vnum, progress=verbose)
+    #         if verbose: print("{} boards detected".format(len(rows)))
+    #         rows_cam.extend(rows)
+    #     all_rows.append(rows_cam)
+    #
+    # return all_rows
+
+
 def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=True):
     # adapted from anipose
     cap = cv2.VideoCapture(calibration_video)
@@ -1519,18 +1541,32 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
         if framenum % skip != 0 and go <= 0:
             continue
 
-        charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame, board)
+        if isinstance(board, CharucoBoard):
+            charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame, board)
 
-        if charucoCorners is not None and len(charucoCorners) > 0:
-            if prefix is None:
-                key = framenum
-            else:
-                key = (prefix, framenum)
-            go = int(skip / 2)
-            row = {'framenum': key, 'corners': charucoCorners, 'ids': charucoIds}
-            rows.append(row)
+            if charucoCorners is not None and len(charucoCorners) > 0:
+                if prefix is None:
+                    key = framenum
+                else:
+                    key = (prefix, framenum)
+                go = int(skip / 2)
+                row = {'framenum': key, 'corners': charucoCorners, 'ids': charucoIds}
+                rows.append(row)
 
-        go = max(0, go - 1)
+            go = max(0, go - 1)
+        elif isinstance(board, Checkerboard):
+            corners, ids = board.detect_image(frame, subpix=True)
+
+            if corners is not None and len(corners) > 0:
+                if prefix is None:
+                    key = framenum
+                else:
+                    key = (prefix, framenum)
+                go = int(skip / 2)
+                row = {'framenum': key, 'corners': corners, 'ids': ids}
+                rows.append(row)
+
+            go = max(0, go - 1)
 
     cap.release()
 
@@ -1570,7 +1606,6 @@ def detect_markers(image, board, camera=None, refine=True):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     else:
         gray = image
-
 
     params = aruco.DetectorParameters()
 

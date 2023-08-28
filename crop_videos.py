@@ -115,6 +115,26 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
     return cropped_video_directories
 
 
+def write_video_frames(vid_name, img_type='.jpg', dest_folder=None):
+
+    vid_path, vid_filename = os.path.split(vid_name)
+    if dest_folder is None:
+        dest_folder = vid_path
+
+    if img_type[0] != '.':
+        img_type = '.' + img_type
+
+    vid_filename, _ = os.path.splitext(vid_filename)
+
+    full_jpg_path = os.path.join(dest_folder, '{}_frame_%d{}'.format(vid_filename, img_type))
+
+    command = (
+        f"ffmpeg -i {vid_path_in} "
+        f"-c:v copy -bsf:v mjpeg2jpeg {full_jpg_path} "
+    )
+    subprocess.call(command, shell=True)
+
+
 def cropped_vid_name(full_vid_path, dest_folder, view_name, crop_params, fliplr=False):
     """
     function to return the name to be used for the cropped video
@@ -190,7 +210,8 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
         for jpg_name in tqdm(jpg_list):
             img = cv2.imread(jpg_name)
             cropped_img = img[y1-1:y2-1, x1-1:x2-1, :]
-            if view_name == 'rightmirror' or fliplr==True:
+            # if view_name == 'rightmirror' or fliplr==True:
+            if fliplr == True:
                 # flip the image left to right so it can be run through a single "side mirror" DLC network
                 # or, if this is a calibration video, both mirror views should be flipped
                 cropped_img = cv2.flip(cropped_img, 1)   # 2nd argument flipCode > 0 indicates flip horizontally
@@ -206,7 +227,8 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
         # destroy the temp jpeg folder
         shutil.rmtree(jpg_temp_folder)
     elif filtertype == 'h264':
-        if view_name == 'rightmirror' or fliplr==True:
+        # if view_name == 'rightmirror' or fliplr==True:
+        if fliplr == True:
             # flip the image left to right so it can be run through a single "side mirror" DLC network
             # or, if this is a calibration video, both mirror views should be flipped
             command = (

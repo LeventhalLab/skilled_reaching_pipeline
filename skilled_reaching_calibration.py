@@ -1510,7 +1510,7 @@ def calibrate_mirror_views(cropped_vids, board):
     # return all_rows
 
 
-def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=True):
+def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=True, min_rows_detected=20):
     # adapted from anipose
     cap = cv2.VideoCapture(calibration_video)
 
@@ -1572,6 +1572,9 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
 
     rows = board.fill_points_rows(rows)
 
+    #todo: if not enough rows, save images for manual point extraction
+    if len(rows) < min_rows_detected:
+        crop_videos.write_video_frames(calibration_video, img_type='.jpg')
     return rows, size
 
 

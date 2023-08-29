@@ -1498,7 +1498,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, parent_directori
         #tooo: undistort the points in the rows list, and flip them left-right if from a mirror view
 
         # translate points back to full frame, then undistort, unnormalize, translate back into cropped frame, and fliplr if in a mirror view
-        for row in rows:
+        for i_row, row in enumerate(rows):
             orig_coord_x = row['corners'][:,:,0] + cropped_vid_metadata['crop_params'][0]
             orig_coord_y = row['corners'][:,:,1] + cropped_vid_metadata['crop_params'][2]
             orig_coord = np.hstack((orig_coord_x, orig_coord_y))
@@ -1508,43 +1508,52 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, parent_directori
 
             corners_ud_x = orig_ud[:,0] - cropped_vid_metadata['crop_params'][0]
             corners_ud_y = orig_ud[:,1] - cropped_vid_metadata['crop_params'][2]
+
+
+            if 'mirror' in cropped_vid:
+                # need to flip the undistorted points left-right for proper camera group calibration
+                # w = width of the cropped image
+                w = cropped_vid_metadata['crop_params'][1] - cropped_vid_metadata['crop_params'][0] + 1
+                corners_ud_x = w - corners_ud_x
+
             corners_ud = np.array([[c_x, x_y] for c_x, x_y in zip(corners_ud_x, corners_ud_y)])
             corners_ud = np.expand_dims(corners_ud, 1)
 
-            # comment in lines below to display on full original image
-            # load original video frame
-            # orig_video = navigation_utilities.find_calibration_video(cropped_vid_metadata, parent_directories['calibration_vids_parent'])
-            # cap = cv2.VideoCapture(orig_video)
-            #
-            # cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
-            # res, img = cap.read()
-            #
-            # plt.imshow(img)
-            # plt.scatter(orig_coord[:,0], orig_coord[:,1])
-            # plt.scatter(orig_ud[:,0], orig_ud[:,1])
-            #
-            # cap.release()
+            rows[i_row]['corners_ud'] = corners_ud
 
-            cap = cv2.VideoCapture(cropped_vid)
-            cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
-            res, img = cap.read()
-
-            plt.imshow(img)
-            plt.scatter(row['corners'][:,:,0], row['corners'][:,:,1])
-            plt.scatter(corners_ud[:,:,0], corners_ud[:,:,1])
-
-            cap.release()
             pass
 
+            # do the ID's need to be rearranged? Is that different for charuco vs checkerboard calibration?
 
-        # cam_intrinsic_data = {'ret': ret,
-        #                       'mtx': mtx,
-        #                       'dist': dist,
-        #                       'rvecs': rvecs,
-        #                       'tvecs': tvecs,
-        #                       'obj': objp,
-        #                       'valid_frames': valid_frames,
-        #                       'frames_used': frames_to_use}
+
+
+            # comment in lines below to display on full original image
+            # load original video frame
+            # if 'mirror' in cropped_vid:
+            #     orig_video = navigation_utilities.find_calibration_video(cropped_vid_metadata, parent_directories['calibration_vids_parent'])
+            #     cap = cv2.VideoCapture(orig_video)
+            #
+            #     cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
+            #     res, img = cap.read()
+            #
+            #     plt.imshow(img)
+            #     plt.scatter(orig_coord[:,0], orig_coord[:,1])
+            #     plt.scatter(orig_ud[:,0], orig_ud[:,1])
+            #
+            #     cap.release()
+            #     pass
+            # if 'mirror' in cropped_vid:
+            #     cap = cv2.VideoCapture(cropped_vid)
+            #     cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
+            #     res, img = cap.read()
+            #
+            #     plt.imshow(img)
+            #     plt.scatter(row['corners'][:,:,0], row['corners'][:,:,1])
+            #     plt.scatter(corners_ud[:,:,0], corners_ud[:,:,1])
+            #
+            #     cap.release()
+            #     pass
+
         pass
 
 

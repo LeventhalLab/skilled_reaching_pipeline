@@ -1488,7 +1488,7 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
     return cam_intrinsic_data
 
 
-def calibrate_mirror_views(cropped_vids, cam_intrinsics, board):
+def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, parent_directories):
 
     all_rows = []
     for cropped_vid in cropped_vids:
@@ -1501,9 +1501,17 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board):
         for row in rows:
             orig_coord_x = row['corners'][:,:,0] + cropped_vid_metadata['crop_params'][0]
             orig_coord_y = row['corners'][:,:,1] + cropped_vid_metadata['crop_params'][2]
+            orig_coord = np.hstack((orig_coord_x, orig_coord_y))
+
+            # load original video frame
+            orig_video = navigation_utilities.find_calibration_video(cropped_vid_metadata, parent_directories['calibration_vids_parent'])
+            cap = cv2.VideoCapture(orig_video)
+
+            row_ud_norm = cv2.undistortPoints(orig_coord, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+            pass
             # todo: check that these are the right indices by plotting over a frame from the original video
-            
-        rows_ud_norm = [cv2.undistortPoints(row['corners'], cam_intrinsics['mtx'], cam_intrinsics['dist']) for row in rows]
+
+        row_ud_norm = [cv2.undistortPoints(row['corners'], cam_intrinsics['mtx'], cam_intrinsics['dist']) for row in rows]
         rows_ud = [cvb.unnormalize_points(fpts_ud_norm, mtx[i_cam]) for fpts_ud_norm in framepts_ud_norm]
 
         # cam_intrinsic_data = {'ret': ret,

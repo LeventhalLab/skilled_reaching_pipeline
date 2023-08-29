@@ -1381,25 +1381,31 @@ def construct_dlc_output_pickle_names(video_metadata, view):
     return pickle_name_full, pickle_name_meta
 
 
-def find_calibration_video(video_metadata, calibration_parent):
+def find_calibration_video(video_metadata, calibration_parent, vidtype='.avi'):
     """
 
     :param video_metadata:
     :param calibration_parent:
     :return:
     """
-    date_string = video_metadata['triggertime'].strftime('%Y%m%d')
-    year_folder = os.path.join(calibration_parent, date_string[0:4])
-    month_folder = os.path.join(year_folder, date_string[0:6] + '_calibration')
-    calibration_folder = os.path.join(month_folder, date_string[0:6] + '_calibration_videos')
+    # date_string = video_metadata['triggertime'].strftime('%Y%m%d')
+    # year_folder = os.path.join(calibration_parent, date_string[0:4])
+    # month_folder = os.path.join(year_folder, date_string[0:6] + '_calibration')
+    # calibration_folder = os.path.join(month_folder, date_string[0:6] + '_calibration_videos')
 
-    test_name = 'SR_boxCalibration_box{:02d}_{}.mat'.format(video_metadata['boxnum'], date_string)
-    test_name = os.path.join(calibration_folder, test_name)
+    if vidtype[0] != '.':
+        vidtype = '.' + vidtype
+
+    time_string = fname_time2string(video_metadata['time'])
+    month_folder = os.path.join(calibration_parent, 'calibration_videos_{}'.format(time_string[0:6]))
+
+    test_name = 'GridCalibration_box{:02d}_{}{}'.format(video_metadata['boxnum'], time_string, vidtype)
+    test_name = os.path.join(month_folder, test_name)
 
     if os.path.exists(test_name):
         return test_name
     else:
-        return ''
+        return None
         # sys.exit('No calibration file found for ' + video_metadata['video_name'])
 
 

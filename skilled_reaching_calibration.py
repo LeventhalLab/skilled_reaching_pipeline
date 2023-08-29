@@ -1517,18 +1517,39 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, parent_directori
                 corners_ud_x = w - corners_ud_x
 
             corners_ud = np.array([[c_x, x_y] for c_x, x_y in zip(corners_ud_x, corners_ud_y)])
+            if isinstance(board, Checkerboard):
+                # make sure the top left corner is always labeled first and the labels go across rows
+                corners_ud = reorder_checkerboard_points(corners_ud, board.get_size())
             corners_ud = np.expand_dims(corners_ud, 1)
 
-            rows[i_row]['corners_ud'] = corners_ud
+            rows[i_row]['corners_distorted'] = row['corners']
+            rows[i_row]['corners'] = corners_ud
 
-            pass
+    pass
+    # todo: now overlay points on the cropped vids and try to make sure it all works
 
             # do the ID's need to be rearranged? Is that different for charuco vs checkerboard calibration?
 
 
-
             # comment in lines below to display on full original image
             # load original video frame
+            if 'direct' in cropped_vid:
+                orig_video = navigation_utilities.find_calibration_video(cropped_vid_metadata, parent_directories['calibration_vids_parent'])
+                cap = cv2.VideoCapture(orig_video)
+
+                cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
+                res, img = cap.read()
+
+                plt.imshow(img)
+                for ii, id in enumerate(row['ids']):
+            #         plt.text(orig_coord[ii,0], orig_coord[ii,1], '{:d}'.format(id), c='r')
+                    plt.text(reordered_orig_pts[ii,0], reordered_orig_pts[ii,1], '{:d}'.format(id), c='r')
+                # plt.scatter(orig_coord[:,0], orig_coord[:,1])
+                # plt.scatter(orig_ud[:,0], orig_ud[:,1])
+
+                cap.release()
+                plt.show()
+                pass
             # if 'mirror' in cropped_vid:
             #     orig_video = navigation_utilities.find_calibration_video(cropped_vid_metadata, parent_directories['calibration_vids_parent'])
             #     cap = cv2.VideoCapture(orig_video)
@@ -1537,10 +1558,14 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, parent_directori
             #     res, img = cap.read()
             #
             #     plt.imshow(img)
-            #     plt.scatter(orig_coord[:,0], orig_coord[:,1])
-            #     plt.scatter(orig_ud[:,0], orig_ud[:,1])
+            #     for ii, id in enumerate(row['ids']):
+            #         # plt.text(orig_coord[ii,0], orig_coord[ii,1], '{:d}'.format(id), c='r')
+            #         plt.text(reordered_orig_pts[ii, 0], reordered_orig_pts[ii, 1], '{:d}'.format(id), c='r')
+            #     # plt.scatter(orig_coord[:,0], orig_coord[:,1])
+            #     # plt.scatter(orig_ud[:,0], orig_ud[:,1])
             #
             #     cap.release()
+            #     plt.show()
             #     pass
             # if 'mirror' in cropped_vid:
             #     cap = cv2.VideoCapture(cropped_vid)
@@ -1571,6 +1596,10 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, parent_directori
     #
     # return all_rows
 
+
+def match_mirror_points(mirrors_corner, direct_corner, direct_ids):
+
+    pass
 
 def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=True, min_rows_detected=20):
     # adapted from anipose
@@ -1619,6 +1648,8 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
         elif isinstance(board, Checkerboard):
             corners, ids = board.detect_image(frame, subpix=True)
 
+            # reorder to make sure that the top left is corner 0
+
             if corners is not None and len(corners) > 0:
                 if prefix is None:
                     key = framenum
@@ -1640,6 +1671,51 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
         crop_videos.write_video_frames(calibration_video, img_type='.jpg')
 
     return rows, size
+
+
+def reorder_checkerboard_points(corners, size):
+
+    # reordeer chessboard corners so first point is top left
+    if np.ndim(corners) == 3:
+        first_corner = corners[0, 0]
+        last_corner = corners[-1, 0]
+    else:
+        first_corner = corners[0,:]
+        last_corner = corners[-1,:]
+    num_corners = np.prod(size)
+    # what are the relative positions of the first and last points?
+    if first_corner[0] < last_corner[0] and first_corner[1] < last_corner[1]:
+        # first corner is top left; then it will go left->right (I think)
+        # so the order should already be correct
+        id_order = np.arange(num_corners)
+    elif first_corner[0] > last_corner[0] and first_corner[1] < last_corner[1]:
+        # first corner is top right; then it will go down the column (I think)
+        id_order = []
+        # the first index in size is the row because it always starts counting along the first axis in size
+        for i_row in range(size[0]):
+            for i_col in range(size[1]):
+                id_order.append((size[1]-i_col-1) * size[0] + i_row)
+        id_order = np.array(id_order)
+    elif first_corner[0] > last_corner[0] and first_corner[1] > last_corner[1]:
+        # first corner is bottom right; then it will go left along the bottom row (I think)
+        id_order = []
+        # this time the rows are the second index in size
+        for i_row in range(size[1]):
+            for i_col in range(size[0]):
+                id_order.append(((size[1]-i_row) * size[0]) - i_col - 1)
+        id_order = np.array(id_order)
+    elif first_corner[0] < last_corner[0] and first_corner[1] > last_corner[1]:
+        # first corner is bottom left; then it will go up along the left column (I think)
+        id_order = []
+        # this time the rows are the first index in size because going up the columns
+        for i_row in range(size[0]):
+            for i_col in range(size[1]):
+                id_order.append((size[0] * (i_col+1)) - i_row - 1)
+        id_order = np.array(id_order)
+
+    reordered_corners = np.array([corners[ii,:] for ii in id_order])
+
+    return reordered_corners
 
 
 def detect_image(image, board, subpix=True):

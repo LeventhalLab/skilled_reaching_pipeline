@@ -1503,16 +1503,39 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, parent_directori
             orig_coord_y = row['corners'][:,:,1] + cropped_vid_metadata['crop_params'][2]
             orig_coord = np.hstack((orig_coord_x, orig_coord_y))
 
+            orig_ud_norm = cv2.undistortPoints(orig_coord, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+            orig_ud = cvb.unnormalize_points(orig_ud_norm, cam_intrinsics['mtx'])
+
+            corners_ud_x = orig_ud[:,0] - cropped_vid_metadata['crop_params'][0]
+            corners_ud_y = orig_ud[:,1] - cropped_vid_metadata['crop_params'][2]
+            corners_ud = np.array([[c_x, x_y] for c_x, x_y in zip(corners_ud_x, corners_ud_y)])
+            corners_ud = np.expand_dims(corners_ud, 1)
+
+            # comment in lines below to display on full original image
             # load original video frame
-            orig_video = navigation_utilities.find_calibration_video(cropped_vid_metadata, parent_directories['calibration_vids_parent'])
-            cap = cv2.VideoCapture(orig_video)
+            # orig_video = navigation_utilities.find_calibration_video(cropped_vid_metadata, parent_directories['calibration_vids_parent'])
+            # cap = cv2.VideoCapture(orig_video)
+            #
+            # cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
+            # res, img = cap.read()
+            #
+            # plt.imshow(img)
+            # plt.scatter(orig_coord[:,0], orig_coord[:,1])
+            # plt.scatter(orig_ud[:,0], orig_ud[:,1])
+            #
+            # cap.release()
 
-            row_ud_norm = cv2.undistortPoints(orig_coord, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+            cap = cv2.VideoCapture(cropped_vid)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
+            res, img = cap.read()
+
+            plt.imshow(img)
+            plt.scatter(row['corners'][:,:,0], row['corners'][:,:,1])
+            plt.scatter(corners_ud[:,:,0], corners_ud[:,:,1])
+
+            cap.release()
             pass
-            # todo: check that these are the right indices by plotting over a frame from the original video
 
-        row_ud_norm = [cv2.undistortPoints(row['corners'], cam_intrinsics['mtx'], cam_intrinsics['dist']) for row in rows]
-        rows_ud = [cvb.unnormalize_points(fpts_ud_norm, mtx[i_cam]) for fpts_ud_norm in framepts_ud_norm]
 
         # cam_intrinsic_data = {'ret': ret,
         #                       'mtx': mtx,

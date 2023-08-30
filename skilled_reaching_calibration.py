@@ -998,7 +998,7 @@ def write_charuco_image(board, dpi, calib_dir, units='mm'):
     x_total = int(board.squaresX * board.square_length)
     y_total = int(board.squaresY * board.square_length)
 
-    board_dict = board.board.getDictionary()
+    board_dict = board.board.getDictionfary()
     dict_size = board_dict.bytesList.shape[0]
     marker_bits = board_dict.markerSize
 

@@ -11,6 +11,8 @@ import pandas as pd
 import cv2
 import sys
 import deeplabcut
+from boards import CharucoBoard, Checkerboard
+from aniposelib.cameras import Camera, CameraGroup
 
 
 def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_dirs, rat_df, cropped_vid_type='.avi', gputouse=0, save_as_csv=True, create_marked_vids=True):
@@ -200,6 +202,7 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
 
 def calibrate_all_sessions(parent_directories,
                            calibration_metadata_df,
+                           cgroup,
                            vidtype='.avi',
                            view_list=['direct', 'leftmirror', 'rightmirror'],
                            filtertype='h264'):
@@ -266,7 +269,7 @@ def calibrate_all_sessions(parent_directories,
 
             # todo: test if chessboard detection is sufficient for the old boards
             for cropped_vid in current_cropped_calibration_vids:
-                skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, parent_directories)
+                skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cgroup, parent_directories)
                 pass
 
             pass
@@ -346,7 +349,7 @@ if __name__ == '__main__':
     # rat_database_name = '/home/levlab/Public/rat_SR_videos_to_analyze/SR_rat_database.csv'
     label_videos = True
 
-    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 484, 485, 497, 498, 499, 500, 501, 502]
+    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 484, 485, 486, 497, 498, 499, 500, 501, 502]
 
     # rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
 
@@ -357,14 +360,17 @@ if __name__ == '__main__':
     gputouse = 3
     # step 1: preprocess videos to extract left mirror, right mirror, and direct views
 
-    view_list = ('direct', 'leftmirror', 'rightmirror')
+    cam_names = ('direct', 'leftmirror', 'rightmirror')
+    n_cams = len(cam_names)
+    cgroup = CameraGroup.from_names(cam_names, fisheye=False)
+
     filtertype = 'h264'
 
     # parameters for cropping
     crop_params_dict = {
-        view_list[0]: [700, 1350, 270, 935],
-        view_list[1]: [1, 470, 270, 920],
-        view_list[2]: [1570, 2040, 270, 920]
+        cam_names[0]: [700, 1350, 270, 935],
+        cam_names[1]: [1, 470, 270, 920],
+        cam_names[2]: [1570, 2040, 270, 920]
     }
     cropped_vid_type = '.avi'
 
@@ -452,12 +458,13 @@ if __name__ == '__main__':
 
         calibrate_all_sessions(parent_directories[expt],
                                calibration_metadata_df,
-                               view_list=view_list,
+                               cgroup,
+                               view_list=cam_names,
                                filtertype=filtertype)
 
     for expt in experiment_list:
         rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
-        folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parents[expt], view_list=view_list)
+        folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parents[expt], view_list=cam_names)
 
         scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, parent_directories[expt], rat_df,
                                              cropped_vid_type=cropped_vid_type,
@@ -471,7 +478,7 @@ if __name__ == '__main__':
         crop_filtertype = 'h264'  # currently choices are 'h264' or 'mjpeg2jpeg'. Python based vid conversion (vs labview) should use h264
 
         video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folders[expt], rats_to_analyze=rats_to_analyze)
-        cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parents[expt], crop_params_df, view_list, vidtype='avi', filtertype=crop_filtertype)
+        cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parents[expt], crop_params_df, cam_names, vidtype='avi', filtertype=crop_filtertype)
 
         # calibrate_all_sessions(calibration_vids_parent, calibration_files_parent, crop_params_df, cb_size=cb_size)
 
@@ -499,7 +506,7 @@ if __name__ == '__main__':
 
     for expt in experiment_list:
         rat_db = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
-        folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parents[expt], view_list=view_list)
+        folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parents[expt], view_list=cam_names)
 
         scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_videos_parents[expt], rat_db, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
 
@@ -511,7 +518,7 @@ if __name__ == '__main__':
                                   cropped_vid_type=cropped_vid_type,
                                   skipdirect=skipdirectlabel,
                                   skipmirror=skipmirrorlabel,
-                                  view_list=view_list)
+                                  view_list=cam_names)
 
     # step 3: make sure calibration has been run for these sessions
     # find list of all analyzed videos; extract dates and boxes for each session

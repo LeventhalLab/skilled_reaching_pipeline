@@ -1488,10 +1488,72 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
     return cam_intrinsic_data
 
 
-def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, parent_directories):
+def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_directories):
+    CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
+
+    all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories)
+
+    expected_cam_idx = 0
+    for rows, cropped_vid in zip(all_rows, cropped_vids):
+        # get intrinsics for each camera
+        # figure out which camera this is
+        this_cam = None
+        for i_cam, cam_name in enumerate(cgroup.get_names()):
+            if cam_name in cropped_vid:
+                this_cam = cam_name
+                cam_idx = i_cam
+                if cam_idx != expected_cam_idx:
+                    # error handling here for the cameras not being in the same order as the videos
+                    error('cropped video names and cameras are not in the same order')
+                expected_cam_idx += 1
+                break
+        if this_cam is None:
+            # error handling here for no camera corresponding to this video
+            error('no camera corresponding to {}'.format(cropped_vid))
+
+        cap = cv2.VideoCapture(cropped_vid)
+        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        size = (w, h)
+        cap.release()
+
+        cgroup.cameras[cam_idx].set_size(size)
+        # initialize the intrinsic matrix for the cropped view
+        # distortion coefficients should be zero - points should already be undistorted
+        objp, imgp = board.get_all_calibration_points(rows)
+        mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= 7]
+        objp, imgp = zip(*mixed)
+        matrix = cv2.initCameraMatrix2D(objp, imgp, tuple(size))
+        # mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp, imgp, size, matrix, np.zeros((1,5)), flags=CALIBRATION_FLAGS)
+
+        cgroup.cameras[cam_idx].set_camera_matrix(matrix)
+        cgroup.cameras[cam_idx].set_distortions(np.zeros((1,5)))
+
+    for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
+        # need to make sure the cameras are in the right order
+        all_rows[i] = board.estimate_pose_rows(cam, row)
+        pass
+
+    merged = cgroup.merge_rows(all_rows)
+    pass
+def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories):
+    # all_rows = []
+    #
+    # for cix, (cam, cam_videos) in enumerate(zip(self.cameras, videos)):
+    #     rows_cam = []
+    #     for vnum, vidname in enumerate(cam_videos):
+    #         if verbose: print(vidname)
+    #         rows = board.detect_video(vidname, prefix=vnum, progress=verbose)
+    #         if verbose: print("{} boards detected".format(len(rows)))
+    #         rows_cam.extend(rows)
+    #     all_rows.append(rows_cam)
+    #
+    # return all_rows
+
 
     all_rows = []
     for cropped_vid in cropped_vids:
+        rows_cam = []
         rows, size = detect_video_pts(cropped_vid, board)
 
         cropped_vid_metadata = navigation_utilities.parse_cropped_calibration_video_name(cropped_vid)
@@ -1509,47 +1571,76 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, parent_directori
             corners_ud_x = orig_ud[:,0] - cropped_vid_metadata['crop_params'][0]
             corners_ud_y = orig_ud[:,1] - cropped_vid_metadata['crop_params'][2]
 
-
+            fliplr = False
             if 'mirror' in cropped_vid:
                 # need to flip the undistorted points left-right for proper camera group calibration
                 # w = width of the cropped image
                 w = cropped_vid_metadata['crop_params'][1] - cropped_vid_metadata['crop_params'][0] + 1
                 corners_ud_x = w - corners_ud_x
+                fliplr = True
 
             corners_ud = np.array([[c_x, x_y] for c_x, x_y in zip(corners_ud_x, corners_ud_y)])
             if isinstance(board, Checkerboard):
                 # make sure the top left corner is always labeled first and the labels go across rows
-                corners_ud = reorder_checkerboard_points(corners_ud, board.get_size())
+                corners_ud = reorder_checkerboard_points(corners_ud, board.get_size(), fliplr)
             corners_ud = np.expand_dims(corners_ud, 1)
 
             rows[i_row]['corners_distorted'] = row['corners']
             rows[i_row]['corners'] = corners_ud
 
-    pass
-    # todo: now overlay points on the cropped vids and try to make sure it all works
+            rows_cam.extend(rows)
+
+        all_rows.append(rows_cam)
+
+            # if 'mirror' in cropped_vid and i_row==10:
+            #     cap = cv2.VideoCapture(cropped_vid)
+            #     cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
+            #     res, img = cap.read()
+            #
+            #     cap.release()
+            #
+            #     plt.figure()
+            #     plt.imshow(img)
+            #     for ii, id in enumerate(row['ids']):
+            #         plt.text(rows[i_row]['corners_distorted'][ii, 0, 0], rows[i_row]['corners_distorted'][ii, 0, 1], '{:d}'.format(id), c='r')
+            #     # plt.scatter(row['corners'][:,:,0], row['corners'][:,:,1])
+            #     # plt.scatter(corners_ud[:,:,0], corners_ud[:,:,1])
+            #     # plt.show()
+            #
+            #     plt.figure()
+            #     img_flip = cv2.flip(img, 1)
+            #     plt.imshow(img_flip)
+            #     for ii, id in enumerate(row['ids']):
+            #         plt.text(rows[i_row]['corners'][ii, 0, 0], rows[i_row]['corners'][ii, 0, 1], '{:d}'.format(id), c='r')
+            #
+            #
+            #     plt.show()
+            #     pass
+
+    return all_rows
 
             # do the ID's need to be rearranged? Is that different for charuco vs checkerboard calibration?
 
 
             # comment in lines below to display on full original image
             # load original video frame
-            if 'direct' in cropped_vid:
-                orig_video = navigation_utilities.find_calibration_video(cropped_vid_metadata, parent_directories['calibration_vids_parent'])
-                cap = cv2.VideoCapture(orig_video)
-
-                cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
-                res, img = cap.read()
-
-                plt.imshow(img)
-                for ii, id in enumerate(row['ids']):
-            #         plt.text(orig_coord[ii,0], orig_coord[ii,1], '{:d}'.format(id), c='r')
-                    plt.text(reordered_orig_pts[ii,0], reordered_orig_pts[ii,1], '{:d}'.format(id), c='r')
-                # plt.scatter(orig_coord[:,0], orig_coord[:,1])
-                # plt.scatter(orig_ud[:,0], orig_ud[:,1])
-
-                cap.release()
-                plt.show()
-                pass
+            # if 'direct' in cropped_vid:
+            #     orig_video = navigation_utilities.find_calibration_video(cropped_vid_metadata, parent_directories['calibration_vids_parent'])
+            #     cap = cv2.VideoCapture(orig_video)
+            #
+            #     cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
+            #     res, img = cap.read()
+            #
+            #     plt.imshow(img)
+            #     for ii, id in enumerate(row['ids']):
+            # #         plt.text(orig_coord[ii,0], orig_coord[ii,1], '{:d}'.format(id), c='r')
+            #         plt.text(reordered_orig_pts[ii,0], reordered_orig_pts[ii,1], '{:d}'.format(id), c='r')
+            #     # plt.scatter(orig_coord[:,0], orig_coord[:,1])
+            #     # plt.scatter(orig_ud[:,0], orig_ud[:,1])
+            #
+            #     cap.release()
+            #     plt.show()
+            #     pass
             # if 'mirror' in cropped_vid:
             #     orig_video = navigation_utilities.find_calibration_video(cropped_vid_metadata, parent_directories['calibration_vids_parent'])
             #     cap = cv2.VideoCapture(orig_video)
@@ -1579,7 +1670,6 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, parent_directori
             #     cap.release()
             #     pass
 
-        pass
 
 
 
@@ -1673,7 +1763,7 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
     return rows, size
 
 
-def reorder_checkerboard_points(corners, size):
+def reorder_checkerboard_points(corners, size, fliplr):
 
     # reordeer chessboard corners so first point is top left
     if np.ndim(corners) == 3:
@@ -1683,37 +1773,76 @@ def reorder_checkerboard_points(corners, size):
         first_corner = corners[0,:]
         last_corner = corners[-1,:]
     num_corners = np.prod(size)
-    # what are the relative positions of the first and last points?
-    if first_corner[0] < last_corner[0] and first_corner[1] < last_corner[1]:
-        # first corner is top left; then it will go left->right (I think)
-        # so the order should already be correct
-        id_order = np.arange(num_corners)
-    elif first_corner[0] > last_corner[0] and first_corner[1] < last_corner[1]:
-        # first corner is top right; then it will go down the column (I think)
-        id_order = []
-        # the first index in size is the row because it always starts counting along the first axis in size
-        for i_row in range(size[0]):
-            for i_col in range(size[1]):
-                id_order.append((size[1]-i_col-1) * size[0] + i_row)
-        id_order = np.array(id_order)
-    elif first_corner[0] > last_corner[0] and first_corner[1] > last_corner[1]:
-        # first corner is bottom right; then it will go left along the bottom row (I think)
-        id_order = []
-        # this time the rows are the second index in size
-        for i_row in range(size[1]):
-            for i_col in range(size[0]):
-                id_order.append(((size[1]-i_row) * size[0]) - i_col - 1)
-        id_order = np.array(id_order)
-    elif first_corner[0] < last_corner[0] and first_corner[1] > last_corner[1]:
-        # first corner is bottom left; then it will go up along the left column (I think)
-        id_order = []
-        # this time the rows are the first index in size because going up the columns
-        for i_row in range(size[0]):
-            for i_col in range(size[1]):
-                id_order.append((size[0] * (i_col+1)) - i_row - 1)
-        id_order = np.array(id_order)
 
-    reordered_corners = np.array([corners[ii,:] for ii in id_order])
+    if not fliplr:
+        # what are the relative positions of the first and last points?
+        if first_corner[0] < last_corner[0] and first_corner[1] < last_corner[1]:
+            # first corner is top left; then it will go left->right (I think)
+            # so the order should already be correct
+            id_order = np.arange(num_corners)
+        elif first_corner[0] > last_corner[0] and first_corner[1] < last_corner[1]:
+            # first corner is top right; then it will go down the column (I think)
+            # this seems to be working correctly
+            id_order = []
+            # the first index in size is the row because it always starts counting along the first axis in size
+            for i_row in range(size[0]):
+                for i_col in range(size[1]):
+                    id_order.append((size[1]-i_col-1) * size[0] + i_row)
+            id_order = np.array(id_order)
+        elif first_corner[0] > last_corner[0] and first_corner[1] > last_corner[1]:
+            # first corner is bottom right; then it will go left along the bottom row (I think)
+            id_order = []
+            # this time the rows are the second index in size
+            for i_row in range(size[1]):
+                for i_col in range(size[0]):
+                    id_order.append(((size[1]-i_row) * size[0]) - i_col - 1)
+            id_order = np.array(id_order)
+        elif first_corner[0] < last_corner[0] and first_corner[1] > last_corner[1]:
+            # first corner is bottom left; then it will go up along the left column (I think)
+            id_order = []
+            # this time the rows are the first index in size because going up the columns
+            for i_row in range(size[0]):
+                for i_col in range(size[1]):
+                    id_order.append((size[0] * (i_col+1)) - i_row - 1)
+            id_order = np.array(id_order)
+
+    else:
+        # the points have been flipped left-right, meaning that the points order has also flipped
+        # what are the relative positions of the first and last points?
+        if first_corner[0] < last_corner[0] and first_corner[1] < last_corner[1]:
+            # first corner is top left; this means it used to be top right; then it will go top->bottom (I think)
+            id_order = []
+            # since it's going top-->bottom, first index in size is the number of rows
+            for i_row in range(size[0]):
+                for i_col in range(size[1]):
+                    id_order.append((size[0] * i_col) + i_row)
+            id_order = np.array(id_order)
+        elif first_corner[0] > last_corner[0] and first_corner[1] < last_corner[1]:
+            # first corner is top right; this means it used to be top left; then it will go right to left (I think)
+            id_order = []
+            # since it's going right-->left, first index in size is the number of columns
+            for i_row in range(size[1]):
+                for i_col in range(size[0]):
+                    id_order.append(i_row * size[0] + (size[0] - i_col - 1))
+            id_order = np.array(id_order)
+        elif first_corner[0] > last_corner[0] and first_corner[1] > last_corner[1]:
+            # first corner is bottom right; this means it used to be bottom left; then it will go up the columns (I think)
+            id_order = []
+            # since it's going bottom-->top, first index in size is the number of rows
+            for i_row in range(size[0]):
+                for i_col in range(size[1]):
+                    id_order.append(np.prod(size) - i_col * size[0] - i_row - 1)
+            id_order = np.array(id_order)
+        elif first_corner[0] < last_corner[0] and first_corner[1] > last_corner[1]:
+            # first corner is bottom left; this means it used to be bottom right; then it will go left to right (I think)
+            id_order = []
+            # since it's going left-->right, first index in size is the number of columns
+            for i_row in range(size[1]):
+                for i_col in range(size[0]):
+                    id_order.append((size[1] * (size[0]-i_row-1)) + i_col)
+            id_order = np.array(id_order)
+
+    reordered_corners = np.array([corners[ii, :] for ii in id_order])
 
     return reordered_corners
 

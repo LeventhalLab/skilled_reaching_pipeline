@@ -22,6 +22,7 @@ from boards import CharucoBoard, Checkerboard, merge_rows, extract_points, extra
 from aniposelib.cameras import Camera, CameraGroup
 from aniposelib.utils import load_pose2d_fnames, get_initial_extrinsics, make_M, get_rtvec, get_connections
 from random import randint
+from pprint import pprint
 import pandas as pd
 import matplotlib
 matplotlib.use('TKAgg')
@@ -1552,10 +1553,12 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_d
         cgroup.set_rotations(rvecs)
         cgroup.set_translations(tvecs)
 
-    error = cgroup.bundle_adjust_iter(imgp, extra, verbose=verbose, **kwargs)
+    # need to look and decide if default parameters in bundle_ajust_iter work well here
+    error = cgroup.bundle_adjust_iter(imgp, extra, verbose=verbose)
 
-    return error
-    pass
+    return cgroup, error
+
+
 def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories):
     # all_rows = []
     #

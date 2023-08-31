@@ -18,9 +18,9 @@ import glob
 from tqdm import trange
 import computer_vision_basics as cvb
 import skilled_reaching_io
-from boards import CharucoBoard, Checkerboard
+from boards import CharucoBoard, Checkerboard, merge_rows, extract_points, extract_rtvecs
 from aniposelib.cameras import Camera, CameraGroup
-from aniposelib.utils import load_pose2d_fnames
+from aniposelib.utils import load_pose2d_fnames, get_initial_extrinsics, make_M, get_rtvec, get_connections
 from random import randint
 import pandas as pd
 import matplotlib
@@ -1488,10 +1488,11 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
     return cam_intrinsic_data
 
 
-def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_directories):
+def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_directories, init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
     all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories)
+    cam_names = cgroup.get_names()
 
     expected_cam_idx = 0
     for rows, cropped_vid in zip(all_rows, cropped_vids):
@@ -1527,14 +1528,33 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_d
         # mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp, imgp, size, matrix, np.zeros((1,5)), flags=CALIBRATION_FLAGS)
 
         cgroup.cameras[cam_idx].set_camera_matrix(matrix)
-        cgroup.cameras[cam_idx].set_distortions(np.zeros((1,5)))
+        cgroup.cameras[cam_idx].set_distortions(np.zeros((1,5)))   # because all points should already be undistorted
 
     for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
-        # need to make sure the cameras are in the right order
+        # need to make sure the cameras are in the right order; this should have been checked in the code above
         all_rows[i] = board.estimate_pose_rows(cam, row)
-        pass
 
-    merged = cgroup.merge_rows(all_rows)
+    merged = merge_rows(all_rows, cam_names=cam_names)
+    imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
+    '''
+        extra = {
+        'objp': objp,
+        'ids': board_ids,
+        'rvecs': rvecs,
+        'tvecs': tvecs
+    }'''
+
+    if init_extrinsics:
+        rtvecs = extract_rtvecs(merged)
+        if verbose:
+            pprint(get_connections(rtvecs, cam_names))
+        rvecs, tvecs = get_initial_extrinsics(rtvecs, cam_names)
+        cgroup.set_rotations(rvecs)
+        cgroup.set_translations(tvecs)
+
+    error = cgroup.bundle_adjust_iter(imgp, extra, verbose=verbose, **kwargs)
+
+    return error
     pass
 def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories):
     # all_rows = []

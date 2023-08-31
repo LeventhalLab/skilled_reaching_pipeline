@@ -269,7 +269,7 @@ def calibrate_all_sessions(parent_directories,
 
             # todo: test if chessboard detection is sufficient for the old boards
             for cropped_vid in current_cropped_calibration_vids:
-                skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cgroup, parent_directories)
+                cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cgroup, parent_directories)
                 pass
 
             pass

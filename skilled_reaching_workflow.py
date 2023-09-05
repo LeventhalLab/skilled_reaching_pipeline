@@ -268,11 +268,15 @@ def calibrate_all_sessions(parent_directories,
             # skilled_reaching_calibration.write_charuco_image(mirror_board, 600, parent_directories['calibration_vids_parent'])
 
             # todo: test if chessboard detection is sufficient for the old boards
-            for cropped_vid in current_cropped_calibration_vids:
+            calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name, calibration_files_parent)
+            if os.path.exists(calibration_toml_name):
+                cgroup = CameraGroup.load(calibration_toml_name)
+            else:
                 cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cgroup, parent_directories)
+                cgroup.dump(calibration_toml_name)
                 pass
-
             pass
+
 
 
     for cf in calib_vid_folders:

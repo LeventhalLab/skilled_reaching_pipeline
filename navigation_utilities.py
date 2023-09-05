@@ -2398,6 +2398,32 @@ def create_calibration_summary_name(full_calib_vid_name, calibration_files_paren
     return full_calib_fname
 
 
+def create_calibration_toml_name(full_calib_vid_name, calibration_files_parent):
+    '''
+
+    :param full_calib_vid_name:
+    :return:
+    '''
+
+    # store the toml file with the calibration parameters in the same folder as the calibration video
+    calib_vid_path, _ = os.path.split(full_calib_vid_name)
+    calib_metadata = parse_camera_calibration_video_name(full_calib_vid_name)
+
+    calib_file_path = create_calibration_file_path(calibration_files_parent, calib_metadata)
+
+    if not os.path.isdir(calib_file_path):
+        os.makedirs(calib_file_path)
+
+    calib_fname = '_'.join(('calibrationdata',
+                            fname_time2string(calib_metadata['time']),
+                            'box{:02d}'.format(calib_metadata['boxnum']) + '.toml'
+    ))
+
+    full_calib_fname = os.path.join(calib_file_path, calib_fname)
+
+    return full_calib_fname
+
+
 def fname_time2string(ftime):
 
     fname_timestring = ftime.strftime('%Y%m%d_%H-%M-%S')

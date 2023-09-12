@@ -257,9 +257,6 @@ def calibrate_all_sessions(parent_directories,
             mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
             full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
                                                                                      parent_directories)
-            # current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(full_calib_vid_name,
-            #                                                                                        session_row,
-            #                                                                                        filtertype=filtertype)
 
             # now identify the points, undistort them
             mirror_board = skilled_reaching_calibration.mirror_board_from_df(session_row)
@@ -270,6 +267,11 @@ def calibrate_all_sessions(parent_directories,
             if os.path.exists(calibration_toml_name):
                 cgroup = CameraGroup.load(calibration_toml_name)
             else:
+                # need this here so we have the video names, not because we need videos cropped
+                current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(
+                    full_calib_vid_name,
+                    session_row,
+                    filtertype=filtertype)
                 cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cgroup, parent_directories)
                 cgroup.dump(calibration_toml_name)
                 pass

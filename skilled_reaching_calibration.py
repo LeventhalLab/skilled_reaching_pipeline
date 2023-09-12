@@ -996,7 +996,7 @@ def create_checkerboard(squaresX, squaresY, square_length, manually_verify=False
 
 def write_board_image(board, dpi, calib_dir, units='mm'):
     if type(board) is Checkerboard:
-        write_checkerboard_image(board, dpi, calib_dir, units=units)
+        # write_checkerboard_image(board, dpi, calib_dir, units=units)
         pass
     elif type(board) is CharucoBoard:
         write_charuco_image(board, dpi, calib_dir, units=units)

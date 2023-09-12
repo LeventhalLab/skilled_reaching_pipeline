@@ -1096,7 +1096,7 @@ def crop_calibration_video(calib_vid,
                 # I think we don't want to flip them for now, will flip them left to right after undistortion
             else:
                 fliplr = False
-            calibration_crop_params_dict[key][2] = calib_crop_top
+            # calibration_crop_params_dict[key][2] = calib_crop_top
 
             full_cropped_vid_name = navigation_utilities.create_cropped_calib_vid_name(calib_vid, key, calibration_crop_params_dict, fliplr)
             cropped_vid_names.append(full_cropped_vid_name)
@@ -1526,6 +1526,8 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_directories, init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
+    # get_rows_cropped will undistort points in the full original reference frame, then move them back into the cropped
+    # video, then flip them left-right if in a mirror view
     all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories)
     cam_names = cgroup.get_names()
 
@@ -1558,7 +1560,10 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_d
         # distortion coefficients should be zero - points should already be undistorted
         objp, imgp = board.get_all_calibration_points(rows)
         mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= 7]
-        objp, imgp = zip(*mixed)
+        try:
+            objp, imgp = zip(*mixed)
+        except:
+            pass
         matrix = cv2.initCameraMatrix2D(objp, imgp, tuple(size))
         # mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp, imgp, size, matrix, np.zeros((1,5)), flags=CALIBRATION_FLAGS)
 
@@ -1580,7 +1585,10 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_d
     }'''
 
     if init_extrinsics:
-        rtvecs = extract_rtvecs(merged)
+        try:
+            rtvecs = extract_rtvecs(merged)
+        except:
+            pass
         if verbose:
             pprint(get_connections(rtvecs, cam_names))
         rvecs, tvecs = get_initial_extrinsics(rtvecs, cam_names)

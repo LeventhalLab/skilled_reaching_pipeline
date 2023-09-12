@@ -277,7 +277,7 @@ def calibrate_all_sessions(parent_directories,
                 pass
             pass
 
-
+    #TODO: load the calibration .toml file and verify points
 
     for cf in calib_vid_folders:
         # crop the calibration videos

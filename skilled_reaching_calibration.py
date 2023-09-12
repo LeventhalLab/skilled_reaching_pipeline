@@ -994,6 +994,40 @@ def create_checkerboard(squaresX, squaresY, square_length, manually_verify=False
     return board
 
 
+def write_board_image(board, dpi, calib_dir, units='mm'):
+    if type(board) is Checkerboard:
+        write_checkerboard_image(board, dpi, calib_dir, units=units)
+        pass
+    elif type(board) is CharucoBoard:
+        write_charuco_image(board, dpi, calib_dir, units=units)
+
+def write_checkerboard_image(board, dpi, calib_dir, units='mm'):
+    #todo: will have to build this, but for now just skipping it
+    x_total = int(board.squaresX * board.square_length)
+    y_total = int(board.squaresY * board.square_length)
+
+    fname = '_'.join(['checkerboard',
+                      '{:d}x{:d}'.format(y_total, x_total),
+                      '{:d}x{:d}'.format(board.squaresY, board.squaresX),
+                      '{:d}'.format(int(board.square_length)),
+                      '{:d}dpi.tiff'.format(dpi)])
+    fname = os.path.join(calib_dir, fname)
+
+    if units.lower() == 'mm':
+        cf = 25.4
+    elif units.lower() == 'cm':
+        cf = 2.54
+    elif units.lower() in ['inch', 'inches']:
+        cf = 1.
+
+    xpixels = round(dpi * x_total / cf)
+    ypixels = round(dpi * y_total / cf)
+
+    img = board.board.generateImage((xpixels,ypixels))
+
+    cv2.imwrite(fname, img)
+
+
 def write_charuco_image(board, dpi, calib_dir, units='mm'):
 
     x_total = int(board.squaresX * board.square_length)

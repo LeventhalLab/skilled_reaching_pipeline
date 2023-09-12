@@ -9,6 +9,7 @@ from datetime import datetime
 from tqdm import tqdm
 import skilled_reaching_calibration
 import navigation_utilities
+import skilled_reaching_io
 
 
 def crop_params_dict_from_df(crop_params_df, session_date, box_num, view_list=['direct', 'leftmirror', 'rightmirror']):
@@ -170,6 +171,58 @@ def cropped_vid_name(full_vid_path, dest_folder, view_name, crop_params, fliplr=
     full_dest_name = os.path.join(dest_folder, dest_name)
 
     return full_dest_name
+
+
+def crop_all_calibration_videos(parent_directories,
+                               calibration_metadata_df,
+                               vidtype='.avi',
+                               view_list=['direct', 'leftmirror', 'rightmirror'],
+                               filtertype='h264'):
+
+    calibration_vids_parent = parent_directories['calibration_vids_parent']
+    calibration_files_parent = parent_directories['calibration_files_parent']
+
+    if vidtype[0] != '.':
+        vidtype = '.' + vidtype
+
+    calib_vid_folders = navigation_utilities.find_calibration_vid_folders(calibration_vids_parent)
+
+    ratIDs = list(calibration_metadata_df.keys())
+
+    for ratID in ratIDs:
+        rat_metadata_df = calibration_metadata_df[ratID]
+        num_sessions = len(rat_metadata_df)
+
+        for i_session in range(num_sessions):
+            session_row = rat_metadata_df.iloc[[i_session]]
+
+            # calibrate the camera for this session
+            # cam_cal_vid_name = session_row['cal_vid_name_camera'].values[0]
+            #
+            # cam_cal_pickle = navigation_utilities.create_cam_cal_pickle_name(cam_cal_vid_name, parent_directories)
+            # if os.path.exists(cam_cal_pickle):
+            #     cam_intrinsics = skilled_reaching_io.read_pickle(cam_cal_pickle)
+            # else:
+            #     cam_cal_pickle_folder, _ = os.path.split(cam_cal_pickle)
+            #     if not os.path.exists(cam_cal_pickle_folder):
+            #         os.makedirs(cam_cal_pickle_folder)
+            #     full_cam_cal_vid_path = navigation_utilities.find_camera_calibration_video(cam_cal_vid_name,
+            #                                                                                parent_directories)
+            #     cam_board = skilled_reaching_calibration.camera_board_from_df(session_row)
+            #
+            #     cam_intrinsics = skilled_reaching_calibration.calibrate_single_camera(full_cam_cal_vid_path, cam_board)
+
+            mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
+            full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
+                                                                                     parent_directories)
+            if full_calib_vid_name is None:
+                session_date = session_row.loc[1].at['date']
+                print('no calibration video for session {}'.format(session_date.strftime('%m/%d/%Y')))
+                return
+
+            current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(full_calib_vid_name,
+                                                                                                   session_row,
+                                                                                                   filtertype=filtertype)
 
 
 def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mjpeg2jpeg', fliplr=False):

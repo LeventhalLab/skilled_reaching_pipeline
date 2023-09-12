@@ -249,8 +249,6 @@ def calibrate_all_sessions(parent_directories,
 
                 cam_intrinsics = skilled_reaching_calibration.calibrate_single_camera(full_cam_cal_vid_path, cam_board)
 
-
-                # todo: write the results to a .pickle file for use later, then change the cropping functions to undistort images first;
                 # alternatively, undistort after identifying points, which may be faster
                 skilled_reaching_io.write_pickle(cam_cal_pickle, cam_intrinsics)
 
@@ -259,13 +257,13 @@ def calibrate_all_sessions(parent_directories,
             mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
             full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
                                                                                      parent_directories)
-            current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(full_calib_vid_name,
-                                                                                                   session_row,
-                                                                                                   filtertype=filtertype)
+            # current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(full_calib_vid_name,
+            #                                                                                        session_row,
+            #                                                                                        filtertype=filtertype)
 
             # now identify the points, undistort them
             mirror_board = skilled_reaching_calibration.mirror_board_from_df(session_row)
-            # skilled_reaching_calibration.write_charuco_image(mirror_board, 600, parent_directories['calibration_vids_parent'])
+            skilled_reaching_calibration.write_board_image(mirror_board, 600, parent_directories['calibration_vids_parent'])
 
             # todo: test if chessboard detection is sufficient for the old boards
             calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name, calibration_files_parent)
@@ -353,7 +351,7 @@ if __name__ == '__main__':
     # rat_database_name = '/home/levlab/Public/rat_SR_videos_to_analyze/SR_rat_database.csv'
     label_videos = True
 
-    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 484, 485, 486, 497, 498, 499, 500, 501, 502]
+    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502]
 
     # rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
 
@@ -459,6 +457,16 @@ if __name__ == '__main__':
         session_metadata_xlsx_path = os.path.join(video_root_folders[expt], 'SR_{}_video_session_metadata.xlsx'.format(expt))
         # calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
         calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+
+        crop_videos.crop_all_calibration_videos(parent_directories[expt],
+                                    calibration_metadata_df,
+                                    vidtype='.avi',
+                                    view_list=cam_names,
+                                    filtertype=filtertype)
+
+        # current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(full_calib_vid_name,
+        #                                                                                        session_row,
+        #                                                                                        filtertype=filtertype)
 
         calibrate_all_sessions(parent_directories[expt],
                                calibration_metadata_df,

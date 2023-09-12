@@ -1235,6 +1235,8 @@ def cal_frames_folder_from_cal_vids_name(cal_vid_name):
 def find_mirror_calibration_video(mirror_cal_vid_name, parent_directories):
 
     cal_metadata = parse_camera_calibration_video_name(mirror_cal_vid_name)
+    if cal_metadata is None:
+        return None
     month_folder = 'calibration_videos_{}'.format(cal_metadata['time'].strftime('%Y%m'))
     month_folder = os.path.join(parent_directories['calibration_vids_parent'], month_folder)
 
@@ -1494,7 +1496,10 @@ def parse_camera_calibration_video_name(calibration_video_name):
         'boxnum': 99,
         'time': datetime(1, 1, 1)
     }
-    _, cal_vid_name = os.path.split(calibration_video_name)
+    try:
+        _, cal_vid_name = os.path.split(calibration_video_name)
+    except:
+        return None
     cal_vid_name, _ = os.path.splitext(cal_vid_name)
 
     cal_vid_name_parts = cal_vid_name.split('_')

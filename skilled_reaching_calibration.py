@@ -1601,11 +1601,12 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_d
     return cgroup, error
 
 
-def test_calibration(session_metadata, parent_directories):
+def test_calibration(session_metadata, calibration_metadata_df, parent_directories):
 
     calibration_vids_parent = parent_directories['calibration_vids_parent']
     calibration_files_parent = parent_directories['calibration_files_parent']
 
+    rat_metadata_df = calibration_metadata_df[session_metadata['ratID']]
     session_row = rat_metadata_df.iloc[[i_session]]
     session_metadata = {
                         'ratID': ratID,
@@ -1613,7 +1614,7 @@ def test_calibration(session_metadata, parent_directories):
                         'date': session_date,
                         'task': folder_parts[2],
                         'session_num': session_num,
-                        'current': current_value
+                        'current': 0.
     }
     mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
     full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,

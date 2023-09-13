@@ -451,15 +451,20 @@ if __name__ == '__main__':
     # test_cal_vid = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\test_calibration\GridCalibration_box01_20230823_18-40-45.avi'
     #
     # ret, mtx, dist = skilled_reaching_calibration.calibrate_single_camera(test_cal_vid, board)
-
+    expt = 'dLightPhotometry'
     session_metadata = {
-        'ratID': 'R0486',
-        'rat_num': 486,
-        'date': datetime(2023, 8, 21),
+        'ratID': 'R0452',
+        'rat_num': 452,
+        'date': datetime(2023, 3, 28),
         'task': 'skilledreaching',
         'session_num': 1,
-        'current': current_value
+        'current': 0.
     }
+    session_metadata_xlsx_path = os.path.join(video_root_folders[expt],
+                                              'SR_{}_video_session_metadata.xlsx'.format(expt))
+    calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+    skilled_reaching_calibration.test_calibration(session_metadata, calibration_metadata_df, parent_directories[expt])
+
     for expt in experiment_list:
 
         # first, calibrate the cameras and write results into a .toml file

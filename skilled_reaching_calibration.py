@@ -20,7 +20,7 @@ import computer_vision_basics as cvb
 import skilled_reaching_io
 from boards import CharucoBoard, Checkerboard, merge_rows, extract_points, extract_rtvecs
 from aniposelib.cameras import Camera, CameraGroup
-from aniposelib.utils import load_pose2d_fnames, get_initial_extrinsics, make_M, get_rtvec, get_connections
+from utils import load_pose2d_fnames, get_initial_extrinsics, make_M, get_rtvec, get_connections
 from random import randint
 from pprint import pprint
 import pandas as pd
@@ -1585,13 +1585,13 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_d
     }'''
 
     if init_extrinsics:
-        try:
-            rtvecs = extract_rtvecs(merged)
-        except:
-            pass
+        rtvecs = extract_rtvecs(merged)
         if verbose:
             pprint(get_connections(rtvecs, cam_names))
-        rvecs, tvecs = get_initial_extrinsics(rtvecs, cam_names)
+        try:
+            rvecs, tvecs = get_initial_extrinsics(rtvecs, cam_names)
+        except:
+            pass
         cgroup.set_rotations(rvecs)
         cgroup.set_translations(tvecs)
 
@@ -1599,6 +1599,28 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_d
     error = cgroup.bundle_adjust_iter(imgp, extra, verbose=verbose)
 
     return cgroup, error
+
+
+def test_calibration(session_metadata, parent_directories):
+
+    calibration_vids_parent = parent_directories['calibration_vids_parent']
+    calibration_files_parent = parent_directories['calibration_files_parent']
+
+    session_row = rat_metadata_df.iloc[[i_session]]
+    session_metadata = {
+                        'ratID': ratID,
+                        'rat_num': rat_num,
+                        'date': session_date,
+                        'task': folder_parts[2],
+                        'session_num': session_num,
+                        'current': current_value
+    }
+    mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
+    full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
+                                                                             parent_directories)
+
+    calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name,
+                                                                              calibration_files_parent)
 
 
 def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories):

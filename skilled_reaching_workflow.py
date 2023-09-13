@@ -279,6 +279,7 @@ def calibrate_all_sessions(parent_directories,
 
     #TODO: load the calibration .toml file and verify points
 
+
     for cf in calib_vid_folders:
         # crop the calibration videos
         calib_vids = glob.glob(os.path.join(cf, 'GridCalibration_*' + vidtype))
@@ -451,6 +452,14 @@ if __name__ == '__main__':
     #
     # ret, mtx, dist = skilled_reaching_calibration.calibrate_single_camera(test_cal_vid, board)
 
+    session_metadata = {
+        'ratID': 'R0486',
+        'rat_num': 486,
+        'date': datetime(2023, 8, 21),
+        'task': 'skilledreaching',
+        'session_num': 1,
+        'current': current_value
+    }
     for expt in experiment_list:
 
         # first, calibrate the cameras and write results into a .toml file

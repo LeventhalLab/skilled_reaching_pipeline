@@ -1526,8 +1526,10 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_directories, init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
-    # get_rows_cropped will undistort points in the full original reference frame, then move them back into the cropped
-    # video, then flip them left-right if in a mirror view
+    # get_rows_cropped_vids will
+    #  1. detect the checkerboard/charuco board points
+    #  2. undistort points in the full original reference frame, then move them back into the cropped
+    #      video, then flip them left-right if in a mirror view
     all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories)
     cam_names = cgroup.get_names()
 
@@ -1596,7 +1598,8 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_d
         cgroup.set_translations(tvecs)
 
     # need to look and decide if default parameters in bundle_ajust_iter work well here
-    error = cgroup.bundle_adjust_iter(imgp, extra, verbose=verbose)
+    # don't undistort the points - already done in get_rows_cropped_vids
+    error = cgroup.bundle_adjust_iter(imgp, extra, undistort=False, verbose=verbose)
 
     return cgroup, error
 
@@ -1607,21 +1610,27 @@ def test_calibration(session_metadata, calibration_metadata_df, parent_directori
     calibration_files_parent = parent_directories['calibration_files_parent']
 
     rat_metadata_df = calibration_metadata_df[session_metadata['ratID']]
-    session_row = rat_metadata_df.iloc[[i_session]]
-    session_metadata = {
-                        'ratID': ratID,
-                        'rat_num': rat_num,
-                        'date': session_date,
-                        'task': folder_parts[2],
-                        'session_num': session_num,
-                        'current': 0.
-    }
+    session_row = rat_metadata_df.loc[rat_metadata_df['date']==session_metadata['date']]
+    # session_metadata = {
+    #                     'ratID': ratID,
+    #                     'rat_num': rat_num,
+    #                     'date': session_date,
+    #                     'task': folder_parts[2],
+    #                     'session_num': session_num,
+    #                     'current': 0.
+    # }
     mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
     full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
                                                                              parent_directories)
 
     calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name,
                                                                               calibration_files_parent)
+
+    cgroup = CameraGroup.load(calibration_toml_name)
+
+    pass
+
+
 
 
 def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories):

@@ -260,7 +260,7 @@ def calibrate_all_sessions(parent_directories,
 
             # now identify the points, undistort them
             mirror_board = skilled_reaching_calibration.mirror_board_from_df(session_row)
-            skilled_reaching_calibration.write_board_image(mirror_board, 600, parent_directories['calibration_vids_parent'])
+            # skilled_reaching_calibration.write_board_image(mirror_board, 600, parent_directories['calibration_vids_parent'])
 
             # todo: test if chessboard detection is sufficient for the old boards
             calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name, calibration_files_parent)
@@ -463,7 +463,7 @@ if __name__ == '__main__':
     session_metadata_xlsx_path = os.path.join(video_root_folders[expt],
                                               'SR_{}_video_session_metadata.xlsx'.format(expt))
     calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
-    skilled_reaching_calibration.test_calibration(session_metadata, calibration_metadata_df, parent_directories[expt])
+    # skilled_reaching_calibration.test_calibration(session_metadata, calibration_metadata_df, parent_directories[expt])
 
     for expt in experiment_list:
 

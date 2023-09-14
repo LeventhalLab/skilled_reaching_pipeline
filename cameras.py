@@ -658,6 +658,7 @@ class CameraGroup:
                            max_nfev=200, ftol=1e-4,
                            n_samp_iter=100, n_samp_full=1000,
                            error_threshold=0.3,
+                           undistort=False,
                            verbose=False):
         """Given an CxNx2 array of 2D points,
         where N is the number of points and C is the number of cameras,
@@ -691,7 +692,7 @@ class CameraGroup:
         for i in range(n_iters):
             p2ds, extra = resample_points(p2ds_full, extra_full,
                                           n_samp=n_samp_full)
-            p3ds = self.triangulate(p2ds)
+            p3ds = self.triangulate(p2ds, undistort=undistort)
             errors_full = self.reprojection_error(p3ds, p2ds, mean=False)
             errors_norm = self.reprojection_error(p3ds, p2ds, mean=True)
 
@@ -726,7 +727,7 @@ class CameraGroup:
 
         p2ds, extra = resample_points(p2ds_full, extra_full,
                                       n_samp=n_samp_full)
-        p3ds = self.triangulate(p2ds)
+        p3ds = self.triangulate(p2ds, undistort=undistort)
         errors_full = self.reprojection_error(p3ds, p2ds, mean=False)
         errors_norm = self.reprojection_error(p3ds, p2ds, mean=True)
         error_dict = get_error_dict(errors_full)

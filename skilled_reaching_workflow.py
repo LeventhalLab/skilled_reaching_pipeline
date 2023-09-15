@@ -12,7 +12,7 @@ import cv2
 import sys
 import deeplabcut
 from boards import CharucoBoard, Checkerboard
-from aniposelib.cameras import Camera, CameraGroup
+from cameras import Camera, CameraGroup
 
 
 def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_dirs, rat_df, cropped_vid_type='.avi', gputouse=0, save_as_csv=True, create_marked_vids=True):

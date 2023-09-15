@@ -19,7 +19,7 @@ from tqdm import trange
 import computer_vision_basics as cvb
 import skilled_reaching_io
 from boards import CharucoBoard, Checkerboard, merge_rows, extract_points, extract_rtvecs
-from aniposelib.cameras import Camera, CameraGroup
+from cameras import Camera, CameraGroup
 from utils import load_pose2d_fnames, get_initial_extrinsics, make_M, get_rtvec, get_connections
 from random import randint
 from pprint import pprint
@@ -1599,7 +1599,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_d
 
     # need to look and decide if default parameters in bundle_ajust_iter work well here
     # don't undistort the points - already done in get_rows_cropped_vids
-    error = cgroup.bundle_adjust_iter(imgp, extra, undistort=False, verbose=verbose)
+    error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
 
     return cgroup, error
 

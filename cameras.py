@@ -12,9 +12,9 @@ from tqdm import trange
 from pprint import pprint
 import time
 
-from .boards import merge_rows, extract_points, \
+from boards import merge_rows, extract_points, \
     extract_rtvecs, get_video_params
-from .utils import get_initial_extrinsics, make_M, get_rtvec, \
+from utils import get_initial_extrinsics, make_M, get_rtvec, \
     get_connections
 
 @jit(nopython=True, parallel=True)
@@ -762,6 +762,117 @@ class CameraGroup:
 
         return error
 
+
+    def bundle_adjust_iter_fixed_dist(self, p2ds, extra=None,
+                           n_iters=10, start_mu=15, end_mu=1,
+                           max_nfev=200, ftol=1e-4,
+                           n_samp_iter=100, n_samp_full=1000,
+                           error_threshold=0.3,
+                           undistort=False,
+                           verbose=False):
+        """Given an CxNx2 array of 2D points,
+        where N is the number of points and C is the number of cameras,
+        this performs iterative bundle adjustsment to fine-tune the parameters of the cameras.
+        That is, it performs bundle adjustment multiple times, adjusting the weights given to points
+        to reduce the influence of outliers.
+        This is inspired by the algorithm for Fast Global Registration by Zhou, Park, and Koltun
+        """
+
+        assert p2ds.shape[0] == len(self.cameras), \
+            "Invalid points shape, first dim should be equal to" \
+            " number of cameras ({}), but shape is {}".format(
+                len(self.cameras), p2ds.shape
+            )
+
+        p2ds_full = p2ds
+        extra_full = extra
+
+        p2ds, extra = resample_points(p2ds_full, extra_full,
+                                      n_samp=n_samp_full)
+        error = self.average_error(p2ds, median=True)
+
+        if verbose:
+            print('error: ', error)
+
+        mus = np.exp(np.linspace(np.log(start_mu), np.log(end_mu), num=n_iters))
+
+        if verbose:
+            print('n_samples: {}'.format(n_samp_iter))
+
+        for i in range(n_iters):
+            p2ds, extra = resample_points(p2ds_full, extra_full,
+                                          n_samp=n_samp_full)
+            p3ds = self.triangulate(p2ds, undistort=undistort)
+            errors_full = self.reprojection_error(p3ds, p2ds, mean=False)
+            errors_norm = self.reprojection_error(p3ds, p2ds, mean=True)
+
+            error_dict = get_error_dict(errors_full)
+            max_error = 0
+            min_error = 0
+            for k, v in error_dict.items():
+                num, percents = v
+                max_error = max(percents[-1], max_error)
+                min_error = max(percents[0], min_error)
+            mu = max(min(max_error, mus[i]), min_error)
+
+            good = errors_norm < mu
+            extra_good = subset_extra(extra, good)
+            p2ds_samp, extra_samp = resample_points(
+                p2ds[:, good], extra_good, n_samp=n_samp_iter)
+
+            error = np.median(errors_norm)
+
+            if error < error_threshold:
+                break
+
+            if verbose:
+                pprint(error_dict)
+                print('error: {:.2f}, mu: {:.1f}, ratio: {:.3f}'.format(error, mu, np.mean(good)))
+
+            self.bundle_adjust_fixed_dist(p2ds_samp, extra_samp,
+                               loss='linear', ftol=ftol,
+                               max_nfev=max_nfev,
+                               verbose=verbose)
+
+
+        p2ds, extra = resample_points(p2ds_full, extra_full,
+                                      n_samp=n_samp_full)
+        p3ds = self.triangulate(p2ds, undistort=undistort)
+        errors_full = self.reprojection_error(p3ds, p2ds, mean=False)
+        errors_norm = self.reprojection_error(p3ds, p2ds, mean=True)
+        error_dict = get_error_dict(errors_full)
+        if verbose:
+            pprint(error_dict)
+
+        max_error = 0
+        min_error = 0
+        for k, v in error_dict.items():
+            num, percents = v
+            max_error = max(percents[-1], max_error)
+            min_error = max(percents[0], min_error)
+        mu = max(max(max_error, end_mu), min_error)
+
+        good = errors_norm < mu
+        extra_good = subset_extra(extra, good)
+        self.bundle_adjust_fixed_dist(p2ds[:, good], extra_good,
+                           loss='linear',
+                           ftol=ftol, max_nfev=max(200, max_nfev),
+                           verbose=verbose)
+
+        error = self.average_error(p2ds, median=True)
+
+        p3ds = self.triangulate(p2ds)
+        errors_full = self.reprojection_error(p3ds, p2ds, mean=False)
+        error_dict = get_error_dict(errors_full)
+        if verbose:
+            pprint(error_dict)
+
+        if verbose:
+            print('error: ', error)
+
+        return error
+
+
     def bundle_adjust(self, p2ds, extra=None,
                       loss='linear',
                       threshold=50,
@@ -783,7 +894,7 @@ class CameraGroup:
         if extra is not None:
             extra['ids_map'] = remap_ids(extra['ids'])
 
-        x0, n_cam_params = self._initialize_params_bundle(p2ds, extra)
+        x0, n_cam_params = self._initialize_params_bundle(p2ds, extra, undistort=False)
 
         if start_params is not None:
             x0 = start_params
@@ -794,6 +905,8 @@ class CameraGroup:
         jac_sparse = self._jac_sparsity_bundle(p2ds, n_cam_params, extra)
 
         f_scale = threshold
+
+        # this is the step where distortion coefficients get adjusted - how to fix them at zeros?
         opt = optimize.least_squares(error_fun,
                                      x0,
                                      jac_sparsity=jac_sparse,
@@ -816,6 +929,66 @@ class CameraGroup:
         error = self.average_error(p2ds)
         return error
 
+
+    def bundle_adjust_fixed_dist(self, p2ds, extra=None,
+                      loss='linear',
+                      threshold=50,
+                      ftol=1e-4,
+                      max_nfev=1000,
+                      weights=None,
+                      start_params=None,
+                      verbose=True):
+        """Given an CxNx2 array of 2D points,
+        where N is the number of points and C is the number of cameras,
+        this performs bundle adjustsment to fine-tune the parameters of the cameras"""
+
+        assert p2ds.shape[0] == len(self.cameras), \
+            "Invalid points shape, first dim should be equal to" \
+            " number of cameras ({}), but shape is {}".format(
+                len(self.cameras), p2ds.shape
+            )
+
+        if extra is not None:
+            extra['ids_map'] = remap_ids(extra['ids'])
+
+        x0, n_cam_params = self._initialize_params_bundle_fixed_dist(p2ds, extra, undistort=False)
+
+        if start_params is not None:
+            x0 = start_params
+            n_cam_params = len(self.cameras[0].get_params())
+
+        error_fun = self._error_fun_bundle_fixed_dist
+
+        jac_sparse = self._jac_sparsity_bundle(p2ds, n_cam_params, extra)
+
+        f_scale = threshold
+
+        # this is the step where distortion coefficients get adjusted - how to fix them at zeros?
+        opt = optimize.least_squares(error_fun,
+                                     x0,
+                                     jac_sparsity=jac_sparse,
+                                     f_scale=f_scale,
+                                     x_scale='jac',
+                                     loss=loss,
+                                     ftol=ftol,
+                                     method='trf',
+                                     tr_solver='lsmr',
+                                     verbose=2 * verbose,
+                                     max_nfev=max_nfev,
+                                     args=(p2ds, n_cam_params, extra))
+        best_params = opt.x
+
+        for i, cam in enumerate(self.cameras):
+            a = i * n_cam_params
+            b = (i + 1) * n_cam_params
+            this_cam_params = np.zeros(9)
+            this_cam_params[0:n_cam_params] = best_params[a:b]
+            cam.set_params(this_cam_params)
+
+        error = self.average_error(p2ds)
+        return error
+
+
     @jit(parallel=True, forceobj=True)
     def _error_fun_bundle(self, params, p2ds, n_cam_params, extra):
         """Error function for bundle adjustment"""
@@ -827,8 +1000,50 @@ class CameraGroup:
             a = i * n_cam_params
             b = (i + 1) * n_cam_params
             cam.set_params(params[a:b])
+            # params[7] = dist[0] and params[8]=dist[1]
 
+        # n_cams = len(self.cameras)
+        sub = n_cam_params * n_cams
+        n3d = p2ds.shape[1] * 3
+        p3ds_test = params[sub:sub+n3d].reshape(-1, 3)
+        errors = self.reprojection_error(p3ds_test, p2ds)
+        errors_reproj = errors[good]
+
+        if extra is not None:
+            ids = extra['ids_map']
+            objp = extra['objp']
+            min_scale = np.min(objp[objp > 0])
+            n_boards = int(np.max(ids)) + 1
+            a = sub+n3d
+            rvecs = params[a:a+n_boards*3].reshape(-1, 3)
+            tvecs = params[a+n_boards*3:a+n_boards*6].reshape(-1, 3)
+            expected = transform_points(objp, rvecs[ids], tvecs[ids])
+            errors_obj = 2 * (p3ds_test - expected).ravel() / min_scale
+        else:
+            errors_obj = np.array([])
+
+        return np.hstack([errors_reproj, errors_obj])
+
+
+    @jit(parallel=True, forceobj=True)
+    def _error_fun_bundle_fixed_dist(self, params, p2ds, n_cam_params, extra):
+        """Error function for bundle adjustment"""
+        good = ~np.isnan(p2ds)
         n_cams = len(self.cameras)
+
+        for i in range(n_cams):
+            cam = self.cameras[i]
+            a = i * n_cam_params
+            b = (i + 1) * n_cam_params
+
+            # workaround to force this distortion coefficients to zero since they're no longer included in the
+            # optimization parameters
+            this_cam_params = np.zeros(9)
+            this_cam_params[0:n_cam_params] = params[a:b]
+            cam.set_params(this_cam_params)
+            # params[7] = dist[0] and params[8]=dist[1] for each camera
+
+        # n_cams = len(self.cameras)
         sub = n_cam_params * n_cams
         n3d = p2ds.shape[1] * 3
         p3ds_test = params[sub:sub+n3d].reshape(-1, 3)
@@ -927,7 +1142,7 @@ class CameraGroup:
 
         return A_sparse
 
-    def _initialize_params_bundle(self, p2ds, extra):
+    def _initialize_params_bundle(self, p2ds, extra, undistort=False):
         """Given an CxNx2 array of 2D points,
         where N is the number of points and C is the number of cameras,
         initializes the parameters for bundle adjustment"""
@@ -942,7 +1157,70 @@ class CameraGroup:
             "number of cameras in CameraGroup does not " \
             "match number of cameras in 2D points given"
 
-        p3ds = self.triangulate(p2ds)
+        p3ds = self.triangulate(p2ds, undistort=undistort)
+
+        if extra is not None:
+            ids = extra['ids_map']
+            n_boards = int(np.max(ids[~np.isnan(ids)])) + 1
+            total_board_params = n_boards * (3 + 3) # rvecs + tvecs
+
+            # initialize to 0
+            rvecs = np.zeros((n_boards, 3), dtype='float64')
+            tvecs = np.zeros((n_boards, 3), dtype='float64')
+
+            if 'rvecs' in extra and 'tvecs' in extra:
+                rvecs_all = extra['rvecs']
+                tvecs_all = extra['tvecs']
+                for board_num in range(n_boards):
+                    point_id = np.where(ids == board_num)[0][0]
+                    cam_ids_possible = np.where(~np.isnan(p2ds[:, point_id, 0]))[0]
+                    cam_id = np.random.choice(cam_ids_possible)
+                    M_cam = self.cameras[cam_id].get_extrinsics_mat()
+                    M_board_cam = make_M(rvecs_all[cam_id, point_id],
+                                         tvecs_all[cam_id, point_id])
+                    M_board = np.matmul(np.linalg.inv(M_cam), M_board_cam)
+                    rvec, tvec = get_rtvec(M_board)
+                    rvecs[board_num] = rvec
+                    tvecs[board_num] = tvec
+
+
+        else:
+            total_board_params = 0
+
+        x0 = np.zeros(total_cam_params + p3ds.size + total_board_params)
+        x0[:total_cam_params] = cam_params
+        x0[total_cam_params:total_cam_params+p3ds.size] = p3ds.ravel()
+
+        if extra is not None:
+            start_board = total_cam_params+p3ds.size
+            x0[start_board:start_board + n_boards*3] = rvecs.ravel()
+            x0[start_board + n_boards*3:start_board + n_boards*6] = \
+                tvecs.ravel()
+
+        return x0, n_cam_params
+
+
+    def _initialize_params_bundle_fixed_dist(self, p2ds, extra, undistort=False):
+        """Given an CxNx2 array of 2D points,
+        where N is the number of points and C is the number of cameras,
+        initializes the parameters for bundle adjustment"""
+
+        # only take the first 6 params - ignore the distortion coefficients
+        # params[0:3] is the rotation vector
+        # params[3:6] is the translation vector
+        # params[6] is the focal length
+        # params[7] is the first distortion coefficient, which we're ignoring here
+        cam_params = np.hstack([cam.get_params()[:7] for cam in self.cameras])
+        n_cam_params = len(cam_params) // len(self.cameras)
+
+        total_cam_params = len(cam_params)
+
+        n_cams, n_points, _ = p2ds.shape
+        assert n_cams == len(self.cameras), \
+            "number of cameras in CameraGroup does not " \
+            "match number of cameras in 2D points given"
+
+        p3ds = self.triangulate(p2ds, undistort=undistort)
 
         if extra is not None:
             ids = extra['ids_map']
@@ -1568,6 +1846,44 @@ class CameraGroup:
             self.set_translations(tvecs)
 
         error = self.bundle_adjust_iter(imgp, extra, verbose=verbose, **kwargs)
+
+        return error
+
+
+    def calibrate_rows_fixed_dist(self, all_rows, board,
+                       init_intrinsics=True, init_extrinsics=True, verbose=True,
+                       **kwargs):
+        assert len(all_rows) == len(self.cameras), \
+            "Number of camera detections does not match number of cameras"
+
+        for rows, camera in zip(all_rows, self.cameras):
+            size = camera.get_size()
+
+            assert size is not None, \
+                "Camera with name {} has no specified frame size".format(camera.get_name())
+
+            if init_intrinsics:
+                objp, imgp = board.get_all_calibration_points(rows)
+                mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= 7]
+                objp, imgp = zip(*mixed)
+                matrix = cv2.initCameraMatrix2D(objp, imgp, tuple(size))
+                camera.set_camera_matrix(matrix)
+
+        for i, (row, cam) in enumerate(zip(all_rows, self.cameras)):
+            all_rows[i] = board.estimate_pose_rows(cam, row)
+
+        merged = merge_rows(all_rows)
+        imgp, extra = extract_points(merged, board, min_cameras=2)
+
+        if init_extrinsics:
+            rtvecs = extract_rtvecs(merged)
+            if verbose:
+                pprint(get_connections(rtvecs, self.get_names()))
+            rvecs, tvecs = get_initial_extrinsics(rtvecs, self.get_names())
+            self.set_rotations(rvecs)
+            self.set_translations(tvecs)
+
+        error = self.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose, **kwargs)
 
         return error
 

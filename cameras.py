@@ -861,7 +861,7 @@ class CameraGroup:
 
         error = self.average_error(p2ds, median=True)
 
-        p3ds = self.triangulate(p2ds)
+        p3ds = self.triangulate(p2ds, undistort=undistort)
         errors_full = self.reprojection_error(p3ds, p2ds, mean=False)
         error_dict = get_error_dict(errors_full)
         if verbose:

@@ -2372,9 +2372,9 @@ def create_calibration_file_path(calibration_files_parent, calib_metadata):
     month_str = calib_metadata['time'].strftime('%Y%m')
     # year_folder = os.path.join(calibration_files_parent, 'calibration_files_' + year_str)
     month_folder = os.path.join(calibration_files_parent, 'calibration_files_' + month_str)
-    box_folder = os.path.join(month_folder, 'calibration_files_' + month_str + '_box{:02d}'.format(calib_metadata['boxnum']))
+    # box_folder = os.path.join(month_folder, 'calibration_files_' + month_str + '_box{:02d}'.format(calib_metadata['boxnum']))
 
-    return box_folder
+    return month_folder
 
 
 def create_calibration_summary_name(full_calib_vid_name, calibration_files_parent):

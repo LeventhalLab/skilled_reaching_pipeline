@@ -1523,58 +1523,98 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
     return cam_intrinsic_data
 
 
-def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_directories, init_extrinsics=True, verbose=True):
+def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, calibration_pickle_name, init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
+    if os.path.exists(calibration_pickle_name):
+        calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
+        cgroup = calibration_data['cgroup']
+    else:
+        cgroup = CameraGroup.from_names(cam_names, fisheye=False)
+        calibration_data = {'cam_intrinsics': cam_intrinsics,
+                            'cgroup': cgroup,
+                            'mirror_board': board,
+                            'intrinsics_initialized': False,
+                            'estimated_poses': False,
+                            'extrinsics initialized': False,
+                            'bundle_adjust_completed': False}
     # get_rows_cropped_vids will
     #  1. detect the checkerboard/charuco board points
     #  2. undistort points in the full original reference frame, then move them back into the cropped
     #      video, then flip them left-right if in a mirror view
-    all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories)
-    cam_names = cgroup.get_names()
+    if 'all_rows' not in calibration_data.keys():
+        all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories)
+        calibration_data = {'cam_intrinsics': cam_intrinsics,
+                            'cgroup': cgroup,
+                            'mirror_board': board,
+                            'all_rows': all_rows,
+                            'intrinsics_initialized': False,
+                            'estimated_poses': False,
+                            'extrinsics initialized': False,
+                            'bundle_adjust_completed': False}
+        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+    else:
+        all_rows = calibration_data['all_rows']
 
-    expected_cam_idx = 0
-    for rows, cropped_vid in zip(all_rows, cropped_vids):
-        # get intrinsics for each camera
-        # figure out which camera this is
-        this_cam = None
-        for i_cam, cam_name in enumerate(cgroup.get_names()):
-            if cam_name in cropped_vid:
-                this_cam = cam_name
-                cam_idx = i_cam
-                if cam_idx != expected_cam_idx:
-                    # error handling here for the cameras not being in the same order as the videos
-                    error('cropped video names and cameras are not in the same order')
-                expected_cam_idx += 1
-                break
-        if this_cam is None:
-            # error handling here for no camera corresponding to this video
-            error('no camera corresponding to {}'.format(cropped_vid))
+    # at this point, should save the camera groups/boards in a .pickle file so don't have to detect the boards each time
+    # also, once saved, write something to verify that the points are what I think they are
 
-        cap = cv2.VideoCapture(cropped_vid)
-        w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        size = (w, h)
-        cap.release()
+    # initialize the intrinsic matrix and distoration coefficients (should be all zeros) for each view
+    if not calibration_data['intrinsics_initialized']:
+        print('initializing camera matrices...')
+        expected_cam_idx = 0
+        for rows, cropped_vid in zip(all_rows, cropped_vids):
+            # get intrinsics for each camera
+            # figure out which camera this is
+            this_cam = None
+            for i_cam, cam_name in enumerate(cgroup.get_names()):
+                if cam_name in cropped_vid:
+                    this_cam = cam_name
+                    cam_idx = i_cam
+                    if cam_idx != expected_cam_idx:
+                        # error handling here for the cameras not being in the same order as the videos
+                        error('cropped video names and cameras are not in the same order')
+                    expected_cam_idx += 1
+                    break
+            if this_cam is None:
+                # error handling here for no camera corresponding to this video
+                error('no camera corresponding to {}'.format(cropped_vid))
 
-        cgroup.cameras[cam_idx].set_size(size)
-        # initialize the intrinsic matrix for the cropped view
-        # distortion coefficients should be zero - points should already be undistorted
-        objp, imgp = board.get_all_calibration_points(rows)
-        mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= 7]
-        try:
-            objp, imgp = zip(*mixed)
-        except:
-            pass
-        matrix = cv2.initCameraMatrix2D(objp, imgp, tuple(size))
-        # mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp, imgp, size, matrix, np.zeros((1,5)), flags=CALIBRATION_FLAGS)
+            cap = cv2.VideoCapture(cropped_vid)
+            w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            size = (w, h)
+            cap.release()
 
-        cgroup.cameras[cam_idx].set_camera_matrix(matrix)
-        cgroup.cameras[cam_idx].set_distortions(np.zeros((1,5)))   # because all points should already be undistorted
+            cgroup.cameras[cam_idx].set_size(size)
+            # initialize the intrinsic matrix for the cropped view
+            # distortion coefficients should be zero - points should already be undistorted
+            objp, imgp = board.get_all_calibration_points(rows)
+            mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= 7]
+            try:
+                objp, imgp = zip(*mixed)
+            except:
+                pass
+            matrix = cv2.initCameraMatrix2D(objp, imgp, tuple(size))
+            # mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp, imgp, size, matrix, np.zeros((1,5)), flags=CALIBRATION_FLAGS)
 
-    for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
-        # need to make sure the cameras are in the right order; this should have been checked in the code above
-        all_rows[i] = board.estimate_pose_rows(cam, row)
+            cgroup.cameras[cam_idx].set_camera_matrix(matrix)
+            cgroup.cameras[cam_idx].set_distortions(np.zeros((1,5)))   # because all points should already be undistorted
+
+        calibration_data['cgroup'] = cgroup
+        calibration_data['intrinsics_initialized'] = True
+        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+
+    # test to see if poses have already been estimated for each frame
+    if not calibration_data['estimated_poses']:
+        print('estimating poses...')
+        for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
+            # need to make sure the cameras are in the right order; this should have been checked in the code above
+            all_rows[i] = board.estimate_pose_rows(cam, row)
+
+        calibration_data['all_rows'] = all_rows
+        calibration_data['estimated_poses'] = True
+        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
 
     merged = merge_rows(all_rows, cam_names=cam_names)
     imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
@@ -1586,7 +1626,8 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_d
         'tvecs': tvecs
     }'''
 
-    if init_extrinsics:
+    if not calibration_data['extrinsics initialized'] and init_extrinsics:
+        print('initializing extrinsics...')
         rtvecs = extract_rtvecs(merged)
         if verbose:
             pprint(get_connections(rtvecs, cam_names))
@@ -1597,9 +1638,23 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cgroup, parent_d
         cgroup.set_rotations(rvecs)
         cgroup.set_translations(tvecs)
 
+        calibration_data['cgroup'] = cgroup
+        calibration_data['extrinsics initialized'] = True
+        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+
+
     # need to look and decide if default parameters in bundle_ajust_iter work well here
     # don't undistort the points - already done in get_rows_cropped_vids
-    error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
+    if not calibration_data['bundle_adjust_completed']:
+        print('calculating bundle adjustment...')
+        error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
+
+        calibration_data['error'] = error
+        calibration_data['cgroup'] = cgroup
+        calibration_data['bundle_adjust_completed'] = True
+        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+    else:
+        error = calibration_data['error']
 
     return cgroup, error
 

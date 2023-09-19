@@ -202,9 +202,8 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
 
 def calibrate_all_sessions(parent_directories,
                            calibration_metadata_df,
-                           cgroup,
+                           cam_names,
                            vidtype='.avi',
-                           view_list=['direct', 'leftmirror', 'rightmirror'],
                            filtertype='h264'):
     '''
     loop through all folders containing calibration videos and store calibration parameters
@@ -264,17 +263,19 @@ def calibrate_all_sessions(parent_directories,
 
             # todo: test if chessboard detection is sufficient for the old boards
             calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name, calibration_files_parent)
-            if os.path.exists(calibration_toml_name):
-                cgroup = CameraGroup.load(calibration_toml_name)
-            else:
-                # need this here so we have the video names, not because we need videos cropped
-                current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(
-                    full_calib_vid_name,
-                    session_row,
-                    filtertype=filtertype)
-                cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cgroup, parent_directories)
-                cgroup.dump(calibration_toml_name)
-                pass
+            calibration_pickle_name = navigation_utilities.create_calibration_summary_name(full_calib_vid_name, calibration_files_parent)
+            # if os.path.exists(calibration_toml_name):
+            #     cgroup = CameraGroup.load(calibration_toml_name)
+            # else:
+
+            # need this here so we have the video names, not because we need videos cropped
+            current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(
+                full_calib_vid_name,
+                session_row,
+                filtertype=filtertype)
+            print('calibrating {}'.format(mirror_calib_vid_name))
+            cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, calibration_pickle_name)
+            # cgroup.dump(calibration_toml_name)
             pass
 
     #TODO: load the calibration .toml file and verify points
@@ -367,7 +368,7 @@ if __name__ == '__main__':
 
     cam_names = ('direct', 'leftmirror', 'rightmirror')
     n_cams = len(cam_names)
-    cgroup = CameraGroup.from_names(cam_names, fisheye=False)
+    # cgroup = CameraGroup.from_names(cam_names, fisheye=False)
 
     filtertype = 'h264'
 
@@ -486,8 +487,7 @@ if __name__ == '__main__':
 
         calibrate_all_sessions(parent_directories[expt],
                                calibration_metadata_df,
-                               cgroup,
-                               view_list=cam_names,
+                               cam_names,
                                filtertype=filtertype)
 
     for expt in experiment_list:

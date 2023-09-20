@@ -1702,10 +1702,12 @@ def test_anipose_calibration(session_row, parent_directories):
 
         cols = ['b','r','g']
         for i_cam in range(num_cams):
+            plt.scatter(frame_pts[i_cam,:,0],frame_pts[i_cam,:,1],c=cols[i_cam])
             for i_pt in range(pts_per_cam):
                 if not np.isnan(frame_pts[i_cam,i_pt,0]):
                     plt.text(frame_pts[i_cam,i_pt,0], frame_pts[i_cam,i_pt,1], '{:d}'.format(i_pt), c=cols[i_cam])
 
+        plt.gca().invert_yaxis()
         plt.show()
 
     calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name,

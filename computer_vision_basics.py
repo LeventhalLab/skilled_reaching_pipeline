@@ -20,6 +20,20 @@ def find_fund_matrix_mirror(x1, x2):
     A[:, 1] = x2[:, 0] - x1[:, 0]
     A[:, 2] = x2[:, 1] - x1[:, 1]
 
+    # solve the linear system of equations A * [f12, f13, f23]' = 0
+    #todo: calculate the svd
+    # [~, ~, vA] = svd(A, 0)
+    F = np.zeros((3, 3))
+    fvec = vA[:, -1]
+
+    # put the solutions to the constraint equation into F
+    F[0, 1] = fvec[0]
+    F[0, 2] = fvec[1]
+    F[1, 2] = fvec[2]
+    F[1, 0] = -F[0, 1]
+    F[2, 0] = -F[0, 2]
+    F[2, 1] = -F[1, 2]
+
 
 def project_points(world_points, proj_matrix, mtx):
 

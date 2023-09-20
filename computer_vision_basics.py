@@ -6,6 +6,21 @@ import plot_utilities
 import matplotlib.pyplot as plt
 
 
+def find_fund_matrix_mirror(x1, x2):
+    '''
+
+    :param x1: nx2 array of matched points in one view
+    :param x2: nx2 array of matched points in the other view
+    :return:
+    '''
+    num_points = np.shape(matched_points)[1]
+    A = np.zeros((num_points, 3))
+
+    A[:, 0] = (x2[:, 0] * x1[:, 1]) - (x1[:, 0] * x2[:, 1])
+    A[:, 1] = x2[:, 0] - x1[:, 0]
+    A[:, 2] = x2[:, 1] - x1[:, 1]
+
+
 def project_points(world_points, proj_matrix, mtx):
 
     # make sure world_points is a 3 x n array, where n is the number of points
@@ -22,6 +37,7 @@ def project_points(world_points, proj_matrix, mtx):
     proj_points = pp_hom[:2, :] / pp_hom[-1, :]
 
     return proj_points
+
 
 def unnormalize_points(points2d_norm, mtx):
     '''

@@ -276,9 +276,10 @@ def calibrate_all_sessions(parent_directories,
             print('calibrating {}'.format(mirror_calib_vid_name))
             cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, calibration_pickle_name)
             # cgroup.dump(calibration_toml_name)
+            skilled_reaching_calibration.test_anipose_calibration(session_row, parent_directories)
             pass
 
-    #TODO: load the calibration .toml file and verify points
+    #TODO: load the calibration .toml/.pickle file and verify points
 
 
     for cf in calib_vid_folders:

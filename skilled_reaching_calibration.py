@@ -1659,13 +1659,21 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     return cgroup, error
 
 
-def test_calibration(session_metadata, calibration_metadata_df, parent_directories):
+def test_anipose_calibration(session_row, parent_directories):
 
     calibration_vids_parent = parent_directories['calibration_vids_parent']
     calibration_files_parent = parent_directories['calibration_files_parent']
 
-    rat_metadata_df = calibration_metadata_df[session_metadata['ratID']]
-    session_row = rat_metadata_df.loc[rat_metadata_df['date']==session_metadata['date']]
+    mirror_calib_vid_name = session_row.iloc[0]['cal_vid_name_mirrors']
+    full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
+                                                                             parent_directories)
+
+    calibration_pickle_name = navigation_utilities.create_calibration_summary_name(full_calib_vid_name, calibration_files_parent)
+    if not os.path.exists(calibration_pickle_name):
+        print('session has not been calibrated yet')
+        return
+
+    calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
     # session_metadata = {
     #                     'ratID': ratID,
     #                     'rat_num': rat_num,
@@ -1674,9 +1682,31 @@ def test_calibration(session_metadata, calibration_metadata_df, parent_directori
     #                     'session_num': session_num,
     #                     'current': 0.
     # }
-    mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
-    full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
-                                                                             parent_directories)
+    cgroup = calibration_data['cgroup']
+    cam_names = cgroup.get_names()
+    num_cams = len(cam_names)
+    merged = merge_rows(calibration_data['all_rows'], cam_names=cam_names)
+    # imgp, extra = extract_points(merged, calibration_data['mirror_board'], min_cameras=2)
+
+    # loop through frames, see if we can reconstruct the checkerboard
+    pts_per_cam = calibration_data['mirror_board'].squaresX * calibration_data['mirror_board'].squaresY
+    for rix, row in enumerate(merged):
+        frame_pts = np.empty((num_cams, pts_per_cam, 2))
+        frame_pts.fill(np.NaN)
+        for i_cam, cam in enumerate(cam_names):
+            if cam in row.keys():
+                frame_pts[i_cam,:,:] = np.squeeze(row[cam]['corners'])
+        pts3d = cgroup.triangulate(frame_pts, undistort=False, progress=False)
+        """Given an CxNx2 array, this returns an Nx3 array of points,
+        where N is the number of points and C is the number of cameras"""
+
+        cols = ['b','r','g']
+        for i_cam in range(num_cams):
+            for i_pt in range(pts_per_cam):
+                if not np.isnan(frame_pts[i_cam,i_pt,0]):
+                    plt.text(frame_pts[i_cam,i_pt,0], frame_pts[i_cam,i_pt,1], '{:d}'.format(i_pt), c=cols[i_cam])
+
+        plt.show()
 
     calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name,
                                                                               calibration_files_parent)
@@ -1684,8 +1714,6 @@ def test_calibration(session_metadata, calibration_metadata_df, parent_directori
     cgroup = CameraGroup.load(calibration_toml_name)
 
     pass
-
-
 
 
 def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories):

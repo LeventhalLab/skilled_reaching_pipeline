@@ -22,7 +22,7 @@ def find_fund_matrix_mirror(x1, x2):
 
     # solve the linear system of equations A * [f12, f13, f23]' = 0
     #todo: calculate the svd
-    # [~, ~, vA] = svd(A, 0)
+    _, _, vA = np.linalg.svd(A, full_matrices=False)
     F = np.zeros((3, 3))
     fvec = vA[:, -1]
 
@@ -33,6 +33,8 @@ def find_fund_matrix_mirror(x1, x2):
     F[1, 0] = -F[0, 1]
     F[2, 0] = -F[0, 2]
     F[2, 1] = -F[1, 2]
+
+    return F
 
 
 def project_points(world_points, proj_matrix, mtx):

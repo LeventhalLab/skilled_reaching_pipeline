@@ -1718,6 +1718,23 @@ def test_anipose_calibration(session_row, parent_directories):
     pass
 
 
+def test_fundamental_matrix(pts1, pts2, undistorted_image, F):
+
+    w = np.shape(undistorted_image)[1]   # verify index
+    h = np.shape(undistorted_image)[0]   # verify index
+
+    # find epipolar lines
+    
+
+    plt.imshow(undistorted_image)
+    plt.scatter(pts1[:, 0], pts1[:, 1])
+    plt.scatter(pts2[:, 0], pts2[:, 1])
+
+
+
+    # WORKING HERE...
+
+
 def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories):
     # all_rows = []
     #

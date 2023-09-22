@@ -6,7 +6,7 @@ import plot_utilities
 import matplotlib.pyplot as plt
 
 
-def find_fund_matrix_mirror(x1, x2):
+def fund_matrix_mirror(x1, x2):
     '''
 
     :param x1: nx2 array of matched points in one view

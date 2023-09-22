@@ -1559,6 +1559,15 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     # at this point, should save the camera groups/boards in a .pickle file so don't have to detect the boards each time
     # also, once saved, write something to verify that the points are what I think they are
 
+    # calculate the fundamental matrices for direct-->left mirror and direct-->right mirror
+    merged = merge_rows(all_rows, cam_names=cam_names)
+    # todo: extract matched points for each "camera" pair from the merged dictionary
+    imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
+
+    mirror_calib_vid_name = navigation_utilities.calib_vid_name_from_cropped_calib_vid_name(cropped_vids[0])
+    full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
+                                                                             parent_directories)
+
     # initialize the intrinsic matrix and distortion coefficients (should be all zeros) for each view
     if not calibration_data['intrinsics_initialized']:
         print('initializing camera matrices...')
@@ -1769,7 +1778,7 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
 
         all_rows.append(rows)
 
-    mirror_calib_vid_name = navigation_utilities.calib_vid_name_from_cropped_calib_vid_name(cropped_vid)
+    # mirror_calib_vid_name = navigation_utilities.calib_vid_name_from_cropped_calib_vid_name(cropped_vid)
 
     # load original video, undistort a frame, and overlay detected points
     # full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,

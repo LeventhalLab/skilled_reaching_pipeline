@@ -1248,6 +1248,19 @@ def find_mirror_calibration_video(mirror_cal_vid_name, parent_directories):
     return full_mirror_cal_vid_name
 
 
+def calib_vid_name_from_cropped_calib_vid_name(cropped_calib_vid_name):
+
+    _, cropped_calib_vid_name = os.path.split(cropped_calib_vid_name)
+    cropped_calib_vid_name, ext = os.path.splitext(cropped_calib_vid_name)
+    name_parts = cropped_calib_vid_name.split('_')
+
+    base_name = '_'.join(name_parts[:4])
+
+    calib_vid_name = base_name + ext
+
+    return calib_vid_name
+
+
 def create_cropped_calib_vid_name(full_calib_vid_name, crop_view, crop_params_dict, fliplr):
     '''
 

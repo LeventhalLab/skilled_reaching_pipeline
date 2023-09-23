@@ -1523,6 +1523,65 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
     return cam_intrinsic_data
 
 
+def collect_matched_mirror_points(merged, board):
+
+    if type(board) is Checkerboard:
+        pts_per_frame = np.shape(merged[0]['direct']['corners'])[0]
+        # count up all merged rows that contain leftmirror points
+        leftmirror_rows = [mr for mr in merged if 'leftmirror' in mr.keys()]
+        rightmirror_rows = [mr for mr in merged if 'rightmirror' in mr.keys()]
+
+        num_leftmirror_rows = len(leftmirror_rows)
+        num_leftmirror_pts = num_leftmirror_rows * pts_per_frame
+
+        num_rightmirror_rows = len(rightmirrow_rows)
+        num_rightmirror_pts = num_rightmirror_rows * pts_per_frame
+
+        # initialize arrays to hold imgage points and object points for calibration
+        leftmirror_imgp = np.empty((num_leftmirrow_rows, 1, 2))
+        directleft_imgp = np.empty((num_leftmirrow_rows, 1, 2))
+        rightmirror_imgp = np.empty((num_rightmirrow_rows, 1, 2))
+        directright_imgp = np.empty((num_rightmirrow_rows, 1, 2))
+
+        left_objp = np.empty((num_leftmirrow_rows, 1, 2))
+        right_objp = np.empty((num_rightmirrow_rows, 1, 2))
+
+        current_lm_row = 0
+        current_rm_row = 0
+        for i_row, merged_row in enumerage(merged):
+
+            imgp_direct = merged_row['direct']['corners']
+            if 'leftmirror' in merged_row.keys():
+                imgp_mirror = merged_row['leftmirror']['corners']
+                leftmirror_imgp[current_lm_row:curent_lm_row+pts_per_frame, :, :] = imgp_mirror
+                directleft_imgp[current_lm_row:curent_lm_row+pts_per_frame, :, :] = imgp_direct
+
+                left_objp[current_lm_row:current_lm_row+pts_per_frame, :, :] = board.get_object_points()
+
+                current_lm_row += pts_per_row
+
+            elif 'rightmirror' in merged_row.keys():
+                imgp_mirror = merged_row['rightmirror']['corners']
+                rightmirror_imgp[current_rm_row:curent_rm_row + pts_per_frame, :, :] = imgp_mirror
+                directright_imgp[current_rm_row:curent_rm_row + pts_per_frame, :, :] = imgp_direct
+
+                left_objp[current_rm_row:current_rm_row + pts_per_frame, :, :] = board.get_object_points()
+
+                current_rm_row += pts_per_row
+    elif type(board) is CharucoBoard:
+        # todo: aggregate matched charuco points
+        pass
+
+    stereo_cal_points = {'leftmirror_imgp': leftmirror_imgp,
+                         'directleft_imgp': directleft_imgp,
+                         'left_objp': left_objp,
+                         'rightmirror_imgp': rightmirror_imgp,
+                         'directright_imgp': directright_imgp,
+                         'right_objp': right_objp}
+
+    return stereo_cal_points
+
+
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, calibration_pickle_name, init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
@@ -1561,6 +1620,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
 
     # calculate the fundamental matrices for direct-->left mirror and direct-->right mirror
     merged = merge_rows(all_rows, cam_names=cam_names)
+    stereo_cal_points = collect_matched_mirror_points(merged, board)
     # todo: extract matched points for each "camera" pair from the merged dictionary
     imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
 

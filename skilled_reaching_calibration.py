@@ -1588,7 +1588,8 @@ def mirror_stereo_cal(stereo_cal_points):
     F[:, :, 0] = cvb.fund_matrix_mirror(stereo_cal_points['directleft_imgp'], stereo_cal_points['leftmirror_imgp'])
     F[:, :, 1] = cvb.fund_matrix_mirror(stereo_cal_points['directright_imgp'], stereo_cal_points['rightmirror_imgp'])
 
-    pass
+
+    return F
 
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, calibration_pickle_name, init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
@@ -1629,13 +1630,19 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     # calculate the fundamental matrices for direct-->left mirror and direct-->right mirror
     merged = merge_rows(all_rows, cam_names=cam_names)
     stereo_cal_points = collect_matched_mirror_points(merged, board)
-    mirror_stereo_cal(stereo_cal_points)
-    # todo: extract matched points for each "camera" pair from the merged dictionary
-    imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
+    F = mirror_stereo_cal(stereo_cal_points)
+
+    # todo: load a calibration frame and test fundamental matrix
 
     mirror_calib_vid_name = navigation_utilities.calib_vid_name_from_cropped_calib_vid_name(cropped_vids[0])
     full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
                                                                              parent_directories)
+
+    test_fundamental_matrix(pts1, pts2, undistorted_image, F[:, :, 0])
+
+    imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
+
+
 
     # initialize the intrinsic matrix and distortion coefficients (should be all zeros) for each view
     if not calibration_data['intrinsics_initialized']:

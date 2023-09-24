@@ -14,6 +14,8 @@ def fund_matrix_mirror(x1, x2):
     :return:
     '''
 
+    x1 = np.squeeze(x1)
+    x2 = np.squeeze(x2)
     if np.shape(x2) != np.shape(x1):
         print('matched point arrays are not the same shape')
         return None

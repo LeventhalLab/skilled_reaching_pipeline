@@ -13,7 +13,13 @@ def fund_matrix_mirror(x1, x2):
     :param x2: nx2 array of matched points in the other view
     :return:
     '''
-    num_points = np.shape(matched_points)[1]
+
+    if np.shape(x2) != np.shape(x1):
+        print('matched point arrays are not the same shape')
+        return None
+
+    num_points = np.shape(x1)[0]
+
     A = np.zeros((num_points, 3))
 
     A[:, 0] = (x2[:, 0] * x1[:, 1]) - (x1[:, 0] * x2[:, 1])

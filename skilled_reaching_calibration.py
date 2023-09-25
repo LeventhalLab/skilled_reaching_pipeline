@@ -1632,14 +1632,17 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     stereo_cal_points = collect_matched_mirror_points(merged, board)
     F = mirror_stereo_cal(stereo_cal_points)
 
-    # todo: load a calibration frame and test fundamental matrix
-
-    frame_num = 10
+    # todo: now calculate rotation matrices based on fundamental matrices so that we can get back to using anipose algorithms
+    # alternatively, just reproduce what I was doing before in Matlab, but use the svd method from anipose? what about RANSAC?
+    
+    # comment in code below to test fundamental matrix calculation
+    '''
+    frame_num = 305
     mirror_calib_vid_name = navigation_utilities.calib_vid_name_from_cropped_calib_vid_name(cropped_vids[0])
     full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
                                                                              parent_directories)
-
     test_fundamental_matrix(full_calib_vid_name, merged, frame_num, calibration_data, F)
+    '''
 
     imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
 
@@ -1804,7 +1807,7 @@ def test_anipose_calibration(session_row, parent_directories):
     pass
 
 
-def test_fundamental_matrix(full_calib_vid_name, merged, frame_num, calibration_data, F):
+def test_fundamental_matrix(full_calib_vid_name, merged, frame_num, calibration_data, F, lwidth=1):
 
     cap = cv2.VideoCapture(full_calib_vid_name)
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
@@ -1861,18 +1864,16 @@ def test_fundamental_matrix(full_calib_vid_name, merged, frame_num, calibration_
             col_idx = int(i_line / 7.) % 7
 
             try:
-                ax.plot(edge_pts[:, 0], edge_pts[:, 1], color=line_colors[col_idx], ls='-', marker='.', lw=lwidth)
+                plt.axline(edge_pts[0, :], edge_pts[1, :], color=line_colors[col_idx])
             except:
                 pass
     plt.scatter(pts1[:, 0], pts1[:, 1])
     plt.scatter(pts2[:, 0], pts2[:, 1])
 
     plt.show()
-    pass
 
+    return
 
-
-    # WORKING HERE...
 
 def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories):
 

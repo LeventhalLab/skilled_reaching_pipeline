@@ -29,8 +29,8 @@ def fund_matrix_mirror(x1, x2):
     A[:, 2] = x2[:, 1] - x1[:, 1]
 
     # solve the linear system of equations A * [f12, f13, f23]' = 0
-    #todo: calculate the svd
-    _, _, vA = np.linalg.svd(A, full_matrices=False)
+    _, _, VH = np.linalg.svd(A, full_matrices=False)
+    vA = VH.T.conj()
     F = np.zeros((3, 3))
     fvec = vA[:, -1]
 

@@ -1634,11 +1634,12 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
 
     # todo: load a calibration frame and test fundamental matrix
 
+    frame_num = 10
     mirror_calib_vid_name = navigation_utilities.calib_vid_name_from_cropped_calib_vid_name(cropped_vids[0])
     full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
                                                                              parent_directories)
 
-    test_fundamental_matrix(pts1, pts2, undistorted_image, F[:, :, 0])
+    test_fundamental_matrix(full_calib_vid_name, merged, frame_num, calibration_data, F)
 
     imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
 
@@ -1803,17 +1804,49 @@ def test_anipose_calibration(session_row, parent_directories):
     pass
 
 
-def test_fundamental_matrix(pts1, pts2, undistorted_image, F):
+def test_fundamental_matrix(full_calib_vid_name, merged, frame_num, calibration_data, F):
 
-    w = np.shape(undistorted_image)[1]   # verify index
-    h = np.shape(undistorted_image)[0]   # verify index
+    cap = cv2.VideoCapture(full_calib_vid_name)
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_num)
+    res, img = cap.read()
+
+    cap.release()
+
+    cam_intrinsics = calibration_data['cam_intrinsics']
+
+    img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+
+    w = np.shape(img_ud)[1]   # verify index
+    h = np.shape(img_ud)[0]   # verify index
+
+    found_frame_row = False
+    for merged_row in merged:
+        if 'direct' not in merged_row.keys():
+            continue
+        if merged_row['direct']['framenum'] == frame_num:
+            found_frame_row = True
+            break
+
+    if not found_frame_row:
+        print('matched points not found for frame {:d}'.format(frame_num))
+        pass
 
     # find epipolar lines
+    pts1 = np.squeeze(merged_row['direct']['corners'])
+    if 'leftmirror' in merged_row.keys():
+        pts2 = np.squeeze(merged_row['leftmirror']['corners'])
+        fund_mat = F[:, :, 0]
+    elif 'rightmirror' in merged_row.keys():
+        pts2 = np.squeeze(merged_row['rightmirror']['corners'])
+        fund_mat = F[:, :, 1]
     
 
-    plt.imshow(undistorted_image)
+    plt.imshow(img_ud)
     plt.scatter(pts1[:, 0], pts1[:, 1])
     plt.scatter(pts2[:, 0], pts2[:, 1])
+
+    plt.show()
+    pass
 
 
 

@@ -189,7 +189,7 @@ def refine_optitrack_calibration_from_dlc(session_metadata, parent_directories, 
     # for i_cam in range(2):
     #     plot_point_bool = matched_conf[trial_idx][i_cam][i_frame, :] > min_conf2match
     #     bodyparts = dlc_metadata[i_cam]['data']['DLC-model-config file']['all_joints_names']
-    #     sr_visualization.draw_epipolar_lines_on_img(matched_points[trial_idx][i_cam][i_frame], 1 + i_cam, F_from_E, im_size[i_cam], bodyparts, plot_point_bool, axs[1-i_cam], lwidth=0.5,
+    #     sr_visualization.F(matched_points[trial_idx][i_cam][i_frame], 1 + i_cam, F_from_E, im_size[i_cam], bodyparts, plot_point_bool, axs[1-i_cam], lwidth=0.5,
     #                                linestyle='-')
     #
     # plt.show()
@@ -1839,9 +1839,31 @@ def test_fundamental_matrix(full_calib_vid_name, merged, frame_num, calibration_
     elif 'rightmirror' in merged_row.keys():
         pts2 = np.squeeze(merged_row['rightmirror']['corners'])
         fund_mat = F[:, :, 1]
-    
 
+    epilines = cv2.computeCorrespondEpilines(pts1, 1, fund_mat)
     plt.imshow(img_ud)
+
+    line_colors = [[0., 0., 1.],
+                   [0., 128. / 255., 1.],
+                   [0., 200. / 255., 200. / 255.],
+                   [0., 1., 0],
+                   [200. / 255., 200. / 255., 0.],
+                   [1., 0., 0.],
+                   [1., 0., 1.]]
+
+    for i_line, epiline in enumerate(epilines):
+
+        # todo: figure out how to match colors to checkerboard points
+        epiline = np.squeeze(epiline)
+        edge_pts = cvb.find_line_edge_coordinates(epiline, (w, h))
+
+        if not np.all(edge_pts == 0):
+            col_idx = int(i_line / 7.) % 7
+
+            try:
+                ax.plot(edge_pts[:, 0], edge_pts[:, 1], color=line_colors[col_idx], ls='-', marker='.', lw=lwidth)
+            except:
+                pass
     plt.scatter(pts1[:, 0], pts1[:, 1])
     plt.scatter(pts2[:, 0], pts2[:, 1])
 

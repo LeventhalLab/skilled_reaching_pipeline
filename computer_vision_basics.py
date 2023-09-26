@@ -93,14 +93,23 @@ def unnormalize_points(points2d_norm, mtx):
 
 
 def normalize_points(points2d, mtx):
+    points2d = np.squeeze(points2d)   # in case the array is n x 1 x 2 instead of n x 2
+
     if points2d.ndim == 1:
         num_pts = 1
-        homogeneous_pts = np.append(points2d, 1.)
+        if len(points2d) == 2:
+            homogeneous_pts = np.append(points2d, 1.)
+        else:
+            homogeneous_pts = points2d
         norm_pts = np.linalg.solve(mtx, homogeneous_pts)
         norm_pts = norm_pts[:2] / norm_pts[-1]
     else:
         num_pts = max(np.shape(points2d))
-        homogeneous_pts = np.hstack((points2d, np.ones((num_pts, 1))))
+        if np.shape(points2d)[1] == 2:
+            homogeneous_pts = np.hstack((points2d, np.ones((num_pts, 1))))
+        else:
+            # already converted to homogeneous points
+            homogeneous_pts = points2d
         norm_pts = np.linalg.solve(mtx, homogeneous_pts.T)
         norm_pts = norm_pts[:2, :] / norm_pts[-1, :]
 

@@ -1572,24 +1572,82 @@ def collect_matched_mirror_points(merged, board):
         # todo: aggregate matched charuco points
         pass
 
-    stereo_cal_points = {'leftmirror_imgp': leftmirror_imgp,
-                         'directleft_imgp': directleft_imgp,
+    stereo_cal_points = {'leftmirror': leftmirror_imgp,
+                         'directleft': directleft_imgp,
                          'left_objp': left_objp,
-                         'rightmirror_imgp': rightmirror_imgp,
-                         'directright_imgp': directright_imgp,
+                         'rightmirror': rightmirror_imgp,
+                         'directright': directright_imgp,
                          'right_objp': right_objp}
 
     return stereo_cal_points
 
 
-def mirror_stereo_cal(stereo_cal_points):
+def select_correct_E_mirror(R1, R2, T, pts1, pts2, mtx):
 
+    # construct the four possible solutions
+    rot = np.empty((4, 3, 3))
+    t = np.empty((4, 3))
+
+    num_pts = np.shape(pts1)[0]
+    if np.shape(pts2)[0] != num_pts:
+        print('pts1 and pts2 have different numbers of points')
+        return None
+
+    rot[0, :, :] = R1
+    rot[1, :, :] = R2
+    rot[2, :, :] = R1
+    rot[3, :, :] = R2
+
+    t[0, :] = np.squeeze(T)
+    t[1, :] = np.squeeze(T)
+    t[2, :] = np.squeeze(-T)
+    t[3, :] = np.squeeze(-T)
+
+    t = np.expand_dims(t, 1)
+
+    # convert pts to homogeneous coordinates
+    pts1_norm = cvb.normalize_points(pts1, mtx)
+    pts2_norm = cvb.normalize_points(pts2, mtx)
+
+    x3D = np.empty((4, num_pts, 4))
+    for ii in range(4):
+        # create projection matrices
+        P1 = np.eye(N=3, M=4)
+        P2 = np.hstack((rot[ii, :, :], t[ii, :, :].T))
+        x3D[ii, :, :] = cv2.triangulatePoints(P1, P2, pts1_norm, pts2_norm).T
+
+    correct = 0
+    depth = np.empty((num_pts, 2));
+    for ii in range(4):
+    # compute the depth and sum the sign
+    depth[ii, 0] = sum(sign(DepthOfPoints(x3D(:,:, i), eye(3), zeros(3, 1)))) # using canonical camera
+
+    depth(i, 2) = sum(sign(DepthOfPoints(x3D(:,:, i), rot(:,:, i), t(:,:, i)))); % using
+    the
+    recovered
+    camera
+
+
+end
+    pass
+
+def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']]):
+
+    # calculate fundamental matrices for each view
     F = np.empty((3, 3, 2))
-    F[:, :, 0] = cvb.fund_matrix_mirror(stereo_cal_points['directleft_imgp'], stereo_cal_points['leftmirror_imgp'])
-    F[:, :, 1] = cvb.fund_matrix_mirror(stereo_cal_points['directright_imgp'], stereo_cal_points['rightmirror_imgp'])
+    F[:, :, 0] = cvb.fund_matrix_mirror(stereo_cal_points['directleft'], stereo_cal_points['leftmirror'])
+    F[:, :, 1] = cvb.fund_matrix_mirror(stereo_cal_points['directright'], stereo_cal_points['rightmirror'])
 
-
-    return F
+    # calculate essential matrices
+    E = np.empty((3, 3, 2))
+    R = np.empty((3, 3, 2))
+    T = np.empty((3, 2))
+    for i_view in range(2):
+        E[:, :, i_view] = np.linalg.multi_dot((cam_intrinsics['mtx'].T, F[:, :, i_view], cam_intrinsics['mtx']))
+        R1, R2, T = cv2.decomposeEssentialMat(E[:, :, i_view])
+        cRot, cT, correct = select_correct_E_mirror(R1, R2, T, stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'])
+        pass
+    return E, F
 
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, calibration_pickle_name, init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
@@ -1630,11 +1688,11 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     # calculate the fundamental matrices for direct-->left mirror and direct-->right mirror
     merged = merge_rows(all_rows, cam_names=cam_names)
     stereo_cal_points = collect_matched_mirror_points(merged, board)
-    F = mirror_stereo_cal(stereo_cal_points)
+    E, F = mirror_stereo_cal(stereo_cal_points, cam_intrinsics)
 
     # todo: now calculate rotation matrices based on fundamental matrices so that we can get back to using anipose algorithms
     # alternatively, just reproduce what I was doing before in Matlab, but use the svd method from anipose? what about RANSAC?
-    
+
     # comment in code below to test fundamental matrix calculation
     '''
     frame_num = 305

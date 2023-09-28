@@ -1610,25 +1610,32 @@ def select_correct_E_mirror(R1, R2, T, pts1, pts2, mtx):
     pts2_norm = cvb.normalize_points(pts2, mtx)
 
     x3D = np.empty((4, num_pts, 4))
+    # all_pts = np.array([np.squeeze(pts1), np.squeeze(pts2)])
     for ii in range(4):
         # create projection matrices
         P1 = np.eye(N=3, M=4)
         P2 = np.hstack((rot[ii, :, :], t[ii, :, :].T))
+        # wp, rp = cvb.triangulate_points()
+
         x3D[ii, :, :] = cv2.triangulatePoints(P1, P2, pts1_norm, pts2_norm).T
 
+
+        # points4D = cv2.triangulatePoints(projMatr1, projMatr2, pts_ud[0], pts_ud[1])
+        # world_points = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
+        #
+        #
+        # worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
+
     correct = 0
-    depth = np.empty((num_pts, 2));
+    depth = np.empty((num_pts, 2))
     for ii in range(4):
-    # compute the depth and sum the sign
-    depth[ii, 0] = sum(sign(DepthOfPoints(x3D(:,:, i), eye(3), zeros(3, 1)))) # using canonical camera
+        # compute the depth and sum the signs
+        cvb.depth_of_points(x3D[ii, :, :], np.eye(3), np.zeros((1, 3)))
+        cvb.depth_of_points(x3D[ii, :, :], rot[ii, :, :], t[ii, :, :])
+        # depth[ii, 0] = np.sum(sign(DepthOfPoints(x3D[ii, :, :], np.eye(3), np.zeros(3, 1)))) # using canonical camera
+        #
+        # depth[ii, 1] = np.sum(sign(DepthOfPoints(x3D[ii, :, :], rot[ii, :, :], t[ii, :, :]))) # using the recovered camera
 
-    depth(i, 2) = sum(sign(DepthOfPoints(x3D(:,:, i), rot(:,:, i), t(:,:, i)))); % using
-    the
-    recovered
-    camera
-
-
-end
     pass
 
 def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']]):
@@ -1642,8 +1649,14 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
     E = np.empty((3, 3, 2))
     R = np.empty((3, 3, 2))
     T = np.empty((3, 2))
+
     for i_view in range(2):
         E[:, :, i_view] = np.linalg.multi_dot((cam_intrinsics['mtx'].T, F[:, :, i_view], cam_intrinsics['mtx']))
+
+        # _, R[:, :, i_view], T[:, i_view], _ = cv2.recoverPose(E[:, :, i_view],
+        #                                                 stereo_cal_points[view_names[i_view][0]],
+        #                                                 stereo_cal_points[view_names[i_view][1]],
+        #                                                 cam_intrinsics['mtx'])
         R1, R2, T = cv2.decomposeEssentialMat(E[:, :, i_view])
         cRot, cT, correct = select_correct_E_mirror(R1, R2, T, stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'])
         pass

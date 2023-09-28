@@ -92,6 +92,24 @@ def unnormalize_points(points2d_norm, mtx):
     return unnorm_pts
 
 
+def reflection_matrix(rot, t):
+
+    H = np.hstack((rot, t))
+    H = np.vstack(H, np.array([0., 0., 0., 1.]))
+
+
+def depth_of_points(hom_3dpts, rot, t):
+    k, r, c, _, _, _, _ = cv2.decomposeProjectionMatrix(np.hstack((rot, t.T)))
+    # for i_col in range(4):
+    #     hom_3dpts[:, i_col] = hom_3dpts[:, i_col] / hom_3dpts[:, 3]
+    num_pts = np.shape(hom_3dpts)[0]
+    for ii in range(num_pts):
+        # this is just the z-coordinate with respect to the camera described by rot and t
+        w = np.dot(rot[2, :], np.squeeze((hom_3dpts[ii, :3] - (c[:3]/c[3]).T)))
+
+        depth = (np.sign(np.linalg.det(rot)) * w) / hom_3dpts[ii, 3] * np.linalg.norm(rot[2, :])
+        pass
+
 def normalize_points(points2d, mtx):
     points2d = np.squeeze(points2d)   # in case the array is n x 1 x 2 instead of n x 2
 
@@ -646,6 +664,7 @@ def triangulate_points(pts, cal_data):
 
     # undistort the points from each camera
     pts_ud = [cv2.undistortPoints(pts[i_cam], mtx[i_cam], dist[i_cam]) for i_cam in range(num_cams)]
+    # note that cv2.undistortPoints returns the answer in normalized coordinates
 
     points4D = cv2.triangulatePoints(projMatr1, projMatr2, pts_ud[0], pts_ud[1])
     world_points = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))

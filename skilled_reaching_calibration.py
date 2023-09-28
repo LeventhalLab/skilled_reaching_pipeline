@@ -1671,7 +1671,8 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
         R1, R2, T = cv2.decomposeEssentialMat(E[:, :, i_view])
         c_rot[:, :, i_view], c_t[:, i_view], correct = select_correct_E_mirror(R1, R2, T, stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'])
 
-        P2[: :, i_view] = np.hstack((c_rot[:, :, i_view], c_t[:, i_view].T))
+        t_mat = np.expand_dims(c_t[:, i_view], 1)
+        P2[: :, i_view] = np.hstack((c_rot[:, :, i_view], t_mat))
 
     return E, F, P2
 

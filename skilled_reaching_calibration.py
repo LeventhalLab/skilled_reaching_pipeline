@@ -1626,17 +1626,28 @@ def select_correct_E_mirror(R1, R2, T, pts1, pts2, mtx):
         #
         # worldpoints = np.squeeze(cv2.convertPointsFromHomogeneous(points4D.T))
 
-    correct = 0
-    depth = np.empty((num_pts, 2))
+    correct = None
+    depth = np.empty((4, 2))
     for ii in range(4):
         # compute the depth and sum the signs
-        cvb.depth_of_points(x3D[ii, :, :], np.eye(3), np.zeros((1, 3)))
-        cvb.depth_of_points(x3D[ii, :, :], rot[ii, :, :], t[ii, :, :])
-        # depth[ii, 0] = np.sum(sign(DepthOfPoints(x3D[ii, :, :], np.eye(3), np.zeros(3, 1)))) # using canonical camera
-        #
-        # depth[ii, 1] = np.sum(sign(DepthOfPoints(x3D[ii, :, :], rot[ii, :, :], t[ii, :, :]))) # using the recovered camera
+        depth[ii, 0] = np.sum(np.sign(cvb.depth_of_points(x3D[ii, :, :], np.eye(3), np.zeros((1, 3)))))
+        depth[ii, 1] = np.sum(np.sign(cvb.depth_of_points(x3D[ii, :, :], rot[ii, :, :], t[ii, :, :])))
 
-    pass
+        if depth[ii, 0] == num_pts and depth[ii, 1] == -num_pts:
+            # the correct pair of rotation matrix and translation vector should have all points in front of the real
+            # camera and behind the virtual (mirror) camera
+            correct = ii
+
+    if correct is None:
+        print('No projection matrix has all triangulated points in front of both cameras')
+        c_rot = None
+        c_t = None
+    else:
+        c_rot = rot[correct, :, :]
+        c_t = t[correct, :, :]
+
+    return c_rot, c_t, correct
+
 
 def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']]):
 
@@ -1647,9 +1658,9 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
 
     # calculate essential matrices
     E = np.empty((3, 3, 2))
-    R = np.empty((3, 3, 2))
-    T = np.empty((3, 2))
-
+    c_rot = np.empty((3, 3, 2))
+    c_t = np.empty((3, 2))
+    P2 = np.empty((3, 4, 2))
     for i_view in range(2):
         E[:, :, i_view] = np.linalg.multi_dot((cam_intrinsics['mtx'].T, F[:, :, i_view], cam_intrinsics['mtx']))
 
@@ -1658,9 +1669,11 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
         #                                                 stereo_cal_points[view_names[i_view][1]],
         #                                                 cam_intrinsics['mtx'])
         R1, R2, T = cv2.decomposeEssentialMat(E[:, :, i_view])
-        cRot, cT, correct = select_correct_E_mirror(R1, R2, T, stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'])
-        pass
-    return E, F
+        c_rot[:, :, i_view], c_t[:, i_view], correct = select_correct_E_mirror(R1, R2, T, stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'])
+
+        P2[: :, i_view] = np.hstack((c_rot[:, :, i_view], c_t[:, i_view].T))
+
+    return E, F, P2
 
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, calibration_pickle_name, init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS

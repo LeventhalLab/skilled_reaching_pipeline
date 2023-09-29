@@ -1677,16 +1677,36 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
     return E, F, P2
 
 
+
 def test_board_reconstruction(pts1, pts2, mtx, P2):
 
     P1 = np.eye(N=3, M=4)
 
-    pts1_norm = cvb.normalize_points(pts1, mtx)
-    pts2_norm = cvb.normalize_points(pts2, mtx)
+    pts1_norm = cvb.normalize_points(pts1, mtx).T
+    pts2_norm = cvb.normalize_points(pts2, mtx).T
     # wp, rp = cvb.triangulate_points()
 
-    x3D = cv2.triangulatePoints(P1, P2, pts1_norm, pts2_norm).T
+    x3D = cv2.triangulatePoints(P1, P2, pts1_norm.T, pts2_norm.T).T
 
+    num_pts = np.shape(pts1)[0]
+    camera_mats = np.zeros((3, 4, 2))
+    camera_mats[:, :, 0] = np.eye(3, 4)
+    camera_mats[:, :, 1] = P2
+    for i_pt in range(num_pts):
+        pts_match = np.vstack((pts1_norm[i_pt,:], pts2_norm[i_pt, :]))
+
+        cvb.multiview_ls_triangulation(pts_match, camera_mats)
+        pass
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    ax.scatter(x3D[:, 0], x3D[:, 1], x3D[:, 2])
+    ax.invert_yaxis()
+
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+
+    plt.show()
     pass
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, calibration_pickle_name,
                            view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, verbose=True):

@@ -179,6 +179,48 @@ def linear_eigen_triangulation(u1, P1, u2, P2, max_coordinate_value=1.e16):
     return x[0:3, :].T.astype(output_dtype), x_status
 
 
+def multiview_ls_triangulation(pts, camera_mats):
+    '''
+
+    :param pts: nx2 array (I think) where n is the number of cameras, and columns are (x,y) pairs
+    :param camera_mats: 3x4xn array where n is the number of cameras
+    :return:
+    '''
+    num_cams = np.shape(camera_mats)[2]
+    A = np.zeros((num_cams * 2, 4))
+
+    for i_cam in range(num_cams):
+        x, y = pts[i_cam]
+        mat = camera_mats[:, :, i_cam]
+        mat = np.vstack((mat, [0., 0., 0., 1.]))
+
+        A[(i_cam * 2):(i_cam * 2 + 1)] = x * mat[2] - mat[0]
+        A[(i_cam * 2 + 1):(i_cam * 2 + 2)] = y * mat[2] - mat[1]
+
+    u, s, vh = np.linalg.svd(A, full_matrices=True)
+    p3d = vh[-1]
+    p3d = p3d[:3] / p3d[3]
+    return p3d
+
+
+# from anipose:
+#   mat is a 4x4 matrix where mat[:3,:3] is the rotation matrix, mat[:3, 3] is the translation vector, and the bottom row
+#   is [0,0,0,1]. In other words, it's the 3 x 4 camera matrix P with with a fourth row of [0,0,0,1]
+# def triangulate_simple(points, camera_mats):
+#     num_cams = len(camera_mats)
+#     A = np.zeros((num_cams * 2, 4))
+#     for i in range(num_cams):
+#         x, y = points[i]
+#         mat = camera_mats[i]
+#         A[(i * 2):(i * 2 + 1)] = x * mat[2] - mat[0]
+#         A[(i * 2 + 1):(i * 2 + 2)] = y * mat[2] - mat[1]
+#     u, s, vh = np.linalg.svd(A, full_matrices=True)
+#     p3d = vh[-1]
+#     p3d = p3d[:3] / p3d[3]
+#     return p3d
+
+
+
 # Initialize consts to be used in linear_LS_triangulation()
 linear_LS_triangulation_C = -np.eye(2, 3)
 

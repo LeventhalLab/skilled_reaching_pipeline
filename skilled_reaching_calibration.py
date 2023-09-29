@@ -1672,11 +1672,24 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
         c_rot[:, :, i_view], c_t[:, i_view], correct = select_correct_E_mirror(R1, R2, T, stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'])
 
         t_mat = np.expand_dims(c_t[:, i_view], 1)
-        P2[: :, i_view] = np.hstack((c_rot[:, :, i_view], t_mat))
+        P2[:, :, i_view] = np.hstack((c_rot[:, :, i_view], t_mat))
 
     return E, F, P2
 
-def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, calibration_pickle_name, init_extrinsics=True, verbose=True):
+
+def test_board_reconstruction(pts1, pts2, mtx, P2):
+
+    P1 = np.eye(N=3, M=4)
+
+    pts1_norm = cvb.normalize_points(pts1, mtx)
+    pts2_norm = cvb.normalize_points(pts2, mtx)
+    # wp, rp = cvb.triangulate_points()
+
+    x3D[:, :] = cv2.triangulatePoints(P1, P2, pts1_norm, pts2_norm).T
+
+    pass
+def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, calibration_pickle_name,
+                           view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
     if os.path.exists(calibration_pickle_name):
@@ -1715,7 +1728,11 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     # calculate the fundamental matrices for direct-->left mirror and direct-->right mirror
     merged = merge_rows(all_rows, cam_names=cam_names)
     stereo_cal_points = collect_matched_mirror_points(merged, board)
-    E, F = mirror_stereo_cal(stereo_cal_points, cam_intrinsics)
+    E, F, P2 = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
+
+    # todo: now test the 3d reconstructions
+    i_view = 0
+    test_board_reconstruction(stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'], P2[:, :, i_view])
 
     # todo: now calculate rotation matrices based on fundamental matrices so that we can get back to using anipose algorithms
     # alternatively, just reproduce what I was doing before in Matlab, but use the svd method from anipose? what about RANSAC?

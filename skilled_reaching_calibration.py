@@ -1685,7 +1685,7 @@ def test_board_reconstruction(pts1, pts2, mtx, P2):
     pts2_norm = cvb.normalize_points(pts2, mtx)
     # wp, rp = cvb.triangulate_points()
 
-    x3D[:, :] = cv2.triangulatePoints(P1, P2, pts1_norm, pts2_norm).T
+    x3D = cv2.triangulatePoints(P1, P2, pts1_norm, pts2_norm).T
 
     pass
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, calibration_pickle_name,

@@ -181,6 +181,7 @@ def linear_eigen_triangulation(u1, P1, u2, P2, max_coordinate_value=1.e16):
 
 def multiview_ls_triangulation(pts, camera_mats):
     '''
+    algorithim for multiview triangulation taken from anipose
 
     :param pts: nx2 array (I think) where n is the number of cameras, and columns are (x,y) pairs
     :param camera_mats: 3x4xn array where n is the number of cameras

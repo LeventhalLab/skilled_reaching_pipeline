@@ -1681,21 +1681,26 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
 def test_board_reconstruction(pts1, pts2, mtx, P2):
 
     P1 = np.eye(N=3, M=4)
+    num_pts = np.shape(pts1)[0]
 
     pts1_norm = cvb.normalize_points(pts1, mtx).T
     pts2_norm = cvb.normalize_points(pts2, mtx).T
     # wp, rp = cvb.triangulate_points()
 
     x3D = cv2.triangulatePoints(P1, P2, pts1_norm.T, pts2_norm.T).T
+    x3D_nhom = np.zeros((num_pts, 3))
+    for ii in range(3):
+        x3D_nhom = x3D[:,ii] / x3D[:,3]
 
-    num_pts = np.shape(pts1)[0]
     camera_mats = np.zeros((3, 4, 2))
     camera_mats[:, :, 0] = np.eye(3, 4)
     camera_mats[:, :, 1] = P2
+
+    pts3d = np.zeros((num_pts, 3))
     for i_pt in range(num_pts):
         pts_match = np.vstack((pts1_norm[i_pt,:], pts2_norm[i_pt, :]))
 
-        cvb.multiview_ls_triangulation(pts_match, camera_mats)
+        pts3d[i_pt, :] = cvb.multiview_ls_triangulation(pts_match, camera_mats)
         pass
     fig = plt.figure()
     ax = plt.axes(projection='3d')

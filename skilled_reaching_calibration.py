@@ -1690,7 +1690,7 @@ def test_board_reconstruction(pts1, pts2, mtx, P2):
     x3D = cv2.triangulatePoints(P1, P2, pts1_norm.T, pts2_norm.T).T
     x3D_nhom = np.zeros((num_pts, 3))
     for ii in range(3):
-        x3D_nhom = x3D[:,ii] / x3D[:,3]
+        x3D_nhom[:, ii] = x3D[:,ii] / x3D[:,3]
 
     camera_mats = np.zeros((3, 4, 2))
     camera_mats[:, :, 0] = np.eye(3, 4)

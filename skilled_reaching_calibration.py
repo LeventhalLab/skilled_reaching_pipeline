@@ -1864,7 +1864,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
 
     # todo: now test the 3d reconstructions
     i_view = 0
-    test_board_reconstruction(stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'], rot[:, :, i_view], t[:, i_view], board)
+    test_board_reconstruction(stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'], rot[:, :, i_view], t[:, i_view] * scale_factor[i_view], board)
 
     # imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
     #

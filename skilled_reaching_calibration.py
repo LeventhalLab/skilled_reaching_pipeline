@@ -1691,17 +1691,18 @@ def calc_3d_gridspacing(pts3d, board_size):
 
 
 
+    start_idx = 0
+    distances_per_frame = int(pts_per_img * (pts_per_img - 1) / 2)
+    total_distances = num_img * distances_per_frame
+    all_distances = np.empty((total_distances, 1))
     for i_img in range(num_img):
-        num_distances = int(pts_per_img * (pts_per_img - 1) / 2)
-        all_distances = np.empty((num_distances, 1))
 
-        start_idx = 0
-        for i_pt in range(num_pts - 1):
+        for i_pt in range(start_idx, start_idx + pts_per_img):
 
             axes_diffs = pts3d[i_pt, :] - pts3d[i_pt + 1:num_pts, :]
             new_distances = np.linalg.norm(axes_diffs, ord=None, axis=1)
 
-            all_distances[start_idx:start_idx + pts_per_img] = new_distances
+            all_distances[start_idx:start_idx + distances_per_frame] = new_distances
 
         pass
 

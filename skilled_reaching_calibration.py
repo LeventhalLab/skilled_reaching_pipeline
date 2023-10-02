@@ -1744,6 +1744,11 @@ def calc_3d_scale_factor(pts1, pts2, mtx, rot, t, board):
 
 def test_board_reconstruction(pts1, pts2, mtx, rot, t, board):
 
+    # todo: if rot is a vector, convert to matrix
+    if np.ndim(np.squeeze(rot)) == 1:
+        # this is a rotation vector, not a matrix
+        rot, _ = cv2.Rodrigues(rot)
+
     P1 = np.eye(N=3, M=4)
     P2 = cvb.P_from_RT(rot, t)
     num_pts = np.shape(pts1)[0]
@@ -1864,7 +1869,9 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
 
     # todo: now test the 3d reconstructions
     i_view = 0
-    test_board_reconstruction(stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'], rot[:, :, i_view], t[:, i_view] * scale_factor[i_view], board)
+    rot = cgroup.cameras[i_view + 1].get_rotation()
+    t = cgroup.cameras[i_view + 1].get_translation()
+    test_board_reconstruction(stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'], rot, t, board)
 
     # imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
     #

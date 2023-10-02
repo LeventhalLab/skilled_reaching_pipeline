@@ -1677,8 +1677,24 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
     return E, F, P2
 
 
+def calc_3d_gridspacing(pts3d, board_size):
 
-def test_board_reconstruction(pts1, pts2, mtx, P2):
+    num_col_spacings = (board_size[0] - 1) * board_size[1]
+    num_row_spacings = (board_size[1] - 1) * board_size[0]
+
+    total_spacings = num_row_spacings + num_col_spacings
+
+    num_pts = np.shape(pts3d)[0]   # assume pts3d is a m x 3 where m is the number of points
+    num_distances = num_pts * (num_pts - 1) / 2
+    all_distances = np.empty(num_distances, 1)
+
+    for i_pt in range(num_pts - 1):
+
+        axes_diffs = pts3d[i_pt, :] - pts3d[i_pt + 1:num_pts, :]
+
+        pass
+
+def test_board_reconstruction(pts1, pts2, mtx, P2, board):
 
     P1 = np.eye(N=3, M=4)
     num_pts = np.shape(pts1)[0]
@@ -1697,19 +1713,45 @@ def test_board_reconstruction(pts1, pts2, mtx, P2):
     camera_mats[:, :, 1] = P2
 
     pts3d = np.zeros((num_pts, 3))
+    # wpts3d_Kinv = np.zeros((num_pts, 3))
+    # wpts3d_K = np.zeros((num_pts, 3))
+
     for i_pt in range(num_pts):
         pts_match = np.vstack((pts1_norm[i_pt,:], pts2_norm[i_pt, :]))
 
         pts3d[i_pt, :] = cvb.multiview_ls_triangulation(pts_match, camera_mats)
-        pass
-    fig = plt.figure()
+
+    calc_3d_gridspacing(pts3d, board.get_size())
+
+    Kinv = np.linalg.inv(mtx)
+    wpts3d_Kinv = np.matmul(Kinv, pts3d.T).T
+    wpts3d_K = np.matmul(mtx, pts3d.T).T
+
+#todo: figure out the right way to pull out real-world coordinates
+    fig1 = plt.figure()
     ax = plt.axes(projection='3d')
-    ax.scatter(x3D[:, 0], x3D[:, 1], x3D[:, 2])
+    ax.scatter(x3D_nhom[:63, 0], x3D_nhom[:63, 1], x3D_nhom[:63, 2])
+    # ax.scatter(pts3d[:63, 0], pts3d[:63, 1], pts3d[:63, 2])
+    ax.scatter(wpts3d_Kinv[:63, 0], wpts3d_Kinv[:63, 1], wpts3d_Kinv[:63, 2])
     ax.invert_yaxis()
 
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     ax.set_zlabel('z')
+    ax.set_title('mutliplied by K')
+
+
+    fig2 = plt.figure()
+    ax = plt.axes(projection='3d')
+    ax.scatter(x3D_nhom[:63, 0], x3D_nhom[:63, 1], x3D_nhom[:63, 2])
+    # ax.scatter(pts3d[:63, 0], pts3d[:63, 1], pts3d[:63, 2])
+    ax.scatter(wpts3d_K[:63, 0], wpts3d_K[:63, 1], wpts3d_K[:63, 2])
+    ax.invert_yaxis()
+
+    ax.set_xlabel('x')
+    ax.set_ylabel('y')
+    ax.set_zlabel('z')
+    ax.set_title('mutliplied by Kinv')
 
     plt.show()
     pass
@@ -1757,7 +1799,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
 
     # todo: now test the 3d reconstructions
     i_view = 0
-    test_board_reconstruction(stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'], P2[:, :, i_view])
+    test_board_reconstruction(stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'], P2[:, :, i_view], board)
 
     # todo: now calculate rotation matrices based on fundamental matrices so that we can get back to using anipose algorithms
     # alternatively, just reproduce what I was doing before in Matlab, but use the svd method from anipose? what about RANSAC?

@@ -1682,29 +1682,34 @@ def calc_3d_gridspacing(pts3d, board_size):
     num_col_spacings = (board_size[0] - 1) * board_size[1]
     num_row_spacings = (board_size[1] - 1) * board_size[0]
 
-    total_spacings = num_row_spacings + num_col_spacings
+    grid_spacings_per_frame = num_row_spacings + num_col_spacings
 
     # assume pts3d is a m x 3 where m is the number of points
     num_pts = np.shape(pts3d)[0]
     pts_per_img = np.prod(board_size)
     num_img = int(num_pts / pts_per_img)
 
-
-
     start_idx = 0
     distances_per_frame = int(pts_per_img * (pts_per_img - 1) / 2)
     total_distances = num_img * distances_per_frame
-    all_distances = np.empty((total_distances, 1))
+    total_grid_spacings = num_img * grid_spacings_per_frame
+    all_distances = np.empty(total_distances)
     for i_img in range(num_img):
 
-        for i_pt in range(start_idx, start_idx + pts_per_img):
+        last_frame_pt = start_idx + pts_per_img
+        for i_pt in range(start_idx, last_frame_pt):
 
-            axes_diffs = pts3d[i_pt, :] - pts3d[i_pt + 1:num_pts, :]
+            axes_diffs = pts3d[i_pt, :] - pts3d[i_pt + 1:last_frame_pt, :]
             new_distances = np.linalg.norm(axes_diffs, ord=None, axis=1)
 
-            all_distances[start_idx:start_idx + distances_per_frame] = new_distances
+            all_distances[start_idx:start_idx + len(new_distances)] = new_distances
 
-        pass
+            start_idx += len(new_distances)
+
+    all_distances = np.sort(all_distances)
+    grid_spacing = all_distances[:total_grid_spacings]
+
+    pass
 
 def test_board_reconstruction(pts1, pts2, mtx, P2, board):
 

@@ -1660,7 +1660,7 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
     E = np.empty((3, 3, 2))
     c_rot = np.empty((3, 3, 2))
     c_t = np.empty((3, 2))
-    P2 = np.empty((3, 4, 2))
+    # P2 = np.empty((3, 4, 2))
     for i_view in range(2):
         E[:, :, i_view] = np.linalg.multi_dot((cam_intrinsics['mtx'].T, F[:, :, i_view], cam_intrinsics['mtx']))
 
@@ -1672,9 +1672,9 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
         c_rot[:, :, i_view], c_t[:, i_view], correct = select_correct_E_mirror(R1, R2, T, stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'])
 
         t_mat = np.expand_dims(c_t[:, i_view], 1)
-        P2[:, :, i_view] = np.hstack((c_rot[:, :, i_view], t_mat))
+        # P2[:, :, i_view] = np.hstack((c_rot[:, :, i_view], t_mat))
 
-    return E, F, P2
+    return E, F, c_rot, c_t
 
 
 def calc_3d_gridspacing(pts3d, board_size):
@@ -1689,31 +1689,63 @@ def calc_3d_gridspacing(pts3d, board_size):
     pts_per_img = np.prod(board_size)
     num_img = int(num_pts / pts_per_img)
 
-    start_idx = 0
+    all_dist_start_idx = 0
     distances_per_frame = int(pts_per_img * (pts_per_img - 1) / 2)
     total_distances = num_img * distances_per_frame
     total_grid_spacings = num_img * grid_spacings_per_frame
     all_distances = np.empty(total_distances)
     for i_img in range(num_img):
 
-        last_frame_pt = start_idx + pts_per_img
-        for i_pt in range(start_idx, last_frame_pt):
+        start_frame_pt = i_img * pts_per_img
+        last_frame_pt = start_frame_pt + pts_per_img
+        for i_pt in range(start_frame_pt, last_frame_pt):
 
             axes_diffs = pts3d[i_pt, :] - pts3d[i_pt + 1:last_frame_pt, :]
             new_distances = np.linalg.norm(axes_diffs, ord=None, axis=1)
 
-            all_distances[start_idx:start_idx + len(new_distances)] = new_distances
+            all_distances[all_dist_start_idx:all_dist_start_idx + len(new_distances)] = new_distances
 
-            start_idx += len(new_distances)
+            all_dist_start_idx += len(new_distances)
 
     all_distances = np.sort(all_distances)
     grid_spacing = all_distances[:total_grid_spacings]
 
-    pass
+    return grid_spacing
 
-def test_board_reconstruction(pts1, pts2, mtx, P2, board):
+
+def calc_3d_scale_factor(pts1, pts2, mtx, rot, t, board):
+
+    P2 = cvb.P_from_RT(rot, t)
+    num_pts = np.shape(pts1)[0]
+
+    pts1_norm = cvb.normalize_points(pts1, mtx).T
+    pts2_norm = cvb.normalize_points(pts2, mtx).T
+
+    camera_mats = np.zeros((3, 4, 2))
+    camera_mats[:, :, 0] = np.eye(3, 4)
+    camera_mats[:, :, 1] = P2
+
+    pts3d = np.zeros((num_pts, 3))
+
+    for i_pt in range(num_pts):
+        pts_match = np.vstack((pts1_norm[i_pt,:], pts2_norm[i_pt, :]))
+
+        pts3d[i_pt, :] = cvb.multiview_ls_triangulation(pts_match, camera_mats)
+
+    # calculate grid spacing for 3d reconstructed points from normalized coordinates
+    gridspacing = calc_3d_gridspacing(pts3d, board.get_size())
+
+    mean_spacing = np.mean(gridspacing)
+
+    scale_factor = board.get_square_length() / mean_spacing
+
+    return scale_factor
+
+
+def test_board_reconstruction(pts1, pts2, mtx, rot, t, board):
 
     P1 = np.eye(N=3, M=4)
+    P2 = cvb.P_from_RT(rot, t)
     num_pts = np.shape(pts1)[0]
 
     pts1_norm = cvb.normalize_points(pts1, mtx).T
@@ -1727,7 +1759,7 @@ def test_board_reconstruction(pts1, pts2, mtx, P2, board):
 
     camera_mats = np.zeros((3, 4, 2))
     camera_mats[:, :, 0] = np.eye(3, 4)
-    camera_mats[:, :, 1] = P2
+    camera_mats[:, :, 1] = cvb.P_from_RT(rot, t)
 
     pts3d = np.zeros((num_pts, 3))
     # wpts3d_Kinv = np.zeros((num_pts, 3))
@@ -1748,8 +1780,8 @@ def test_board_reconstruction(pts1, pts2, mtx, P2, board):
     fig1 = plt.figure()
     ax = plt.axes(projection='3d')
     ax.scatter(x3D_nhom[:63, 0], x3D_nhom[:63, 1], x3D_nhom[:63, 2])
-    # ax.scatter(pts3d[:63, 0], pts3d[:63, 1], pts3d[:63, 2])
-    ax.scatter(wpts3d_Kinv[:63, 0], wpts3d_Kinv[:63, 1], wpts3d_Kinv[:63, 2])
+    ax.scatter(pts3d[:63, 0], pts3d[:63, 1], pts3d[:63, 2])
+    # ax.scatter(wpts3d_Kinv[:63, 0], wpts3d_Kinv[:63, 1], wpts3d_Kinv[:63, 2])
     ax.invert_yaxis()
 
     ax.set_xlabel('x')
@@ -1757,18 +1789,18 @@ def test_board_reconstruction(pts1, pts2, mtx, P2, board):
     ax.set_zlabel('z')
     ax.set_title('mutliplied by K')
 
-
-    fig2 = plt.figure()
-    ax = plt.axes(projection='3d')
-    ax.scatter(x3D_nhom[:63, 0], x3D_nhom[:63, 1], x3D_nhom[:63, 2])
-    # ax.scatter(pts3d[:63, 0], pts3d[:63, 1], pts3d[:63, 2])
-    ax.scatter(wpts3d_K[:63, 0], wpts3d_K[:63, 1], wpts3d_K[:63, 2])
-    ax.invert_yaxis()
-
-    ax.set_xlabel('x')
-    ax.set_ylabel('y')
-    ax.set_zlabel('z')
-    ax.set_title('mutliplied by Kinv')
+    #
+    # fig2 = plt.figure()
+    # ax = plt.axes(projection='3d')
+    # ax.scatter(x3D_nhom[:63, 0], x3D_nhom[:63, 1], x3D_nhom[:63, 2])
+    # # ax.scatter(pts3d[:63, 0], pts3d[:63, 1], pts3d[:63, 2])
+    # # ax.scatter(wpts3d_K[:63, 0], wpts3d_K[:63, 1], wpts3d_K[:63, 2])
+    # ax.invert_yaxis()
+    #
+    # ax.set_xlabel('x')
+    # ax.set_ylabel('y')
+    # ax.set_zlabel('z')
+    # ax.set_title('mutliplied by Kinv')
 
     plt.show()
     pass
@@ -1812,126 +1844,130 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     # calculate the fundamental matrices for direct-->left mirror and direct-->right mirror
     merged = merge_rows(all_rows, cam_names=cam_names)
     stereo_cal_points = collect_matched_mirror_points(merged, board)
-    E, F, P2 = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
+    E, F, rot, t = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
+
+    rvecs = [[0., 0., 0.]]
+    cam_t = [[0., 0., 0.]]
+    scale_factor = np.zeros(2)
+    for i_view in range(2):
+        cam_rvec, _ = cv2.Rodrigues(rot[:, :, i_view])
+        rvecs.append(cam_rvec)
+
+        scale_factor[i_view] = calc_3d_scale_factor(stereo_cal_points[view_names[i_view][0]],
+                                                    stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'],
+                                                    rot[:, :, i_view], t[:, i_view], board)
+
+        cam_t.append(t[:, i_view] * scale_factor[i_view])
+
+    cgroup.set_rotations(rvecs)
+    cgroup.set_translations(cam_t)
 
     # todo: now test the 3d reconstructions
     i_view = 0
-    test_board_reconstruction(stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'], P2[:, :, i_view], board)
+    test_board_reconstruction(stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'], rot[:, :, i_view], t[:, i_view], board)
 
-    # todo: now calculate rotation matrices based on fundamental matrices so that we can get back to using anipose algorithms
-    # alternatively, just reproduce what I was doing before in Matlab, but use the svd method from anipose? what about RANSAC?
-
-    # comment in code below to test fundamental matrix calculation
-    '''
-    frame_num = 305
-    mirror_calib_vid_name = navigation_utilities.calib_vid_name_from_cropped_calib_vid_name(cropped_vids[0])
-    full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
-                                                                             parent_directories)
-    test_fundamental_matrix(full_calib_vid_name, merged, frame_num, calibration_data, F)
-    '''
-
-    imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
-
-
-
-    # initialize the intrinsic matrix and distortion coefficients (should be all zeros) for each view
-    if not calibration_data['intrinsics_initialized']:
-        print('initializing camera matrices...')
-        expected_cam_idx = 0
-        for rows, cropped_vid in zip(all_rows, cropped_vids):
-            # get intrinsics for each camera
-            # figure out which camera this is
-            this_cam = None
-            for i_cam, cam_name in enumerate(cgroup.get_names()):
-                if cam_name in cropped_vid:
-                    this_cam = cam_name
-                    cam_idx = i_cam
-                    if cam_idx != expected_cam_idx:
-                        # error handling here for the cameras not being in the same order as the videos
-                        error('cropped video names and cameras are not in the same order')
-                    expected_cam_idx += 1
-                    break
-            if this_cam is None:
-                # error handling here for no camera corresponding to this video
-                error('no camera corresponding to {}'.format(cropped_vid))
-
-            cap = cv2.VideoCapture(cropped_vid)
-            w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            size = (w, h)
-            cap.release()
-
-            cgroup.cameras[cam_idx].set_size(size)
-            # initialize the intrinsic matrix for the cropped view
-            # distortion coefficients should be zero - points should already be undistorted
-            objp, imgp = board.get_all_calibration_points(rows)
-            mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= 7]
-            try:
-                objp, imgp = zip(*mixed)
-            except:
-                pass
-            matrix = cv2.initCameraMatrix2D(objp, imgp, tuple(size))
-            # mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp, imgp, size, matrix, np.zeros((1,5)), flags=CALIBRATION_FLAGS)
-
-            cgroup.cameras[cam_idx].set_camera_matrix(matrix)
-            cgroup.cameras[cam_idx].set_distortions(np.zeros((1,5)))   # because all points should already be undistorted
-
-        calibration_data['cgroup'] = cgroup
-        calibration_data['intrinsics_initialized'] = True
-        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
-
-    # test to see if poses have already been estimated for each frame
-    if not calibration_data['estimated_poses']:
-        print('estimating poses...')
-        for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
-            # need to make sure the cameras are in the right order; this should have been checked in the code above
-            all_rows[i] = board.estimate_pose_rows(cam, row)
-
-        calibration_data['all_rows'] = all_rows
-        calibration_data['estimated_poses'] = True
-        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
-
-    merged = merge_rows(all_rows, cam_names=cam_names)
-    imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
-    '''
-        extra = {
-        'objp': objp,
-        'ids': board_ids,
-        'rvecs': rvecs,
-        'tvecs': tvecs
-    }'''
-
-    if not calibration_data['extrinsics initialized'] and init_extrinsics:
-        print('initializing extrinsics...')
-        rtvecs = extract_rtvecs(merged)
-        if verbose:
-            pprint(get_connections(rtvecs, cam_names))
-        try:
-            rvecs, tvecs = get_initial_extrinsics(rtvecs, cam_names)
-        except:
-            pass
-        cgroup.set_rotations(rvecs)
-        cgroup.set_translations(tvecs)
-
-        calibration_data['cgroup'] = cgroup
-        calibration_data['extrinsics initialized'] = True
-        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
-
-
-    # need to look and decide if default parameters in bundle_ajust_iter work well here
-    # don't undistort the points - already done in get_rows_cropped_vids
-    if not calibration_data['bundle_adjust_completed']:
-        print('calculating bundle adjustment...')
-        error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
-
-        calibration_data['error'] = error
-        calibration_data['cgroup'] = cgroup
-        calibration_data['bundle_adjust_completed'] = True
-        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
-    else:
-        error = calibration_data['error']
-
-    return cgroup, error
+    # imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
+    #
+    #
+    #
+    # # initialize the intrinsic matrix and distortion coefficients (should be all zeros) for each view
+    # if not calibration_data['intrinsics_initialized']:
+    #     print('initializing camera matrices...')
+    #     expected_cam_idx = 0
+    #     for rows, cropped_vid in zip(all_rows, cropped_vids):
+    #         # get intrinsics for each camera
+    #         # figure out which camera this is
+    #         this_cam = None
+    #         for i_cam, cam_name in enumerate(cgroup.get_names()):
+    #             if cam_name in cropped_vid:
+    #                 this_cam = cam_name
+    #                 cam_idx = i_cam
+    #                 if cam_idx != expected_cam_idx:
+    #                     # error handling here for the cameras not being in the same order as the videos
+    #                     error('cropped video names and cameras are not in the same order')
+    #                 expected_cam_idx += 1
+    #                 break
+    #         if this_cam is None:
+    #             # error handling here for no camera corresponding to this video
+    #             error('no camera corresponding to {}'.format(cropped_vid))
+    #
+    #         cap = cv2.VideoCapture(cropped_vid)
+    #         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    #         h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    #         size = (w, h)
+    #         cap.release()
+    #
+    #         cgroup.cameras[cam_idx].set_size(size)
+    #         # initialize the intrinsic matrix for the cropped view
+    #         # distortion coefficients should be zero - points should already be undistorted
+    #         objp, imgp = board.get_all_calibration_points(rows)
+    #         mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= 7]
+    #         try:
+    #             objp, imgp = zip(*mixed)
+    #         except:
+    #             pass
+    #         matrix = cv2.initCameraMatrix2D(objp, imgp, tuple(size))
+    #         # mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp, imgp, size, matrix, np.zeros((1,5)), flags=CALIBRATION_FLAGS)
+    #
+    #         cgroup.cameras[cam_idx].set_camera_matrix(matrix)
+    #         cgroup.cameras[cam_idx].set_distortions(np.zeros((1,5)))   # because all points should already be undistorted
+    #
+    #     calibration_data['cgroup'] = cgroup
+    #     calibration_data['intrinsics_initialized'] = True
+    #     skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+    #
+    # # test to see if poses have already been estimated for each frame
+    # if not calibration_data['estimated_poses']:
+    #     print('estimating poses...')
+    #     for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
+    #         # need to make sure the cameras are in the right order; this should have been checked in the code above
+    #         all_rows[i] = board.estimate_pose_rows(cam, row)
+    #
+    #     calibration_data['all_rows'] = all_rows
+    #     calibration_data['estimated_poses'] = True
+    #     skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+    #
+    # merged = merge_rows(all_rows, cam_names=cam_names)
+    # imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
+    # '''
+    #     extra = {
+    #     'objp': objp,
+    #     'ids': board_ids,
+    #     'rvecs': rvecs,
+    #     'tvecs': tvecs
+    # }'''
+    #
+    # if not calibration_data['extrinsics initialized'] and init_extrinsics:
+    #     print('initializing extrinsics...')
+    #     rtvecs = extract_rtvecs(merged)
+    #     if verbose:
+    #         pprint(get_connections(rtvecs, cam_names))
+    #     try:
+    #         rvecs, tvecs = get_initial_extrinsics(rtvecs, cam_names)
+    #     except:
+    #         pass
+    #     cgroup.set_rotations(rvecs)
+    #     cgroup.set_translations(tvecs)
+    #
+    #     calibration_data['cgroup'] = cgroup
+    #     calibration_data['extrinsics initialized'] = True
+    #     skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+    #
+    #
+    # # need to look and decide if default parameters in bundle_ajust_iter work well here
+    # # don't undistort the points - already done in get_rows_cropped_vids
+    # if not calibration_data['bundle_adjust_completed']:
+    #     print('calculating bundle adjustment...')
+    #     error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
+    #
+    #     calibration_data['error'] = error
+    #     calibration_data['cgroup'] = cgroup
+    #     calibration_data['bundle_adjust_completed'] = True
+    #     skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+    # else:
+    #     error = calibration_data['error']
+    #
+    # return cgroup, error
 
 
 def test_anipose_calibration(session_row, parent_directories):

@@ -1810,6 +1810,8 @@ def test_board_reconstruction(pts1, pts2, mtx, rot, t, board):
 
     plt.show()
     pass
+
+
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, calibration_pickle_name,
                            view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
@@ -1819,6 +1821,9 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
         cgroup = calibration_data['cgroup']
     else:
         cgroup = CameraGroup.from_names(cam_names, fisheye=False)
+        for camera in cgroup.cameras:
+            camera.set_camera_matrix(cam_intrinsics['mtx'])
+            camera.set_distortions([np.zeros(5)])
         calibration_data = {'cam_intrinsics': cam_intrinsics,
                             'cgroup': cgroup,
                             'mirror_board': board,

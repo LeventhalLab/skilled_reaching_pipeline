@@ -11,6 +11,7 @@ import crop_videos
 import os
 import csv
 import numpy as np
+import copy
 import random
 import cv2
 from cv2 import aruco
@@ -1867,7 +1868,13 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     cgroup.set_rotations(rvecs)
     cgroup.set_translations(cam_t)
 
-    # todo: now test the 3d reconstructions
+    cgroup_old = copy.deepcopy(cgroup)
+    imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
+    error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
+
+    return cgroup, error
+
+    # code to test the 3d reconstructions
     i_view = 0
     rot = cgroup.cameras[i_view + 1].get_rotation()
     t = cgroup.cameras[i_view + 1].get_translation()

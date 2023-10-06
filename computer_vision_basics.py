@@ -115,6 +115,12 @@ def depth_of_points(hom_3dpts, rot, t):
 
 
 def normalize_points(points2d, mtx):
+    '''
+
+    :param points2d: n x 2 or 3 matrix where n is number of points. If n x 3, that causes assumption that points are in normalized coordinates
+    :param mtx:
+    :return:
+    '''
     points2d = np.squeeze(points2d)   # in case the array is n x 1 x 2 instead of n x 2
 
     if points2d.ndim == 1:

@@ -1837,6 +1837,9 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     #      video, then flip them left-right if in a mirror view
     if 'all_rows' not in calibration_data.keys():
         all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories)
+        for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
+            # need to make sure the cameras are in the right order; this should have been checked in the code above
+            all_rows[i] = board.estimate_pose_rows(cam, row)
         calibration_data = {'cam_intrinsics': cam_intrinsics,
                             'cgroup': cgroup,
                             'mirror_board': board,
@@ -1848,6 +1851,9 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
         skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
     else:
         all_rows = calibration_data['all_rows']
+        for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
+            # need to make sure the cameras are in the right order; this should have been checked in the code above
+            all_rows[i] = board.estimate_pose_rows(cam, row)
 
     # at this point, should save the camera groups/boards in a .pickle file so don't have to detect the boards each time
     # also, once saved, write something to verify that the points are what I think they are
@@ -1880,10 +1886,10 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     return cgroup, error
 
     # code to test the 3d reconstructions
-    i_view = 0
-    rot = cgroup.cameras[i_view + 1].get_rotation()
-    t = cgroup.cameras[i_view + 1].get_translation()
-    test_board_reconstruction(stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'], rot, t, board)
+    # i_view = 0
+    # rot = cgroup.cameras[i_view + 1].get_rotation()
+    # t = cgroup.cameras[i_view + 1].get_translation()
+    # test_board_reconstruction(stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'], rot, t, board)
 
     # imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
     #
@@ -2131,8 +2137,17 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
             orig_coord_y = row['corners'][:,:,1] + cropped_vid_metadata['crop_params'][2]
             orig_coord = np.hstack((orig_coord_x, orig_coord_y))
 
+            # not sure what the difference is between 'filled' and 'corners' in each row dictionary, just trying to make
+            # this work with anipose
+            orig_filled_x = row['filled'][:,:,0] + cropped_vid_metadata['crop_params'][0]
+            orig_filled_y = row['filled'][:,:,1] + cropped_vid_metadata['crop_params'][2]
+            orig_filled = np.hstack((orig_filled_x, orig_filled_y))
+
             orig_ud_norm = cv2.undistortPoints(orig_coord, cam_intrinsics['mtx'], cam_intrinsics['dist'])
             corners_ud = cvb.unnormalize_points(orig_ud_norm, cam_intrinsics['mtx'])
+
+            filled_ud_norm = cv2.undistortPoints(orig_filled, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+            filled_ud = cvb.unnormalize_points(filled_ud_norm, cam_intrinsics['mtx'])
 
             if isinstance(board, Checkerboard):
                 # make sure the top left corner is always labeled first in the direct view and the labels go left->right across rows
@@ -2142,14 +2157,19 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
                 elif 'mirror' in cropped_vid:
                     fliplr = True
                 corners_ud = reorder_checkerboard_points(corners_ud, board.get_size(), fliplr)
+                filled_ud = reorder_checkerboard_points(filled_ud, board.get_size(), fliplr)
             corners_ud = np.expand_dims(corners_ud, 1)
+            filled_ud = np.expand_dims(filled_ud, 1)
 
             rows[i_row]['corners_distorted'] = row['corners']   # these are still in the cropped video reference frame
             rows[i_row]['corners'] = corners_ud
+            rows[i_row]['filled'] = filled_ud
 
             # rows_cam.extend(rows)
 
         all_rows.append(rows)
+
+    return all_rows
 
     # mirror_calib_vid_name = navigation_utilities.calib_vid_name_from_cropped_calib_vid_name(cropped_vid)
 
@@ -2195,8 +2215,6 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
             #
             #     plt.show()
             #     pass
-
-    return all_rows
 
 
 def test_point_id(vid_name, frame_num, pts, cam_intrinsics):

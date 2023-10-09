@@ -204,7 +204,10 @@ def multiview_ls_triangulation(pts, camera_mats):
         A[(i_cam * 2):(i_cam * 2 + 1)] = x * mat[2] - mat[0]
         A[(i_cam * 2 + 1):(i_cam * 2 + 2)] = y * mat[2] - mat[1]
 
-    u, s, vh = np.linalg.svd(A, full_matrices=True)
+    try:
+        u, s, vh = np.linalg.svd(A, full_matrices=True)
+    except:
+        pass
     p3d = vh[-1]
     p3d = p3d[:3] / p3d[3]
     return p3d

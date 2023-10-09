@@ -2565,10 +2565,10 @@ def reorder_checkerboard_points(corners, size, fliplr):
         elif first_corner[0] < last_corner[0] and first_corner[1] > last_corner[1]:
             # first corner is bottom left; then it will go up along the left column (I think)
             id_order = []
-            # since it's going left-->right, first index in size is the number of columns
-            for i_row in range(size[1]):
-                for i_col in range(size[0]):
-                    id_order.append((size[1] * (size[0]-i_row-1)) + i_col)
+            # since it's going bottom-->top, first index in size is the number of rows
+            for i_row in range(size[0]):
+                for i_col in range(size[1]):
+                    id_order.append((size[1] * size[0] - i_row - 1) - size[0] * i_col)
             id_order = np.array(id_order)
 
     reordered_corners = np.array([corners[ii, :] for ii in id_order])

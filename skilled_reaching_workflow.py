@@ -275,50 +275,51 @@ def calibrate_all_sessions(parent_directories,
                 filtertype=filtertype)
             print('calibrating {}'.format(mirror_calib_vid_name))
             cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, calibration_pickle_name)
+            # note that calibrate_mirror_views writes a pickle file with updated calibration parameters including cgroup
+
+
             # cgroup.dump(calibration_toml_name)
-            skilled_reaching_calibration.test_anipose_calibration(session_row, parent_directories)
-            pass
-
-    #TODO: load the calibration .toml/.pickle file and verify points
+            # skilled_reaching_calibration.test_anipose_calibration(session_row, parent_directories)
 
 
-    for cf in calib_vid_folders:
-        # crop the calibration videos
-        calib_vids = glob.glob(os.path.join(cf, 'GridCalibration_*' + vidtype))
 
-        orig_im_size = []
-        cropped_vid_names = []
-        for calib_vid in calib_vids:
-            current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(calib_vid, calibration_metadata_df, filtertype=filtertype)
-            if current_cropped_calibration_vids is None:
-                # crop_calibration_video returns None if there isn't an associated rat session for the calibration video
-                continue
-
-            cropped_vid_names.append(current_cropped_calibration_vids)
-            vid_obj = cv2.VideoCapture(calib_vid)
-            orig_im_size.append((int(vid_obj.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_obj.get(cv2.CAP_PROP_FRAME_WIDTH))))
-            vid_obj.release()
-        # cropped_vid_names contains a list of lists; each individual list contains the names of 3 files, one each for
-        # the direct, leftmirror, and rightmirror views
-
-        # FOR NOW, JUST CROP THE VIDEOS. COMMENT THE CALIBRATION PART BACK IN LATER (HOPEFULLY CAN JUST RUN ANIPOSE HERE...)
-        for i_calib_vid, cropped_vids_set in enumerate(cropped_vid_names):
-        #     # each cropped_vids_set should contain 3 video names for direct, left, right views
-        #
-            session_metadata = navigation_utilities.parse_camera_calibration_video_name(cropped_vids_set[0])
-            calibration_summary_name = navigation_utilities.create_calibration_summary_name(calib_vids[i_calib_vid], calibration_files_parent)
-        #
-            if os.path.isfile(calibration_summary_name):
-                calibration_data = skilled_reaching_io.read_pickle(calibration_summary_name)
-            else:
-                calibration_metadata = skilled_reaching_calibration.calibration_metadata_from_df(session_metadata, calibration_metadata_df)
-                crop_params_dict = crop_videos.crop_params_dict_from_df(calibration_metadata_df, session_metadata['time'].date(),
-                                                                        session_metadata['boxnum'])
-                cam_names = list(crop_params_dict.keys())
-                skilled_reaching_calibration.anipose_calibrate(cropped_vids_set, cam_names, calibration_metadata)
-                # calibration_data = skilled_reaching_calibration.collect_cb_corners(cropped_vids_set, cb_size)
-                calibration_data['orig_im_size'] = orig_im_size[i_calib_vid]
-                skilled_reaching_io.write_pickle(calibration_summary_name, calibration_data)
+    # for cf in calib_vid_folders:
+    #     # crop the calibration videos
+    #     calib_vids = glob.glob(os.path.join(cf, 'GridCalibration_*' + vidtype))
+    #
+    #     orig_im_size = []
+    #     cropped_vid_names = []
+    #     for calib_vid in calib_vids:
+    #         current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(calib_vid, calibration_metadata_df, filtertype=filtertype)
+    #         if current_cropped_calibration_vids is None:
+    #             # crop_calibration_video returns None if there isn't an associated rat session for the calibration video
+    #             continue
+    #
+    #         cropped_vid_names.append(current_cropped_calibration_vids)
+    #         vid_obj = cv2.VideoCapture(calib_vid)
+    #         orig_im_size.append((int(vid_obj.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_obj.get(cv2.CAP_PROP_FRAME_WIDTH))))
+    #         vid_obj.release()
+    #     # cropped_vid_names contains a list of lists; each individual list contains the names of 3 files, one each for
+    #     # the direct, leftmirror, and rightmirror views
+    #
+    #     # FOR NOW, JUST CROP THE VIDEOS. COMMENT THE CALIBRATION PART BACK IN LATER (HOPEFULLY CAN JUST RUN ANIPOSE HERE...)
+    #     for i_calib_vid, cropped_vids_set in enumerate(cropped_vid_names):
+    #     #     # each cropped_vids_set should contain 3 video names for direct, left, right views
+    #     #
+    #         session_metadata = navigation_utilities.parse_camera_calibration_video_name(cropped_vids_set[0])
+    #         calibration_summary_name = navigation_utilities.create_calibration_summary_name(calib_vids[i_calib_vid], calibration_files_parent)
+    #     #
+    #         if os.path.isfile(calibration_summary_name):
+    #             calibration_data = skilled_reaching_io.read_pickle(calibration_summary_name)
+    #         else:
+    #             calibration_metadata = skilled_reaching_calibration.calibration_metadata_from_df(session_metadata, calibration_metadata_df)
+    #             crop_params_dict = crop_videos.crop_params_dict_from_df(calibration_metadata_df, session_metadata['time'].date(),
+    #                                                                     session_metadata['boxnum'])
+    #             cam_names = list(crop_params_dict.keys())
+    #             skilled_reaching_calibration.anipose_calibrate(cropped_vids_set, cam_names, calibration_metadata)
+    #             # calibration_data = skilled_reaching_calibration.collect_cb_corners(cropped_vids_set, cb_size)
+    #             calibration_data['orig_im_size'] = orig_im_size[i_calib_vid]
+    #             skilled_reaching_io.write_pickle(calibration_summary_name, calibration_data)
         #
         #     # now perform the actual calibration
         #     skilled_reaching_calibration.multi_mirror_calibration(calibration_data, calibration_summary_name)

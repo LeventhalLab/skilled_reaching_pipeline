@@ -1827,9 +1827,12 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
         calibration_data = {'cam_intrinsics': cam_intrinsics,
                             'cgroup': cgroup,
                             'mirror_board': board,
-                            'intrinsics_initialized': False,
+                            'scale_factors': np.zeros(2),
+                            'F': None,
+                            'E': None,
+                            'intrinsics_initialized': True,
                             'estimated_poses': False,
-                            'extrinsics initialized': False,
+                            'extrinsics_initialized': False,
                             'bundle_adjust_completed': False}
     # get_rows_cropped_vids will
     #  1. detect the checkerboard/charuco board points
@@ -1840,20 +1843,14 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
         for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
             # need to make sure the cameras are in the right order; this should have been checked in the code above
             all_rows[i] = board.estimate_pose_rows(cam, row)
-        calibration_data = {'cam_intrinsics': cam_intrinsics,
-                            'cgroup': cgroup,
-                            'mirror_board': board,
-                            'all_rows': all_rows,
-                            'intrinsics_initialized': False,
-                            'estimated_poses': False,
-                            'extrinsics initialized': False,
-                            'bundle_adjust_completed': False}
+        calibration_data['all_rows'] = all_rows
         skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
     else:
         all_rows = calibration_data['all_rows']
         for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
             # need to make sure the cameras are in the right order; this should have been checked in the code above
             all_rows[i] = board.estimate_pose_rows(cam, row)
+        calibration_data['all_rows'] = all_rows
 
     # at this point, should save the camera groups/boards in a .pickle file so don't have to detect the boards each time
     # also, once saved, write something to verify that the points are what I think they are
@@ -1862,26 +1859,44 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     merged = merge_rows(all_rows, cam_names=cam_names)
     stereo_cal_points = collect_matched_mirror_points(merged, board)
     E, F, rot, t = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
+    calibration_data['E'] = E
+    calibration_data['F'] = F
 
-    rvecs = [[0., 0., 0.]]
-    cam_t = [[0., 0., 0.]]
-    scale_factor = np.zeros(2)
-    for i_view in range(2):
-        cam_rvec, _ = cv2.Rodrigues(rot[:, :, i_view])
-        rvecs.append(cam_rvec)
+    if not calibration_data['extrinsics_initialized']:
+        rvecs = [[0., 0., 0.]]
+        cam_t = [[0., 0., 0.]]
+        scale_factors = np.zeros(2)
+        for i_view in range(2):
+            cam_rvec, _ = cv2.Rodrigues(rot[:, :, i_view])
+            rvecs.append(cam_rvec)
 
-        scale_factor[i_view] = calc_3d_scale_factor(stereo_cal_points[view_names[i_view][0]],
-                                                    stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'],
-                                                    rot[:, :, i_view], t[:, i_view], board)
+            scale_factors[i_view] = calc_3d_scale_factor(stereo_cal_points[view_names[i_view][0]],
+                                                        stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'],
+                                                        rot[:, :, i_view], t[:, i_view], board)
 
-        cam_t.append(t[:, i_view] * scale_factor[i_view])
+            cam_t.append(t[:, i_view] * scale_factors[i_view])
+        calibration_data['scale_factors'] = scale_factors
 
-    cgroup.set_rotations(rvecs)
-    cgroup.set_translations(cam_t)
+        cgroup.set_rotations(rvecs)
+        cgroup.set_translations(cam_t)
+
+        calibration_data['extrinsics_initialized'] = True
 
     cgroup_old = copy.deepcopy(cgroup)
     imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
-    error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
+
+    if not calibration_data['bundle_adjust_completed']:
+        error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
+
+        calibration_data['cgroup'] = cgroup
+        calibration_data['error'] = error
+        calibration_data['bundle_adjust_completed'] = True
+
+        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+
+    else:
+        cgroup = calibration_data['cgroup']
+        error = calibration_data['error']
 
     return cgroup, error
 
@@ -2031,25 +2046,27 @@ def test_anipose_calibration(session_row, parent_directories):
         frame_pts.fill(np.NaN)
         for i_cam, cam in enumerate(cam_names):
             if cam in row.keys():
-                frame_pts[i_cam,:,:] = np.squeeze(row[cam]['corners'])
+                frame_pts[i_cam, :, :] = np.squeeze(row[cam]['corners'])
         pts3d = cgroup.triangulate(frame_pts, undistort=False, progress=False)
         """Given an CxNx2 array, this returns an Nx3 array of points,
         where N is the number of points and C is the number of cameras"""
 
-        cols = ['b','r','g']
+        cols = ['b', 'r', 'g']
         for i_cam in range(num_cams):
             plt.scatter(frame_pts[i_cam,:,0],frame_pts[i_cam,:,1],c=cols[i_cam])
             for i_pt in range(pts_per_cam):
                 if not np.isnan(frame_pts[i_cam,i_pt,0]):
-                    plt.text(frame_pts[i_cam,i_pt,0], frame_pts[i_cam,i_pt,1], '{:d}'.format(i_pt), c=cols[i_cam])
+                    plt.text(frame_pts[i_cam,i_pt,0], frame_pts[i_cam, i_pt, 1], '{:d}'.format(i_pt), c=cols[i_cam])
 
         plt.gca().invert_yaxis()
         plt.show()
 
-    calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name,
-                                                                              calibration_files_parent)
+        pass
 
-    cgroup = CameraGroup.load(calibration_toml_name)
+    # calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name,
+    #                                                                           calibration_files_parent)
+    #
+    # cgroup = CameraGroup.load(calibration_toml_name)
 
     pass
 

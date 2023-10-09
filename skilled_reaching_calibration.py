@@ -884,7 +884,7 @@ def verify_checkerboard_points(calibration_vids, calibration_data):
         vid_obj.release()
 
 
-def crop_params_dict_from_sessionrow(cal_vid_path, session_row, view_list=['direct', 'leftmirror', 'rightmirror']):
+def crop_params_dict_from_sessionrow(session_row, view_list=['direct', 'leftmirror', 'rightmirror']):
     crop_params_dict = dict.fromkeys(view_list, None)
     for view in view_list:
         left_edge = session_row[view + '_left'].values[0]
@@ -1076,7 +1076,7 @@ def crop_calibration_video(calib_vid,
 
     # todo: calibrate the camera and undistort the videos prior to cropping, then don't allow calculation of distortion
     # coefficients, etc. during calibration with anipose
-    crop_params_dict = crop_params_dict_from_sessionrow(calib_vid, session_row, view_list=view_list)
+    crop_params_dict = crop_params_dict_from_sessionrow(session_row, view_list=view_list)
 
     if crop_params_dict is None:
         return None

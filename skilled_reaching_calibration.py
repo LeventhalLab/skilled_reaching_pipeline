@@ -1634,7 +1634,7 @@ def select_correct_E_mirror(R1, R2, T, pts1, pts2, mtx):
         depth[ii, 0] = np.sum(np.sign(cvb.depth_of_points(x3D[ii, :, :], np.eye(3), np.zeros((1, 3)))))
         depth[ii, 1] = np.sum(np.sign(cvb.depth_of_points(x3D[ii, :, :], rot[ii, :, :], t[ii, :, :])))
 
-        if depth[ii, 0] == num_pts and depth[ii, 1] == -num_pts:
+        if depth[ii, 0] > 0 and depth[ii, 1] < 0:
             # the correct pair of rotation matrix and translation vector should have all points in front of the real
             # camera and behind the virtual (mirror) camera
             correct = ii
@@ -1729,7 +1729,7 @@ def calc_3d_scale_factor(pts1, pts2, mtx, rot, t, board):
     pts3d = np.zeros((num_pts, 3))
 
     for i_pt in range(num_pts):
-        pts_match = np.vstack((pts1_norm[i_pt,:], pts2_norm[i_pt, :]))
+        pts_match = np.vstack((pts1_norm[i_pt, :], pts2_norm[i_pt, :]))
 
         pts3d[i_pt, :] = cvb.multiview_ls_triangulation(pts_match, camera_mats)
 
@@ -1858,9 +1858,11 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     # calculate the fundamental matrices for direct-->left mirror and direct-->right mirror
     merged = merge_rows(all_rows, cam_names=cam_names)
     stereo_cal_points = collect_matched_mirror_points(merged, board)
-    E, F, rot, t = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
-    calibration_data['E'] = E
-    calibration_data['F'] = F
+    if calibration_data['E'] is None:
+        E, F, rot, t = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
+        # todo: figure out why rot came back for the right mirror as Nans when E and F seem to be fine
+        calibration_data['E'] = E
+        calibration_data['F'] = F
 
     if not calibration_data['extrinsics_initialized']:
         rvecs = [[0., 0., 0.]]

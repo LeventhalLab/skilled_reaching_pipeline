@@ -6,7 +6,7 @@ import plot_utilities
 import matplotlib.pyplot as plt
 
 
-def fund_matrix_mirror(x1, x2):
+def fund_matrix_mirror(x1, x2, min_points=10):
     '''
 
     :param x1: nx2 array of matched points in one view
@@ -19,6 +19,13 @@ def fund_matrix_mirror(x1, x2):
     if np.shape(x2) != np.shape(x1):
         print('matched point arrays are not the same shape')
         return None
+
+    if len(x1) < min_points:
+        # if there aren't enough point matches, make F full of NaNs; will have to go back later and recalibrate
+        F = np.empty((3, 3))
+        F.fill(np.nan)
+
+        return F
 
     num_points = np.shape(x1)[0]
 

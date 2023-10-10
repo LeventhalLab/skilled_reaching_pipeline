@@ -1663,16 +1663,28 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
     c_t = np.empty((3, 2))
     # P2 = np.empty((3, 4, 2))
     for i_view in range(2):
-        E[:, :, i_view] = np.linalg.multi_dot((cam_intrinsics['mtx'].T, F[:, :, i_view], cam_intrinsics['mtx']))
+        if np.isnan(F[0, 0, i_view]).any():
+            temp = np.empty((3, 3))
+            temp.fill(np.nan)
 
-        # _, R[:, :, i_view], T[:, i_view], _ = cv2.recoverPose(E[:, :, i_view],
-        #                                                 stereo_cal_points[view_names[i_view][0]],
-        #                                                 stereo_cal_points[view_names[i_view][1]],
-        #                                                 cam_intrinsics['mtx'])
-        R1, R2, T = cv2.decomposeEssentialMat(E[:, :, i_view])
-        c_rot[:, :, i_view], c_t[:, i_view], correct = select_correct_E_mirror(R1, R2, T, stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'])
+            E[:, :, i_view] = temp
+            c_rot[:, :, i_view] = temp
 
-        t_mat = np.expand_dims(c_t[:, i_view], 1)
+            temp = np.empty((3, 1))
+            temp.fill(np.nan)
+            c_t[:, i_view] = temp
+
+        else:
+            E[:, :, i_view] = np.linalg.multi_dot((cam_intrinsics['mtx'].T, F[:, :, i_view], cam_intrinsics['mtx']))
+
+            # _, R[:, :, i_view], T[:, i_view], _ = cv2.recoverPose(E[:, :, i_view],
+            #                                                 stereo_cal_points[view_names[i_view][0]],
+            #                                                 stereo_cal_points[view_names[i_view][1]],
+            #                                                 cam_intrinsics['mtx'])
+            R1, R2, T = cv2.decomposeEssentialMat(E[:, :, i_view])
+            c_rot[:, :, i_view], c_t[:, i_view], correct = select_correct_E_mirror(R1, R2, T, stereo_cal_points[view_names[i_view][0]], stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'])
+
+            t_mat = np.expand_dims(c_t[:, i_view], 1)
         # P2[:, :, i_view] = np.hstack((c_rot[:, :, i_view], t_mat))
 
     return E, F, c_rot, c_t

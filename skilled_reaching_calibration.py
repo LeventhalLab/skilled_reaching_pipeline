@@ -1670,7 +1670,7 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
             E[:, :, i_view] = temp
             c_rot[:, :, i_view] = temp
 
-            temp = np.empty((3, 1))
+            temp = np.empty(3)
             temp.fill(np.nan)
             c_t[:, i_view] = temp
 

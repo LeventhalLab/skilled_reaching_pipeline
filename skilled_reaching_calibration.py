@@ -1905,7 +1905,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
 
     if not calibration_data['bundle_adjust_completed']:
         # if one of the views couldn't be calibrated, skip bundle adjustment for now
-        if not np.isnan(rot).any():
+        if not np.isnan(calibration_data['E']).any():
             error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
 
             calibration_data['cgroup'] = cgroup

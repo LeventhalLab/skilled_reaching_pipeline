@@ -1912,6 +1912,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
             calibration_data['error'] = error
             calibration_data['bundle_adjust_completed'] = True
         else:
+            # todo: manually calibrate if automatic detection didn't work
             error = None
 
         skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)

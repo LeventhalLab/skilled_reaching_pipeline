@@ -889,6 +889,22 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
     return pickle_metadata
 
 
+def scorername_from_fname(fname):
+
+    fpath, fname = os.path.split(fname)
+    bare_fname, ext = os.path.splitext(fname)
+
+    # scorername should always start with "DLC", then there are 4 underscores separating the network type, dlc project
+    # name and the shuffle
+    fname_parts = bare_fname.split('DLC')
+    scorername_base = 'DLC' + fname_parts[1]
+
+    scorername_parts = scorername_base.split('_')
+    scorername = '_'.join(scorername_parts[:4])
+
+    return scorername
+
+
 def find_other_optitrack_pickles(pickle_file, parent_directories):
 
     pickle_metadata = parse_dlc_output_pickle_name_optitrack(pickle_file)

@@ -1728,6 +1728,10 @@ def calc_3d_gridspacing(pts3d, board_size):
 
 def calc_3d_scale_factor(pts1, pts2, mtx, rot, t, board):
 
+    if np.isnan(rot).any():
+        scale_factor = np.nan
+        return scale_factor
+
     P2 = cvb.P_from_RT(rot, t)
     num_pts = np.shape(pts1)[0]
 
@@ -1872,7 +1876,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     stereo_cal_points = collect_matched_mirror_points(merged, board)
     if calibration_data['E'] is None:
         E, F, rot, t = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
-        # todo: figure out why rot came back for the right mirror as Nans when E and F seem to be fine
+
         calibration_data['E'] = E
         calibration_data['F'] = F
 
@@ -1900,11 +1904,15 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
 
     if not calibration_data['bundle_adjust_completed']:
-        error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
+        # if one of the views couldn't be calibrated, skip bundle adjustment for now
+        if not np.isnan(rot).any():
+            error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
 
-        calibration_data['cgroup'] = cgroup
-        calibration_data['error'] = error
-        calibration_data['bundle_adjust_completed'] = True
+            calibration_data['cgroup'] = cgroup
+            calibration_data['error'] = error
+            calibration_data['bundle_adjust_completed'] = True
+        else:
+            error = None
 
         skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
 

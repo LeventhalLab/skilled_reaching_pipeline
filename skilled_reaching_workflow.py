@@ -223,6 +223,8 @@ def calibrate_all_sessions(parent_directories,
 
     ratIDs = list(calibration_metadata_df.keys())
 
+    # to skip to where I'm working...
+    ratIDs = ['R0484']
     # make sure all cameras have been calibrated
     for ratID in ratIDs:
         rat_metadata_df = calibration_metadata_df[ratID]

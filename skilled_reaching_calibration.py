@@ -947,13 +947,28 @@ def camera_board_from_df(session_row):
 
     board_type = session_row['board_type_camera'].values[0]
 
-    if board_type.lower() == 'charuco':
+    if 'charuco' in board_type.lower():
         marker_length = float(session_row['marker_length_camera'].values[0])
-        cam_board = create_charuco(nrows, ncols, square_length, marker_length)
+        marker_bits, dict_size = dict_from_boardtype(board_type)
+        cam_board = create_charuco(nrows, ncols, square_length, marker_length, marker_bits=marker_bits, dict_size=dict_size)
     elif board_type.lower() in ['chessboard', 'checkerboard']:
         cam_board = create_checkerboard(nrows, ncols, square_length)
 
     return cam_board
+
+
+def dict_from_boardtype(board_type):
+    '''
+
+    :param board_type: string of form 'charuco_dict' where 'dict' is of the form (for example) '4X4_dictsize' where dictsize is 50, 250, etc.
+    :return:
+    '''
+
+    btype_parts = board_type.split('_')
+    marker_bits = int(btype_parts[1][0])
+    dict_size = int(btype_parts[2])
+
+    return marker_bits, dict_size
 
 
 def mirror_board_from_df(session_row):
@@ -964,9 +979,11 @@ def mirror_board_from_df(session_row):
 
     board_type = session_row['board_type_mirrors'].values[0]
 
-    if board_type.lower() == 'charuco':
+    if 'charuco' in board_type.lower():
         marker_length = float(session_row['marker_length_mirrors'].values[0])
-        mirror_board = create_charuco(nrows, ncols, square_length, marker_length, dict_size=250)
+        marker_bits, dict_size = dict_from_boardtype(board_type)
+        mirror_board = create_charuco(nrows, ncols, square_length, marker_length, marker_bits=marker_bits,
+                                   dict_size=dict_size)
     elif board_type.lower() in ['chessboard', 'checkerboard']:
         mirror_board = create_checkerboard(nrows, ncols, square_length)
 

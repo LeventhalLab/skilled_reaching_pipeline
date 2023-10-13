@@ -1604,30 +1604,33 @@ def collect_matched_mirror_points(merged, board):
                     directleft_imgp = sorted_direct_imgp
                     left_objp = sorted_objp
                 else:
-                    leftmirror_imgp = np.vstack(leftmirror_imgp, sorted_mirror_imgp)
-                    directleft_imgp = np.vstack(directleft_imgp, sorted_direct_imgp)
-                    left_objp = np.vstack(left_objp, sorted_objp)
+                    leftmirror_imgp = np.vstack((leftmirror_imgp, sorted_mirror_imgp))
+                    directleft_imgp = np.vstack((directleft_imgp, sorted_direct_imgp))
+                    left_objp = np.vstack((left_objp, sorted_objp))
 
                 num_rows_in_imgp += 1
 
-        pass
+        num_rows_in_imgp = 0
+        for merged_row in rightmirror_rows:
+            sorted_direct_imgp, sorted_mirror_imgp, sorted_objp, sorted_corner_idx = match_points_in_charuco_row(
+                merged_row, objp, 'rightmirror')
 
-        #     leftmirror_imgp[current_lm_row:current_lm_row+pts_per_frame, :, :] = imgp_mirror
-        #     directleft_imgp[current_lm_row:current_lm_row+pts_per_frame, :, :] = imgp_direct
-        #
-        #     left_objp[current_lm_row:current_lm_row+pts_per_frame, :] = board.get_object_points()
-        #
-        #     current_lm_row += pts_per_frame
-        #
-        # for merged_row in rightmirror_rows:
-        #     imgp_direct = merged_row['direct']['corners']
-        #     imgp_mirror = merged_row['rightmirror']['corners']
-        #     rightmirror_imgp[current_rm_row:current_rm_row + pts_per_frame, :, :] = imgp_mirror
-        #     directright_imgp[current_rm_row:current_rm_row + pts_per_frame, :, :] = imgp_direct
-        #
-        #     right_objp[current_rm_row:current_rm_row + pts_per_frame, :] = board.get_object_points()
-        #
-        #     current_rm_row += pts_per_frame
+            if sorted_direct_imgp.any():
+                # if matched points were found for this row
+                if num_rows_in_imgp == 0:
+                    rightmirror_imgp = sorted_mirror_imgp
+                    directright_imgp = sorted_direct_imgp
+                    right_objp = sorted_objp
+                else:
+                    try:
+                        rightmirror_imgp = np.vstack((rightmirror_imgp, sorted_mirror_imgp))
+                    except:
+                        pass
+
+                    directright_imgp = np.vstack((directright_imgp, sorted_direct_imgp))
+                    right_objp = np.vstack((right_objp, sorted_objp))
+
+                num_rows_in_imgp += 1
 
     stereo_cal_points = {'leftmirror': leftmirror_imgp,
                          'directleft': directleft_imgp,

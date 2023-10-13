@@ -698,7 +698,8 @@ class CharucoBoard(CalibrationObject):
         K = camera.get_camera_matrix()
         D = camera.get_distortions()
 
+        # need 32-bit floats for estimatePoseCharucoBoard
         ret, rvec, tvec = aruco.estimatePoseCharucoBoard(
-            corners, ids, self.board, K, D, None, None)
+            corners.astype(np.single), ids, self.board, K, D, None, None)
 
         return rvec, tvec

@@ -77,13 +77,13 @@ def unnormalize_points(points2d_norm, mtx):
     :param mtx: camera intrinsic matrix.
     :return:
     '''
-
+    points2d_norm = np.squeeze(points2d_norm)
     if points2d_norm.ndim == 1:
         num_pts = 1
         homogeneous_pts = np.append(points2d_norm, 1.)
         unnorm_pts = np.dot(mtx, homogeneous_pts)
     else:
-        points2d_norm = np.squeeze(points2d_norm)
+        # points2d_norm = np.squeeze(points2d_norm)
         num_pts = max(np.shape(points2d_norm))
         try:
             homogeneous_pts = np.hstack((points2d_norm, np.ones((num_pts, 1))))

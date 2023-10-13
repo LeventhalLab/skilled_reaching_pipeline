@@ -2229,11 +2229,11 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
     return all_rows
 
     # mirror_calib_vid_name = navigation_utilities.calib_vid_name_from_cropped_calib_vid_name(cropped_vid)
-
-    # load original video, undistort a frame, and overlay detected points
+    #
+    # # load original video, undistort a frame, and overlay detected points
     # full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
     #                                                                          parent_directories)
-    # frame_num = 300
+    # frame_num = 50
     # # find this frame for each "camera"
     # row_idx = np.empty(3)
     # frame_pts = []
@@ -2247,31 +2247,33 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
     #         pass
     #
     # test_point_id(full_calib_vid_name, frame_num, frame_pts, cam_intrinsics)
-
-            # if 'mirror' in cropped_vid and i_row==10:
-            #     cap = cv2.VideoCapture(cropped_vid)
-            #     cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
-            #     res, img = cap.read()
-            #
-            #     cap.release()
-            #
-            #     plt.figure()
-            #     plt.imshow(img)
-            #     for ii, id in enumerate(row['ids']):
-            #         plt.text(rows[i_row]['corners_distorted'][ii, 0, 0], rows[i_row]['corners_distorted'][ii, 0, 1], '{:d}'.format(id), c='r')
-            #     # plt.scatter(row['corners'][:,:,0], row['corners'][:,:,1])
-            #     # plt.scatter(corners_ud[:,:,0], corners_ud[:,:,1])
-            #     # plt.show()
-            #
-            #     plt.figure()
-            #     img_flip = cv2.flip(img, 1)
-            #     plt.imshow(img_flip)
-            #     for ii, id in enumerate(row['ids']):
-            #         plt.text(rows[i_row]['corners'][ii, 0, 0], rows[i_row]['corners'][ii, 0, 1], '{:d}'.format(id), c='r')
-            #
-            #
-            #     plt.show()
-            #     pass
+    #
+    #         # if 'mirror' in cropped_vid and i_row==10:
+    #         #     cap = cv2.VideoCapture(cropped_vid)
+    #         #     cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
+    #         #     res, img = cap.read()
+    #         #
+    #         #     cap.release()
+    #         #
+    #         #     plt.figure()
+    #         #     plt.imshow(img)
+    #         #     for ii, id in enumerate(row['ids']):
+    #         #         plt.text(rows[i_row]['corners_distorted'][ii, 0, 0], rows[i_row]['corners_distorted'][ii, 0, 1], '{:d}'.format(id), c='r')
+    #         #     # plt.scatter(row['corners'][:,:,0], row['corners'][:,:,1])
+    #         #     # plt.scatter(corners_ud[:,:,0], corners_ud[:,:,1])
+    #         #     # plt.show()
+    #         #
+    #         #     plt.figure()
+    #         #     img_flip = cv2.flip(img, 1)
+    #         #     plt.imshow(img_flip)
+    #         #     for ii, id in enumerate(row['ids']):
+    #         #         plt.text(rows[i_row]['corners'][ii, 0, 0], rows[i_row]['corners'][ii, 0, 1], '{:d}'.format(id), c='r')
+    #         #
+    #         #
+    #         #     plt.show()
+    #         #     pass
+    #
+    return all_rows
 
 
 def test_point_id(vid_name, frame_num, pts, cam_intrinsics):
@@ -2760,6 +2762,8 @@ def detect_markers(image, board, camera=None, refine=True):
 
     charucoCorners, charucoIds, markerCorners, markerIds  = ch_detector.detectBoard(gray, markerCorners=markerCorners, markerIds=markerIds)
     # charuco_img = aruco.drawDetectedCornersCharuco(gray, charucoCorners, charucoIds, (255, 0, 0))
+
+    # todo: do we need to refine the detected corners?
 
     return charucoCorners, charucoIds, markerCorners, markerIds
 

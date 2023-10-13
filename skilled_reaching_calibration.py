@@ -1555,7 +1555,7 @@ def collect_matched_mirror_points(merged, board):
         num_rightmirror_rows = len(rightmirror_rows)
         num_rightmirror_pts = num_rightmirror_rows * pts_per_frame
 
-        # initialize arrays to hold imgage points and object points for calibration
+        # initialize arrays to hold image points and object points for calibration
         leftmirror_imgp = np.empty((num_leftmirror_pts, 1, 2))
         directleft_imgp = np.empty((num_leftmirror_pts, 1, 2))
         rightmirror_imgp = np.empty((num_rightmirror_pts, 1, 2))
@@ -1588,7 +1588,46 @@ def collect_matched_mirror_points(merged, board):
 
     elif type(board) is CharucoBoard:
         # todo: aggregate matched charuco points
+        leftmirror_rows = [mr for mr in merged if 'leftmirror' in mr.keys() and 'direct' in mr.keys()]
+        rightmirror_rows = [mr for mr in merged if 'rightmirror' in mr.keys() and 'direct' in mr.keys()]
+
+        objp = board.get_object_points()
+
+        num_rows_in_imgp = 0
+        for merged_row in leftmirror_rows:
+            sorted_direct_imgp, sorted_mirror_imgp, sorted_objp, sorted_corner_idx = match_points_in_charuco_row(merged_row, objp, 'leftmirror')
+
+            if sorted_direct_imgp.any():
+                # if matched points were found for this row
+                if num_rows_in_imgp == 0:
+                    leftmirror_imgp = sorted_mirror_imgp
+                    directleft_imgp = sorted_direct_imgp
+                    left_objp = sorted_objp
+                else:
+                    leftmirror_imgp = np.vstack(leftmirror_imgp, sorted_mirror_imgp)
+                    directleft_imgp = np.vstack(directleft_imgp, sorted_direct_imgp)
+                    left_objp = np.vstack(left_objp, sorted_objp)
+
+                num_rows_in_imgp += 1
+
         pass
+
+        #     leftmirror_imgp[current_lm_row:current_lm_row+pts_per_frame, :, :] = imgp_mirror
+        #     directleft_imgp[current_lm_row:current_lm_row+pts_per_frame, :, :] = imgp_direct
+        #
+        #     left_objp[current_lm_row:current_lm_row+pts_per_frame, :] = board.get_object_points()
+        #
+        #     current_lm_row += pts_per_frame
+        #
+        # for merged_row in rightmirror_rows:
+        #     imgp_direct = merged_row['direct']['corners']
+        #     imgp_mirror = merged_row['rightmirror']['corners']
+        #     rightmirror_imgp[current_rm_row:current_rm_row + pts_per_frame, :, :] = imgp_mirror
+        #     directright_imgp[current_rm_row:current_rm_row + pts_per_frame, :, :] = imgp_direct
+        #
+        #     right_objp[current_rm_row:current_rm_row + pts_per_frame, :] = board.get_object_points()
+        #
+        #     current_rm_row += pts_per_frame
 
     stereo_cal_points = {'leftmirror': leftmirror_imgp,
                          'directleft': directleft_imgp,
@@ -1598,6 +1637,43 @@ def collect_matched_mirror_points(merged, board):
                          'right_objp': right_objp}
 
     return stereo_cal_points
+
+
+def match_points_in_charuco_row(merged_row, objp, mirror_view):
+    imgp_direct = merged_row['direct']['corners']
+    imgp_mirror = merged_row[mirror_view]['corners']
+
+    direct_ids = np.squeeze(merged_row['direct']['ids'])
+    mirror_ids = np.squeeze(merged_row[mirror_view]['ids'])
+
+    # make sure points with the same id's are matched
+    matched_direct_idx = []
+    matched_mirror_idx = []
+
+    sorted_mirror_imgp = []
+    sorted_direct_imgp = []
+    sorted_corner_idx = []
+    sorted_objp = []
+    for d_id_idx, d_id in enumerate(direct_ids):
+        mirror_id_idx = np.where(mirror_ids == d_id)[0]
+
+        if len(mirror_id_idx) == 1:
+            # there is a matched point in the left view for this point in the direct view
+            matched_direct_idx.append(d_id_idx)
+            matched_mirror_idx.append(mirror_id_idx[0])
+            sorted_corner_idx.append(d_id)
+
+            sorted_direct_imgp.append(imgp_direct[matched_direct_idx[-1]])
+            sorted_mirror_imgp.append(imgp_mirror[matched_mirror_idx[-1]])
+            sorted_objp.append(objp[d_id])
+    if sorted_mirror_imgp:
+        sorted_direct_imgp = np.array(sorted_direct_imgp)
+        sorted_mirror_imgp = np.array(sorted_mirror_imgp)
+        sorted_objp = np.array(sorted_objp)
+
+    # sorted_corner_idx probably isn't necessary, but may be helpful for troubleshooting
+    return sorted_direct_imgp, sorted_mirror_imgp, sorted_objp, sorted_corner_idx
+
 
 
 def select_correct_E_mirror(R1, R2, T, pts1, pts2, mtx):
@@ -1845,7 +1921,7 @@ def test_board_reconstruction(pts1, pts2, mtx, rot, t, board):
     pass
 
 
-def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, calibration_pickle_name,
+def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, session_row, calibration_pickle_name,
                            view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
@@ -1859,7 +1935,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
             camera.set_distortions([np.zeros(5)])
         calibration_data = {'cam_intrinsics': cam_intrinsics,
                             'cgroup': cgroup,
-                            'mirror_board': board,
+                            'session_row': session_row,
                             'scale_factors': np.zeros(2),
                             'F': None,
                             'E': None,
@@ -1867,22 +1943,23 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
                             'estimated_poses': False,
                             'extrinsics_initialized': False,
                             'bundle_adjust_completed': False}
+    mirror_board = skilled_reaching_calibration.mirror_board_from_df(session_row)
     # get_rows_cropped_vids will
     #  1. detect the checkerboard/charuco board points
     #  2. undistort points in the full original reference frame, then move them back into the cropped
     #      video, then flip them left-right if in a mirror view
     if 'all_rows' not in calibration_data.keys():
-        all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories)
+        all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, mirror_board, parent_directories)
         for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
             # need to make sure the cameras are in the right order; this should have been checked in the code above
-            all_rows[i] = board.estimate_pose_rows(cam, row)
+            all_rows[i] = mirror_board.estimate_pose_rows(cam, row)
         calibration_data['all_rows'] = all_rows
         skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
     else:
         all_rows = calibration_data['all_rows']
         for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
             # need to make sure the cameras are in the right order; this should have been checked in the code above
-            all_rows[i] = board.estimate_pose_rows(cam, row)
+            all_rows[i] = mirror_board.estimate_pose_rows(cam, row)
         calibration_data['all_rows'] = all_rows
 
     # at this point, should save the camera groups/boards in a .pickle file so don't have to detect the boards each time
@@ -1890,7 +1967,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
 
     # calculate the fundamental matrices for direct-->left mirror and direct-->right mirror
     merged = merge_rows(all_rows, cam_names=cam_names)
-    stereo_cal_points = collect_matched_mirror_points(merged, board)
+    stereo_cal_points = collect_matched_mirror_points(merged, mirror_board)
     if calibration_data['E'] is None:
         E, F, rot, t = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
 
@@ -1907,7 +1984,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
 
             scale_factors[i_view] = calc_3d_scale_factor(stereo_cal_points[view_names[i_view][0]],
                                                         stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'],
-                                                        rot[:, :, i_view], t[:, i_view], board)
+                                                        rot[:, :, i_view], t[:, i_view], mirror_board)
 
             cam_t.append(t[:, i_view] * scale_factors[i_view])
         calibration_data['scale_factors'] = scale_factors
@@ -1918,7 +1995,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
         calibration_data['extrinsics_initialized'] = True
 
     cgroup_old = copy.deepcopy(cgroup)
-    imgp, extra = extract_points(merged, board, cam_names=cam_names, min_cameras=2)
+    imgp, extra = extract_points(merged, mirror_board, cam_names=cam_names, min_cameras=2)
 
     if not calibration_data['bundle_adjust_completed']:
         # if one of the views couldn't be calibrated, skip bundle adjustment for now
@@ -2233,7 +2310,7 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
     # # load original video, undistort a frame, and overlay detected points
     # full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
     #                                                                          parent_directories)
-    # frame_num = 50
+    # frame_num = 318
     # # find this frame for each "camera"
     # row_idx = np.empty(3)
     # frame_pts = []
@@ -2273,7 +2350,7 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
     #         #     plt.show()
     #         #     pass
     #
-    return all_rows
+    # return all_rows
 
 
 def test_point_id(vid_name, frame_num, pts, cam_intrinsics):
@@ -2288,16 +2365,22 @@ def test_point_id(vid_name, frame_num, pts, cam_intrinsics):
 
     plt.imshow(img_ud)
 
-    pts = np.squeeze(pts)
-    if pts.ndim == 3:
-        for pts_array in pts:
-            for i_pt, pt in enumerate(pts_array):
-                plt.text(pt[0], pt[1], '{:d}'.format(i_pt), c='r')
-            plt.scatter(pts_array[:, 0], pts_array[:,1])
+    if np.shape(pts[0]) != np.shape(pts[1]):
+        # the same number of points wasn't found in each view
+        for view_pts in pts:
+            for i_pt in range(np.shape(view_pts)[0]):
+                plt.text(view_pts[i_pt,0], view_pts[i_pt, 1], '{:d}'.format(i_pt), c='b')
     else:
-        for i_pt, pt in enumerate(pts):
-            plt.text(pt[0], pt[1], '{:d}'.format(i_pt), c='r')
-        plt.scatter(pts[:, 0], pts[:, 1])
+        pts = np.squeeze(pts)
+        if pts.ndim == 3:
+            for pts_array in pts:
+                for i_pt, pt in enumerate(pts_array):
+                    plt.text(pt[0], pt[1], '{:d}'.format(i_pt), c='r')
+                plt.scatter(pts_array[:, 0], pts_array[:, 1])
+        else:
+            for i_pt, pt in enumerate(pts):
+                plt.text(pt[0], pt[1], '{:d}'.format(i_pt), c='r')
+            plt.scatter(pts[:, 0], pts[:, 1])
 
     plt.show()
 
@@ -2464,6 +2547,7 @@ def match_mirror_points(mirrors_corner, direct_corner, direct_ids):
 def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=True, min_rows_detected=20):
     # adapted from anipose
     cap = cv2.VideoCapture(calibration_video)
+    _, cvid_name = os.path.split(calibration_video)
 
     if not cap.isOpened():
         raise FileNotFoundError(f'missing video file "{calibration_video}"')
@@ -2493,7 +2577,18 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
             continue
 
         if isinstance(board, CharucoBoard):
+            if 'mirror' in cvid_name:
+                # aruco markers are flipped left-right in the mirror, so need to flip the frame image to detect them
+                orig_frame = np.copy(frame)
+                frame = cv2.flip(frame, 1)
             charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame, board)
+
+            if 'mirror' in cvid_name and charucoCorners is not None and len(charucoCorners) > 0:
+                # now need to flip the identified points left-right to match in the original image
+                w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+                for i_cc, cc in enumerate(charucoCorners):
+                    cc_x = np.squeeze(cc)[0]
+                    charucoCorners[i_cc, 0, 0] = w - cc_x
 
             if charucoCorners is not None and len(charucoCorners) > 0:
                 if prefix is None:

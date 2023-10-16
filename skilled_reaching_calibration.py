@@ -1543,6 +1543,12 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
 
 def collect_matched_mirror_points(merged, board):
 
+    # this will contain the number of points from each frame and which points were identified (more relevant for charuco than for checkerboard)
+    matched_points_metadata = {'left_framenumbers': [],
+                               'right_framenumbers': [],
+                               'left_ptids': [],
+                               'right_ptids': []
+                               }
     if type(board) is Checkerboard:
         pts_per_frame = np.shape(merged[0]['direct']['corners'])[0]
         # count up all merged rows that contain leftmirror points
@@ -1574,6 +1580,9 @@ def collect_matched_mirror_points(merged, board):
 
             left_objp[current_lm_row:current_lm_row+pts_per_frame, :] = board.get_object_points()
 
+            matched_points_metadata['left_framenumbers'].append(merged_row['direct']['framenum'])
+            matched_points_metadata['left_ptids'].append(merged_row['direct']['ids'])
+
             current_lm_row += pts_per_frame
 
         for merged_row in rightmirror_rows:
@@ -1584,10 +1593,12 @@ def collect_matched_mirror_points(merged, board):
 
             right_objp[current_rm_row:current_rm_row + pts_per_frame, :] = board.get_object_points()
 
+            matched_points_metadata['right_framenumbers'].append(merged_row['direct']['framenum'])
+            matched_points_metadata['right_ptids'].append(merged_row['direct']['ids'])
+
             current_rm_row += pts_per_frame
 
     elif type(board) is CharucoBoard:
-        # todo: aggregate matched charuco points
         leftmirror_rows = [mr for mr in merged if 'leftmirror' in mr.keys() and 'direct' in mr.keys()]
         rightmirror_rows = [mr for mr in merged if 'rightmirror' in mr.keys() and 'direct' in mr.keys()]
 
@@ -1608,6 +1619,9 @@ def collect_matched_mirror_points(merged, board):
                     directleft_imgp = np.vstack((directleft_imgp, sorted_direct_imgp))
                     left_objp = np.vstack((left_objp, sorted_objp))
 
+                matched_points_metadata['left_framenumbers'].append(merged_row['direct']['framenum'])
+                matched_points_metadata['left_ptids'].append(sorted_corner_idx)
+
                 num_rows_in_imgp += 1
 
         num_rows_in_imgp = 0
@@ -1622,13 +1636,12 @@ def collect_matched_mirror_points(merged, board):
                     directright_imgp = sorted_direct_imgp
                     right_objp = sorted_objp
                 else:
-                    try:
-                        rightmirror_imgp = np.vstack((rightmirror_imgp, sorted_mirror_imgp))
-                    except:
-                        pass
-
+                    rightmirror_imgp = np.vstack((rightmirror_imgp, sorted_mirror_imgp))
                     directright_imgp = np.vstack((directright_imgp, sorted_direct_imgp))
                     right_objp = np.vstack((right_objp, sorted_objp))
+
+                matched_points_metadata['right_framenumbers'].append(merged_row['direct']['framenum'])
+                matched_points_metadata['right_ptids'].append(sorted_corner_idx)
 
                 num_rows_in_imgp += 1
 
@@ -1639,14 +1652,22 @@ def collect_matched_mirror_points(merged, board):
                          'directright': directright_imgp,
                          'right_objp': right_objp}
 
-    return stereo_cal_points
+    return stereo_cal_points, matched_points_metadata
 
 
 def match_points_in_charuco_row(merged_row, objp, mirror_view):
     imgp_direct = merged_row['direct']['corners']
     imgp_mirror = merged_row[mirror_view]['corners']
 
-    direct_ids = np.squeeze(merged_row['direct']['ids'])
+    # if there is only one identified point in one (or both) of the views, the array dimensions get messed up.
+    # code below insures the output will be n x 1 x 2 where n is the number of points
+    imgp_direct = np.reshape(imgp_direct, (-1, 1, 2))
+    imgp_mirror = np.reshape(imgp_mirror, (-1, 1, 2))
+
+    if np.shape(merged_row['direct']['ids'])[0] == 1:
+        direct_ids = merged_row['direct']['ids'][0]
+    else:
+        direct_ids = np.squeeze(merged_row['direct']['ids'])
     mirror_ids = np.squeeze(merged_row[mirror_view]['ids'])
 
     # make sure points with the same id's are matched
@@ -1657,6 +1678,7 @@ def match_points_in_charuco_row(merged_row, objp, mirror_view):
     sorted_direct_imgp = []
     sorted_corner_idx = []
     sorted_objp = []
+
     for d_id_idx, d_id in enumerate(direct_ids):
         mirror_id_idx = np.where(mirror_ids == d_id)[0]
 
@@ -1669,6 +1691,7 @@ def match_points_in_charuco_row(merged_row, objp, mirror_view):
             sorted_direct_imgp.append(imgp_direct[matched_direct_idx[-1]])
             sorted_mirror_imgp.append(imgp_mirror[matched_mirror_idx[-1]])
             sorted_objp.append(objp[d_id])
+
     if sorted_mirror_imgp:
         sorted_direct_imgp = np.array(sorted_direct_imgp)
         sorted_mirror_imgp = np.array(sorted_mirror_imgp)
@@ -1786,7 +1809,7 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
     return E, F, c_rot, c_t
 
 
-def calc_3d_gridspacing(pts3d, board_size):
+def calc_3d_gridspacing_checkerboard(pts3d, board_size):
 
     num_col_spacings = (board_size[0] - 1) * board_size[1]
     num_row_spacings = (board_size[1] - 1) * board_size[0]
@@ -1822,7 +1845,18 @@ def calc_3d_gridspacing(pts3d, board_size):
     return grid_spacing
 
 
-def calc_3d_scale_factor(pts1, pts2, mtx, rot, t, board):
+def calc_3d_scale_factor(pts1, pts2, mtx, rot, t, matched_points_metadata, board):
+    '''
+    
+    :param pts1:
+    :param pts2:
+    :param mtx:
+    :param rot:
+    :param t:
+    :param matched_points_metadata:
+    :param board:
+    :return:
+    '''
 
     if np.isnan(rot).any():
         scale_factor = np.nan
@@ -1845,12 +1879,16 @@ def calc_3d_scale_factor(pts1, pts2, mtx, rot, t, board):
 
         pts3d[i_pt, :] = cvb.multiview_ls_triangulation(pts_match, camera_mats)
 
+
     # calculate grid spacing for 3d reconstructed points from normalized coordinates
-    gridspacing = calc_3d_gridspacing(pts3d, board.get_size())
+    if type(board) is Checkerboard:
+        gridspacing = calc_3d_gridspacing_checkerboard(pts3d, board.get_size())
+        mean_spacing = np.mean(gridspacing)
+        scale_factor = board.get_square_length() / mean_spacing
+    elif type(board) is CharucoBoard:
+        # need to figure out how many points were matched for each image, and what the spacing should be between the points
+        pass
 
-    mean_spacing = np.mean(gridspacing)
-
-    scale_factor = board.get_square_length() / mean_spacing
 
     return scale_factor
 
@@ -1970,7 +2008,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
 
     # calculate the fundamental matrices for direct-->left mirror and direct-->right mirror
     merged = merge_rows(all_rows, cam_names=cam_names)
-    stereo_cal_points = collect_matched_mirror_points(merged, mirror_board)
+    stereo_cal_points, matched_points_metadata = collect_matched_mirror_points(merged, mirror_board)
     if calibration_data['E'] is None:
         E, F, rot, t = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
 
@@ -1987,7 +2025,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
 
             scale_factors[i_view] = calc_3d_scale_factor(stereo_cal_points[view_names[i_view][0]],
                                                         stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'],
-                                                        rot[:, :, i_view], t[:, i_view], mirror_board)
+                                                        rot[:, :, i_view], t[:, i_view], matched_points_metadata, mirror_board)
 
             cam_t.append(t[:, i_view] * scale_factors[i_view])
         calibration_data['scale_factors'] = scale_factors

@@ -1544,11 +1544,8 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
 def collect_matched_mirror_points(merged, board):
 
     # this will contain the number of points from each frame and which points were identified (more relevant for charuco than for checkerboard)
-    matched_points_metadata = {'left_framenumbers': [],
-                               'right_framenumbers': [],
-                               'left_ptids': [],
-                               'right_ptids': []
-                               }
+    # first dictionary in this list is for the left mirror, second dictionary is for the right mirror
+    matched_points_metadata = [{'framenumbers': [],'ptids': []}, {'framenumbers': [],'ptids': []}]
     if type(board) is Checkerboard:
         pts_per_frame = np.shape(merged[0]['direct']['corners'])[0]
         # count up all merged rows that contain leftmirror points
@@ -1580,8 +1577,8 @@ def collect_matched_mirror_points(merged, board):
 
             left_objp[current_lm_row:current_lm_row+pts_per_frame, :] = board.get_object_points()
 
-            matched_points_metadata['left_framenumbers'].append(merged_row['direct']['framenum'])
-            matched_points_metadata['left_ptids'].append(merged_row['direct']['ids'])
+            matched_points_metadata[0]['framenumbers'].append(merged_row['direct']['framenum'])
+            matched_points_metadata[0]['ptids'].append(merged_row['direct']['ids'])
 
             current_lm_row += pts_per_frame
 
@@ -1593,8 +1590,8 @@ def collect_matched_mirror_points(merged, board):
 
             right_objp[current_rm_row:current_rm_row + pts_per_frame, :] = board.get_object_points()
 
-            matched_points_metadata['right_framenumbers'].append(merged_row['direct']['framenum'])
-            matched_points_metadata['right_ptids'].append(merged_row['direct']['ids'])
+            matched_points_metadata[1]['framenumbers'].append(merged_row['direct']['framenum'])
+            matched_points_metadata[1]['ptids'].append(merged_row['direct']['ids'])
 
             current_rm_row += pts_per_frame
 
@@ -1619,8 +1616,8 @@ def collect_matched_mirror_points(merged, board):
                     directleft_imgp = np.vstack((directleft_imgp, sorted_direct_imgp))
                     left_objp = np.vstack((left_objp, sorted_objp))
 
-                matched_points_metadata['left_framenumbers'].append(merged_row['direct']['framenum'])
-                matched_points_metadata['left_ptids'].append(sorted_corner_idx)
+                matched_points_metadata[0]['framenumbers'].append(merged_row['direct']['framenum'])
+                matched_points_metadata[0]['ptids'].append(merged_row['direct']['ids'])
 
                 num_rows_in_imgp += 1
 
@@ -1640,8 +1637,8 @@ def collect_matched_mirror_points(merged, board):
                     directright_imgp = np.vstack((directright_imgp, sorted_direct_imgp))
                     right_objp = np.vstack((right_objp, sorted_objp))
 
-                matched_points_metadata['right_framenumbers'].append(merged_row['direct']['framenum'])
-                matched_points_metadata['right_ptids'].append(sorted_corner_idx)
+                matched_points_metadata[1]['framenumbers'].append(merged_row['direct']['framenum'])
+                matched_points_metadata[1]['ptids'].append(merged_row['direct']['ids'])
 
                 num_rows_in_imgp += 1
 
@@ -2025,7 +2022,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
 
             scale_factors[i_view] = calc_3d_scale_factor(stereo_cal_points[view_names[i_view][0]],
                                                         stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'],
-                                                        rot[:, :, i_view], t[:, i_view], matched_points_metadata, mirror_board)
+                                                        rot[:, :, i_view], t[:, i_view], matched_points_metadata[i_view], mirror_board)
 
             cam_t.append(t[:, i_view] * scale_factors[i_view])
         calibration_data['scale_factors'] = scale_factors

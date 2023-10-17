@@ -1617,7 +1617,8 @@ def collect_matched_mirror_points(merged, board):
                     left_objp = np.vstack((left_objp, sorted_objp))
 
                 matched_points_metadata[0]['framenumbers'].append(merged_row['direct']['framenum'])
-                matched_points_metadata[0]['ptids'].append(merged_row['direct']['ids'])
+                matched_points_metadata[0]['ptids'].append(sorted_corner_idx)
+                # matched_points_metadata[0]['ptids'].append(merged_row['direct']['ids'])
 
                 num_rows_in_imgp += 1
 
@@ -1638,7 +1639,8 @@ def collect_matched_mirror_points(merged, board):
                     right_objp = np.vstack((right_objp, sorted_objp))
 
                 matched_points_metadata[1]['framenumbers'].append(merged_row['direct']['framenum'])
-                matched_points_metadata[1]['ptids'].append(merged_row['direct']['ids'])
+                # matched_points_metadata[1]['ptids'].append(merged_row['direct']['ids'])
+                matched_points_metadata[1]['ptids'].append(sorted_corner_idx)
 
                 num_rows_in_imgp += 1
 
@@ -1884,11 +1886,47 @@ def calc_3d_scale_factor(pts1, pts2, mtx, rot, t, matched_points_metadata, board
         scale_factor = board.get_square_length() / mean_spacing
     elif type(board) is CharucoBoard:
         # need to figure out how many points were matched for each image, and what the spacing should be between the points
-        pass
 
+        corners_start_idx = 0
+        objp = board.get_object_points()
+        frame_scale_factors = []
+        for frame_ptids in matched_points_metadata['ptids']:
+            num_frame_pts = len(frame_ptids)
+            if num_frame_pts == 1:
+                # can't get scale from a single point
+                corners_start_idx += 1
+            else:
+                # find all pairwise combinations of points in this frame and the real distances between them
+                # this requires knowledge of how points are arranged numerically in the grid; but this should be available
+                # in the boards object
+                frame_pts3d = pts3d[corners_start_idx:corners_start_idx + num_frame_pts, :]
+                frame_scale_factors.append(pt3d_dist_ratios(frame_pts3d, frame_ptids, objp))
+
+                corners_start_idx += num_frame_pts
+
+        scale_factor = np.mean(frame_scale_factors)
 
     return scale_factor
 
+
+def pt3d_dist_ratios(pts3d, ptids, objp):
+
+    # find all pairwise combinations of points
+    num_frame_pts = len(ptids)
+    scale_factors = []
+    for i_pt_a in range(num_frame_pts - 1):
+        pt3d_a = pts3d[i_pt_a, :]
+        for i_pt_b in range(i_pt_a + 1, num_frame_pts):
+            pt3d_b = pts3d[i_pt_b, :]
+
+            # calculate distance between 3d point a and 3d point b
+            dist_3d = np.linalg.norm(pt3d_a - pt3d_b)
+            dist_objp = np.linalg.norm(objp[ptids[i_pt_a], :] - objp[ptids[i_pt_b], :])
+            scale_factors.append(dist_objp / dist_3d)
+
+    mean_scaling = np.mean(scale_factors)
+
+    return mean_scaling
 
 def test_board_reconstruction(pts1, pts2, mtx, rot, t, board):
 

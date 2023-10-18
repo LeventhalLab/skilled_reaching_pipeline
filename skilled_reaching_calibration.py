@@ -1691,10 +1691,9 @@ def match_points_in_charuco_row(merged_row, objp, mirror_view):
             sorted_mirror_imgp.append(imgp_mirror[matched_mirror_idx[-1]])
             sorted_objp.append(objp[d_id])
 
-    if sorted_mirror_imgp:
-        sorted_direct_imgp = np.array(sorted_direct_imgp)
-        sorted_mirror_imgp = np.array(sorted_mirror_imgp)
-        sorted_objp = np.array(sorted_objp)
+    sorted_direct_imgp = np.array(sorted_direct_imgp)
+    sorted_mirror_imgp = np.array(sorted_mirror_imgp)
+    sorted_objp = np.array(sorted_objp)
 
     # sorted_corner_idx probably isn't necessary, but may be helpful for troubleshooting
     return sorted_direct_imgp, sorted_mirror_imgp, sorted_objp, sorted_corner_idx

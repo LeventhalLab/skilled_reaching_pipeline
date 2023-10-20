@@ -224,7 +224,7 @@ def calibrate_all_sessions(parent_directories,
     ratIDs = list(calibration_metadata_df.keys())
 
     # to skip to where I'm working...
-    ratIDs = ['R0484']
+    ratIDs = ['R0484', 'R0485', 'R0486', 'R0487']
     # make sure all cameras have been calibrated
     for ratID in ratIDs:
         rat_metadata_df = calibration_metadata_df[ratID]
@@ -471,8 +471,6 @@ if __name__ == '__main__':
     # skilled_reaching_calibration.test_calibration(session_metadata, calibration_metadata_df, parent_directories[expt])
 
     for expt in experiment_list:
-
-        # first, calibrate the cameras and write results into a .toml file
 
         # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
         session_metadata_xlsx_path = os.path.join(video_root_folders[expt], 'SR_{}_video_session_metadata.xlsx'.format(expt))

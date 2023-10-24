@@ -1293,7 +1293,7 @@ def create_cropped_calib_vid_name(full_calib_vid_name, crop_view, crop_params_di
     _, vid_name = os.path.split(full_calib_vid_name)
     vid_name, ext = os.path.splitext(vid_name)
 
-    cp_strings = [str(cp) for cp in crop_params_dict[crop_view]]
+    cp_strings = [str(int(cp)) for cp in crop_params_dict[crop_view]]
     cp_joined = '-'.join(cp_strings)
 
     cropped_vid_name = vid_name + '_' + crop_view + '_' + cp_joined

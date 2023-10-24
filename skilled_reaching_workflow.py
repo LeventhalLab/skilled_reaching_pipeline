@@ -224,7 +224,7 @@ def calibrate_all_sessions(parent_directories,
     ratIDs = list(calibration_metadata_df.keys())
 
     # to skip to where I'm working...
-    ratIDs = ['R0484', 'R0485', 'R0486', 'R0487']
+    # ratIDs = ['R0484', 'R0485', 'R0486', 'R0487']
     # make sure all cameras have been calibrated
     for ratID in ratIDs:
         rat_metadata_df = calibration_metadata_df[ratID]
@@ -330,7 +330,7 @@ def calibrate_all_sessions(parent_directories,
 if __name__ == '__main__':
 
 
-    experiment_list = ['dLightPhotometry', 'sr6OHDA']
+    experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLightPhotometry']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
     create_marked_vids = True

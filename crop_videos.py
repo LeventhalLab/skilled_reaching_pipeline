@@ -1,5 +1,6 @@
 import glob
 import os
+import numpy as np
 # from moviepy.editor import *
 import subprocess
 import cv2
@@ -215,6 +216,7 @@ def crop_all_calibration_videos(parent_directories,
             #     cam_intrinsics = skilled_reaching_calibration.calibrate_single_camera(full_cam_cal_vid_path, cam_board)
 
             mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
+
             if mirror_calib_vid_name.lower() == 'none':
                 # no calibration video for this session
                 session_date = session_row['date'].values[0]

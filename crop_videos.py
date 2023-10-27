@@ -194,8 +194,10 @@ def crop_all_calibration_videos(parent_directories,
         num_sessions = len(rat_metadata_df)
 
         for i_session in range(num_sessions):
-            session_row = rat_metadata_df.iloc[[i_session]]
-
+            try:
+                session_row = rat_metadata_df.iloc[[i_session]]
+            except:
+                pass
             # calibrate the camera for this session
             # cam_cal_vid_name = session_row['cal_vid_name_camera'].values[0]
             #
@@ -213,12 +215,20 @@ def crop_all_calibration_videos(parent_directories,
             #     cam_intrinsics = skilled_reaching_calibration.calibrate_single_camera(full_cam_cal_vid_path, cam_board)
 
             mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
+            if mirror_calib_vid_name.lower() == 'none':
+                # no calibration video for this session
+                session_date = session_row['date'].values[0]
+                session_num = session_row['session_num'].values[0]
+                print('no calibration video for session {:d} on {}'.format(session_num, np.datetime_as_string(session_date, unit='D')))
+                continue
+
             full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
                                                                                      parent_directories)
             if full_calib_vid_name is None:
-                session_date = session_row.loc[1].at['date']
-                print('no calibration video for session {}'.format(session_date.strftime('%m/%d/%Y')))
-                return
+                session_date = session_row['date'].values[0]
+                session_num = session_row['session_num'].values[0]
+                print('no calibration video for session {:d} on {}'.format(session_num, np.datetime_as_string(session_date, unit='D')))
+                continue
 
             current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(full_calib_vid_name,
                                                                                                    session_row,

@@ -178,7 +178,8 @@ def crop_all_calibration_videos(parent_directories,
                                calibration_metadata_df,
                                vidtype='.avi',
                                view_list=['direct', 'leftmirror', 'rightmirror'],
-                               filtertype='h264'):
+                               filtertype='h264',
+                               rat_nums='all'):
 
     calibration_vids_parent = parent_directories['calibration_vids_parent']
     calibration_files_parent = parent_directories['calibration_files_parent']
@@ -188,9 +189,17 @@ def crop_all_calibration_videos(parent_directories,
 
     calib_vid_folders = navigation_utilities.find_calibration_vid_folders(calibration_vids_parent)
 
-    ratIDs = list(calibration_metadata_df.keys())
+    expt_ratIDs = list(calibration_metadata_df.keys())
+    if rat_nums == 'all':
+        ratIDs = expt_ratIDs
+    else:
+        ratIDs = ['R{:04d}'.format(rn) for rn in rat_nums]
 
     for ratID in ratIDs:
+
+        if ratID not in expt_ratIDs:
+            continue
+
         rat_metadata_df = calibration_metadata_df[ratID]
         num_sessions = len(rat_metadata_df)
 

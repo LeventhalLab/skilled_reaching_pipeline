@@ -204,7 +204,8 @@ def calibrate_all_sessions(parent_directories,
                            calibration_metadata_df,
                            cam_names,
                            vidtype='.avi',
-                           filtertype='h264'):
+                           filtertype='h264',
+                           rat_nums='all'):
     '''
     loop through all folders containing calibration videos and store calibration parameters
     :param parent_directories:
@@ -221,12 +222,18 @@ def calibrate_all_sessions(parent_directories,
 
     calib_vid_folders = navigation_utilities.find_calibration_vid_folders(calibration_vids_parent)
 
-    ratIDs = list(calibration_metadata_df.keys())
+    expt_ratIDs = list(calibration_metadata_df.keys())
+    if rat_nums == 'all':
+        ratIDs = expt_ratIDs
+    else:
+        ratIDs = ['R{:04d}'.format(rn) for rn in rat_nums]
 
     # to skip to where I'm working...
     # ratIDs = ['R0484', 'R0485', 'R0486', 'R0487']
     # make sure all cameras have been calibrated
     for ratID in ratIDs:
+        if ratID not in expt_ratIDs:
+            continue
         rat_metadata_df = calibration_metadata_df[ratID]
 
         num_sessions = len(rat_metadata_df)
@@ -331,7 +338,7 @@ if __name__ == '__main__':
 
 
     # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLightPhotometry']
-    experiment_list = [ 'sr6OHDA', 'dLightPhotometry']
+    experiment_list = ['dLightPhotometry', 'sr6OHDA']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
     create_marked_vids = True
@@ -482,7 +489,8 @@ if __name__ == '__main__':
                                     calibration_metadata_df,
                                     vidtype='.avi',
                                     view_list=cam_names,
-                                    filtertype=filtertype)
+                                    filtertype=filtertype,
+                                    rat_nums=rats_to_analyze)
 
         # current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(full_calib_vid_name,
         #                                                                                        session_row,
@@ -491,7 +499,8 @@ if __name__ == '__main__':
         calibrate_all_sessions(parent_directories[expt],
                                calibration_metadata_df,
                                cam_names,
-                               filtertype=filtertype)
+                               filtertype=filtertype,
+                               rat_nums=rats_to_analyze)
 
     for expt in experiment_list:
         rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])

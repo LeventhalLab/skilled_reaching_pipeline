@@ -965,6 +965,7 @@ def dict_from_boardtype(board_type):
     '''
 
     btype_parts = board_type.split('_')
+
     marker_bits = int(btype_parts[1][0])
     dict_size = int(btype_parts[2])
 

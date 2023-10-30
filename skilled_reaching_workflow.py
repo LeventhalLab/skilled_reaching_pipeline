@@ -263,6 +263,8 @@ def calibrate_all_sessions(parent_directories,
             # now have the camera intrinsics; use these to undistort points to calibrate the mirror views
             # first, crop the calibration video
             mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
+            if mirror_calib_vid_name.lower() == 'none':
+                continue
             full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
                                                                                      parent_directories)
 
@@ -365,7 +367,7 @@ if __name__ == '__main__':
 
 
     # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLightPhotometry']
-    experiment_list = ['dLightPhotometry', 'sr6OHDA']
+    experiment_list = ['sr6OHDA', 'dLightPhotometry']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
     create_marked_vids = True

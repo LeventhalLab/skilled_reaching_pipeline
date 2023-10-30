@@ -984,7 +984,8 @@ def mirror_board_from_df(session_row):
         marker_length = float(session_row['marker_length_mirrors'].values[0])
         marker_bits, dict_size = dict_from_boardtype(board_type)
         mirror_board = create_charuco(nrows, ncols, square_length, marker_length, marker_bits=marker_bits,
-                                   dict_size=dict_size)
+                               dict_size=dict_size)
+
     elif board_type.lower() in ['chessboard', 'checkerboard']:
         mirror_board = create_checkerboard(nrows, ncols, square_length)
 
@@ -997,7 +998,7 @@ def mirror_board_from_df(session_row):
 
 def create_charuco(squaresX, squaresY, square_length, marker_length, marker_bits=4, dict_size=50, aruco_dict=None, manually_verify=False):
 
-    board = CharucoBoard(squaresX, squaresY, square_length, marker_length,
+    board = CharucoBoard(int(squaresX), int(squaresY), square_length, marker_length,
                          marker_bits=marker_bits,
                          dict_size=dict_size,
                          aruco_dict=aruco_dict,
@@ -1602,13 +1603,13 @@ def collect_matched_mirror_points(merged, board):
 
         objp = board.get_object_points()
 
-        num_rows_in_imgp = 0
+        num_left_rows_in_imgp = 0
         for merged_row in leftmirror_rows:
             sorted_direct_imgp, sorted_mirror_imgp, sorted_objp, sorted_corner_idx = match_points_in_charuco_row(merged_row, objp, 'leftmirror')
 
             if sorted_direct_imgp.any():
                 # if matched points were found for this row
-                if num_rows_in_imgp == 0:
+                if num_left_rows_in_imgp == 0:
                     leftmirror_imgp = sorted_mirror_imgp
                     directleft_imgp = sorted_direct_imgp
                     left_objp = sorted_objp
@@ -1621,16 +1622,16 @@ def collect_matched_mirror_points(merged, board):
                 matched_points_metadata[0]['ptids'].append(sorted_corner_idx)
                 # matched_points_metadata[0]['ptids'].append(merged_row['direct']['ids'])
 
-                num_rows_in_imgp += 1
+                num_left_rows_in_imgp += 1
 
-        num_rows_in_imgp = 0
+        num_right_rows_in_imgp = 0
         for merged_row in rightmirror_rows:
             sorted_direct_imgp, sorted_mirror_imgp, sorted_objp, sorted_corner_idx = match_points_in_charuco_row(
                 merged_row, objp, 'rightmirror')
 
             if sorted_direct_imgp.any():
                 # if matched points were found for this row
-                if num_rows_in_imgp == 0:
+                if num_right_rows_in_imgp == 0:
                     rightmirror_imgp = sorted_mirror_imgp
                     directright_imgp = sorted_direct_imgp
                     right_objp = sorted_objp
@@ -1643,14 +1644,29 @@ def collect_matched_mirror_points(merged, board):
                 # matched_points_metadata[1]['ptids'].append(merged_row['direct']['ids'])
                 matched_points_metadata[1]['ptids'].append(sorted_corner_idx)
 
-                num_rows_in_imgp += 1
+                num_right_rows_in_imgp += 1
 
-    stereo_cal_points = {'leftmirror': leftmirror_imgp,
-                         'directleft': directleft_imgp,
-                         'left_objp': left_objp,
-                         'rightmirror': rightmirror_imgp,
-                         'directright': directright_imgp,
-                         'right_objp': right_objp}
+        if num_left_rows_in_imgp == 0:
+            # there weren't any matched points for the left mirror
+            leftmirror_imgp = None
+            directleft_imgp = None
+            left_objp = None
+
+        if num_right_rows_in_imgp == 0:
+            # there weren't any matched points for the left mirror
+            rightmirror_imgp = None
+            directright_imgp = None
+            right_objp = None
+
+    try:
+        stereo_cal_points = {'leftmirror': leftmirror_imgp,
+                             'directleft': directleft_imgp,
+                             'left_objp': left_objp,
+                             'rightmirror': rightmirror_imgp,
+                             'directright': directright_imgp,
+                             'right_objp': right_objp}
+    except:
+        pass
 
     return stereo_cal_points, matched_points_metadata
 
@@ -1772,8 +1788,15 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
 
     # calculate fundamental matrices for each view
     F = np.empty((3, 3, 2))
-    F[:, :, 0] = cvb.fund_matrix_mirror(stereo_cal_points['directleft'], stereo_cal_points['leftmirror'])
-    F[:, :, 1] = cvb.fund_matrix_mirror(stereo_cal_points['directright'], stereo_cal_points['rightmirror'])
+    if stereo_cal_points['leftmirror'] is None:
+        F[:, :, 0].fill(np.nan)
+    else:
+        F[:, :, 0] = cvb.fund_matrix_mirror(stereo_cal_points['directleft'], stereo_cal_points['leftmirror'])
+
+    if stereo_cal_points['rightmirror'] is None:
+        F[:, :, 1].fill(np.nan)
+    else:
+        F[:, :, 1] = cvb.fund_matrix_mirror(stereo_cal_points['directright'], stereo_cal_points['rightmirror'])
 
     # calculate essential matrices
     E = np.empty((3, 3, 2))

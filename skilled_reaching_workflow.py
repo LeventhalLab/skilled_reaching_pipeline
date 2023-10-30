@@ -333,6 +333,33 @@ def calibrate_all_sessions(parent_directories,
         #     # now perform the actual calibration
         #     skilled_reaching_calibration.multi_mirror_calibration(calibration_data, calibration_summary_name)
 
+def perform_calibrations(parent_directories, cam_names=('direct', 'leftmirror', 'rightmirror'),
+                         vidtype='.avi', filtertype='h264', rat_nums='all'):
+
+    experiment_list = list(parent_directories.keys())
+    for expt in experiment_list:
+        videos_root_folder = parent_directories[expt]['videos_root_folder']
+        session_metadata_xlsx_path = os.path.join(videos_root_folder, 'SR_{}_video_session_metadata.xlsx'.format(expt))
+
+        # load the .xlsx file containing all the info about which calibration files to use for each session
+        calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+
+        crop_videos.crop_all_calibration_videos(parent_directories[expt],
+                                    calibration_metadata_df,
+                                    vidtype=vidtype,
+                                    view_list=cam_names,
+                                    filtertype=filtertype,
+                                    rat_nums=rat_nums)
+
+
+        calibrate_all_sessions(parent_directories[expt],
+                               calibration_metadata_df,
+                               cam_names,
+                               filtertype=filtertype,
+                               rat_nums=rat_nums)
+
+    return calibration_metadata_df
+
 
 if __name__ == '__main__':
 
@@ -343,63 +370,21 @@ if __name__ == '__main__':
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
     create_marked_vids = True
 
-    # videos_parents = [r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\dLight_Photometry',
-    #                   r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\SR_6OHDA']
-    # video_root_folder = os.path.join(videos_parent, 'videos_to_crop')
-    # video_root_folder = os.path.join(videos_parent, 'data')
-    # cropped_videos_parents = os.path.join(videos_parent, 'cropped')
-    # marked_videos_parent = os.path.join(videos_parent, 'marked')
-    # calibration_vids_parent = os.path.join(videos_parent, 'calibration_videos')
-    # calibration_files_parent = os.path.join(videos_parent, 'calibration_files')
-    # dlc_mat_output_parent = os.path.join(videos_parent, 'matlab_readable_dlc')
-    # trajectories_parent = os.path.join(videos_parent, 'trajectory_files')
-
-
-
-    # cb_size = (6, 9)
-    # test_calibration_file = '/Volumes/Untitled/DLC_output/calibration_images/2020/202012_calibration/202012_calibration_files/SR_boxCalibration_box04_20201217.mat'
-    # test_pickle_file = '/Users/dan/Documents/deeplabcut/cropped_vids/R0382/R0382_20201216c_direct/R0382_20201216_17-23-50_005_direct_700-1350-270-935DLC_resnet50_skilled_reaching_directOct19shuffle1_200000_full.pickle'
-    # skilled_reaching_calibration.read_matlab_calibration(test_calibration_file)
-    # pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name(test_pickle_file)
-    # test_video_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/videos_to_crop/R0382/R0382_20201216c/R0382_box02_20201216_17-31-47_010.avi'
-    # test_calibration_file = '/Users/dan/Documents/deeplabcut/videos_to_analyze/calibration_files/2021/202102_calibration/camera_calibration_videos_202102/CameraCalibration_box02_20210211_14-33-25.avi'
-    # rat_database_name = '/Users/dan/Documents/deeplabcut/videos_to_analyze/SR_rat_database.csv'
-    # rat_database_name = '/home/levlab/Public/rat_SR_videos_to_analyze/SR_rat_database.csv'
     label_videos = True
 
     rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502]
-
-    # rat_df = skilled_reaching_io.read_rat_csv_database(rat_database_name)
 
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
     skipmirrorlabel = False
 
     gputouse = 3
-    # step 1: preprocess videos to extract left mirror, right mirror, and direct views
 
     cam_names = ('direct', 'leftmirror', 'rightmirror')
     n_cams = len(cam_names)
     # cgroup = CameraGroup.from_names(cam_names, fisheye=False)
 
     filtertype = 'h264'
-
-    # parameters for cropping
-    crop_params_dict = {
-        cam_names[0]: [700, 1350, 270, 935],
-        cam_names[1]: [1, 470, 270, 920],
-        cam_names[2]: [1570, 2040, 270, 920]
-    }
-    cropped_vid_type = '.avi'
-
-    # videos_parent = '/home/levlab/Public/rat_SR_videos_to_analyze'   # on the lambda machine
-    # videos_parent = '/Users/dan/Documents/deeplabcut/videos_to_analyze'  # on home mac
-    # videos_parent = '/Volumes/Untitled/videos_to_analyze'
-
-    # view_config_paths = {
-    #     'direct': '/home/levlab/Public/skilled_reaching_direct-Dan_Leventhal-2020-10-19/config.yaml',
-    #     'mirror': '/home/levlab/Public/skilled_reaching_mirror-Dan_Leventhal-2020-10-19/config.yaml'
-    # }
 
     # for lambda computer
     view_config_paths = {
@@ -426,7 +411,7 @@ if __name__ == '__main__':
         DLC_top_folder = '/home/dleventh/Documents/DLC_projects'
         data_root_folder = '/home/dleventh/SharedX/Neuro-Leventhal/data/skilled_reaching'
 
-    # for dLight experiments
+    # store directory tree for each experiment
     videos_parents = {expt: os.path.join(data_root_folder, expt) for expt in experiment_list}
     video_root_folders = {expt: os.path.join(videos_parents[expt], 'data') for expt in experiment_list}
     cropped_videos_parents = {expt: os.path.join(videos_parents[expt], 'cropped') for expt in experiment_list}
@@ -437,12 +422,9 @@ if __name__ == '__main__':
     trajectories_parents = {expt: os.path.join(videos_parents[expt], 'trajectory_files') for expt in experiment_list}
 
     view_keys = list(DLC_folder_names.keys())
+
+    # to find the config files for each DLC network for each view
     view_config_paths = {view_key: os.path.join(DLC_top_folder, DLC_folder_names[view_key], 'config.yaml') for view_key in view_keys}
-    # view_config_paths = {
-    #     'direct': r'C:\Users\dleventh\Documents\deeplabcut_projects\ratdirectsr-DanLeventhal-2023-06-07/config.yaml',
-    #     'nearpaw': r'C:\Users\dleventh\Documents\deeplabcut_projects\ratnearpawmirrorsr-DanLeventhal-2023-06-19/config.yaml',
-    #     'farpaw': r'C:\Users\dleventh\Documents\deeplabcut_projects\ratfarpawmirrorsr-DanLeventhal-2023-07-03/config.yaml'
-    # }
 
     parent_directories = {expt: {
                                 'videos_parent': videos_parents[expt],
@@ -461,46 +443,33 @@ if __name__ == '__main__':
     # board = skilled_reaching_calibration.create_charuco(6,12,20,15)
     # skilled_reaching_calibration.write_charuco_image(board, 600, calibration_vids_parents['dLightPhotometry'])
 
-    # test_cal_vid = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching\test_calibration\GridCalibration_box01_20230823_18-40-45.avi'
+    # excel file containing the cropping parameters, which calibration file to use for each session, etc.
+    # session_metadata_xlsx_path = os.path.join(video_root_folders[expt],
+    #                                           'SR_{}_video_session_metadata.xlsx'.format(expt))
+    # calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+
+    # crop calibration videos and perform the calibrations
+    perform_calibrations(parent_directories, vidtype='.avi', cam_names=cam_names, filtertype=filtertype, rat_nums=rats_to_analyze)
+    # for expt in experiment_list:
     #
-    # ret, mtx, dist = skilled_reaching_calibration.calibrate_single_camera(test_cal_vid, board)
-    expt = 'dLightPhotometry'
-    session_metadata = {
-        'ratID': 'R0452',
-        'rat_num': 452,
-        'date': datetime(2023, 3, 28),
-        'task': 'skilledreaching',
-        'session_num': 1,
-        'current': 0.
-    }
-    session_metadata_xlsx_path = os.path.join(video_root_folders[expt],
-                                              'SR_{}_video_session_metadata.xlsx'.format(expt))
-    calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
-    # skilled_reaching_calibration.test_calibration(session_metadata, calibration_metadata_df, parent_directories[expt])
-
-    for expt in experiment_list:
-
-        # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
-        session_metadata_xlsx_path = os.path.join(video_root_folders[expt], 'SR_{}_video_session_metadata.xlsx'.format(expt))
-        # calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
-        calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
-
-        crop_videos.crop_all_calibration_videos(parent_directories[expt],
-                                    calibration_metadata_df,
-                                    vidtype='.avi',
-                                    view_list=cam_names,
-                                    filtertype=filtertype,
-                                    rat_nums=rats_to_analyze)
-
-        # current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(full_calib_vid_name,
-        #                                                                                        session_row,
-        #                                                                                        filtertype=filtertype)
-
-        calibrate_all_sessions(parent_directories[expt],
-                               calibration_metadata_df,
-                               cam_names,
-                               filtertype=filtertype,
-                               rat_nums=rats_to_analyze)
+    #     # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
+    #     session_metadata_xlsx_path = os.path.join(video_root_folders[expt], 'SR_{}_video_session_metadata.xlsx'.format(expt))
+    #     # calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
+    #     calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+    #
+    #     crop_videos.crop_all_calibration_videos(parent_directories[expt],
+    #                                 calibration_metadata_df,
+    #                                 vidtype='.avi',
+    #                                 view_list=cam_names,
+    #                                 filtertype=filtertype,
+    #                                 rat_nums=rats_to_analyze)
+    #
+    #
+    #     calibrate_all_sessions(parent_directories[expt],
+    #                            calibration_metadata_df,
+    #                            cam_names,
+    #                            filtertype=filtertype,
+    #                            rat_nums=rats_to_analyze)
 
     for expt in experiment_list:
         rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])

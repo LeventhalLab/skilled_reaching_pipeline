@@ -234,12 +234,12 @@ def calibrate_all_sessions(parent_directories,
     for ratID in ratIDs:
         if ratID not in expt_ratIDs:
             continue
-        rat_metadata_df = calibration_metadata_df[ratID]
+        rat_md_df = calibration_metadata_df[ratID]
 
-        num_sessions = len(rat_metadata_df)
+        num_sessions = len(rat_md_df)
 
         for i_session in range(num_sessions):
-            session_row = rat_metadata_df.iloc[[i_session]]
+            session_row = rat_md_df.iloc[[i_session]]
 
             # calibrate the camera for this session
             cam_cal_vid_name = session_row['cal_vid_name_camera'].values[0]
@@ -534,10 +534,7 @@ if __name__ == '__main__':
     # step 4: reconstruct the 3d trajectories
     for expt in experiment_list:
         folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(parent_directories[expt]['cropped_videos_parent'], cam_names)
-        reconstruct_3d.reconstruct_folders_anipose(folders_to_reconstruct,
-                                                   parent_directories[expt]['cropped_videos_parent'],
-                                                   parent_directories[expt]['calibration_files_parent'],
-                                                   parent_directories[expt]['trajectories_parent'])
+        reconstruct_3d.reconstruct_folders_anipose(folders_to_reconstruct, parent_directories[expt], expt)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)
 

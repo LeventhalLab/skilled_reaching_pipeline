@@ -78,17 +78,47 @@ def reconstruct_folders(folders_to_reconstruct, parent_directories,  rat_df):
             reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
-def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  rat_df):
+def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  expt):
 
     cropped_videos_parent = parent_directories['cropped_videos_parent']
     calibration_files_parent = parent_directories['calibration_files_parent']
     trajectories_parent = parent_directories['trajectories_parent']
 
+    videos_root_folder = parent_directories['videos_root_folder']
+    session_metadata_xlsx_path = os.path.join(videos_root_folder, 'SR_{}_video_session_metadata.xlsx'.format(expt))
+
+    # load the .xlsx file containing all the info about which calibration files to use for each session
+    calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+
     for folder_to_reconstruct in folders_to_reconstruct:
 
         # first, figure out if we have calibration files for this session
+        ratID = folder_to_reconstruct['ratID']
         session_date = folder_to_reconstruct['session_date']
-        box_num = folder_to_reconstruct['session_box']
+        box_num = folder_to_reconstruct['boxnum']
+        session_num = folder_to_reconstruct['session_num']
+        task = folder_to_reconstruct['task']
+
+        rat_md_df = calibration_metadata_df[ratID]
+        date_df = rat_md_df.loc[rat_md_df['date'] == session_date]
+        task_df = date_df.loc[date_df['task'] == task]
+        box_df = task_df.loc[task_df['box_num'] == box_num]
+        session_row = box_df.loc[box_df['session_num'] == session_num]
+
+        # calibrate the camera for this session
+        mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
+        if mirror_calib_vid_name.lower() == 'none':
+            continue
+        full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
+                                                                                 parent_directories)
+        calibration_pickle_name = navigation_utilities.create_calibration_summary_name(full_calib_vid_name, calibration_files_parent)
+
+        if not os.path.exists(calibration_pickle_name):
+            continue
+
+        calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
+        cgroup = calibration_data['cgroup']
+
         calibration_folder = navigation_utilities.find_calibration_files_folder(session_date, box_num, calibration_files_parent)
 
         if os.path.exists(calibration_folder):
@@ -97,6 +127,10 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  rat
             cal_data = skilled_reaching_io.get_calibration_data(session_date, box_num, calibration_folder)
             reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
+
+def reconstruct_folder_anipose(folder_to_reconstruct, calibration_data, trajectories_parent):
+
+    cgroup = calibration_data['cgroup']
 
 def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent, view_list=('direct', 'leftmirror', 'rightmirror'), vidtype='.avi'):
 

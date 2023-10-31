@@ -702,4 +702,5 @@ class CharucoBoard(CalibrationObject):
         ret, rvec, tvec = aruco.estimatePoseCharucoBoard(
             corners.astype(np.single), ids, self.board, K, D, None, None)
 
+
         return rvec, tvec

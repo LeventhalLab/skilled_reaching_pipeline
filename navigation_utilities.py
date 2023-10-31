@@ -449,7 +449,7 @@ def parse_paw_trajectory_fname(paw_trajectory_fname):
     return traj_metadata
 
 
-def parse_session_dir_name(session_dir):
+def parse_session_dir_name_legacy(session_dir):
     """
 
     :param session_dir - session directory name assumed to be of the form RXXXX_yyyymmddz, where XXXX is the rat number,
@@ -461,6 +461,22 @@ def parse_session_dir_name(session_dir):
     dir_name_parts = session_dir_name.split('_')
     ratID = dir_name_parts[0]
     session_name = dir_name_parts[1]
+
+    return ratID, session_name
+
+
+def parse_session_dir_name(session_dir):
+    """
+
+    :param session_dir - session directory name assumed to be of the form RXXXX_yyyymmddz, where XXXX is the rat number,
+        yyyymmdd is the date, and z is a letter identifying distinct sessions on the same day (i.e., "a", "b", etc.)
+    :return:
+    """
+
+    _, session_dir_name = os.path.split(session_dir)
+    dir_name_parts = session_dir_name.split('_')
+    ratID = dir_name_parts[0]
+    session_name = '_'.join(dir_name_parts[1:])
 
     return ratID, session_name
 

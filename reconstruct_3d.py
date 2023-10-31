@@ -78,6 +78,26 @@ def reconstruct_folders(folders_to_reconstruct, parent_directories,  rat_df):
             reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
+def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  rat_df):
+
+    cropped_videos_parent = parent_directories['cropped_videos_parent']
+    calibration_files_parent = parent_directories['calibration_files_parent']
+    trajectories_parent = parent_directories['trajectories_parent']
+
+    for folder_to_reconstruct in folders_to_reconstruct:
+
+        # first, figure out if we have calibration files for this session
+        session_date = folder_to_reconstruct['session_date']
+        box_num = folder_to_reconstruct['session_box']
+        calibration_folder = navigation_utilities.find_calibration_files_folder(session_date, box_num, calibration_files_parent)
+
+        if os.path.exists(calibration_folder):
+            # is there a calibration file for this session?
+
+            cal_data = skilled_reaching_io.get_calibration_data(session_date, box_num, calibration_folder)
+            reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
+
+
 def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent, view_list=('direct', 'leftmirror', 'rightmirror'), vidtype='.avi'):
 
     if vidtype[0] is not '.':

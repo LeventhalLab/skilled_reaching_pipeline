@@ -117,6 +117,7 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  exp
             continue
 
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
+        reconstruct_folder_anipose(folder_to_reconstruct, calibration_data, parent_directories)
         cgroup = calibration_data['cgroup']
 
         calibration_folder = navigation_utilities.find_calibration_files_folder(session_date, box_num, calibration_files_parent)
@@ -128,13 +129,15 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  exp
             reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
-def reconstruct_folder_anipose(folder_to_reconstruct, calibration_data, trajectories_parent):
+def reconstruct_folder_anipose(folder_to_reconstruct, calibration_data, parent_directories):
 
     cgroup = calibration_data['cgroup']
 
+    pass
+
 def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent, view_list=('direct', 'leftmirror', 'rightmirror'), vidtype='.avi'):
 
-    if vidtype[0] is not '.':
+    if vidtype[0] != '.':
         vidtype = '.' + vidtype
     _, session_name = os.path.split(folder_to_reconstruct['session_folder'])
     # assume need at least a direct view for each video

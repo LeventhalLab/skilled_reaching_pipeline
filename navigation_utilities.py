@@ -449,7 +449,7 @@ def parse_paw_trajectory_fname(paw_trajectory_fname):
     return traj_metadata
 
 
-def parse_session_dir_name_legacy(session_dir):
+def parse_session_dir_name(session_dir):
     """
 
     :param session_dir - session directory name assumed to be of the form RXXXX_yyyymmddz, where XXXX is the rat number,
@@ -465,7 +465,7 @@ def parse_session_dir_name_legacy(session_dir):
     return ratID, session_name
 
 
-def parse_session_dir_name(session_dir):
+def parse_croppedvid_dir_name(session_dir):
     """
 
     :param session_dir - session directory name assumed to be of the form RXXXX_yyyymmddz, where XXXX is the rat number,
@@ -478,8 +478,40 @@ def parse_session_dir_name(session_dir):
     ratID = dir_name_parts[0]
     session_name = '_'.join(dir_name_parts[1:])
 
-    return ratID, session_name
+    session_date = fname_string_to_date(dir_name_parts[1])
 
+    session_metadata = {'ratID': ratID,
+                        'session_date': session_date,
+                        'task': dir_name_parts[2],
+                        'session_num': int(dir_name_parts[3][-2:])}
+
+    return session_metadata
+
+
+def test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=True):
+
+    if filtered:
+        test_name = '_'.join((session_metadata['ratID'],
+                              'box*',
+                              date_to_string_for_fname(session_metadata['session_date']),
+                              '*',
+                              cam_name,
+                              '*',
+                              'el_filtered.h5'))
+    else:
+        test_name = '_'.join((session_metadata['ratID'],
+                              'box*',
+                              date_to_string_for_fname(session_metadata['session_date']),
+                              '*',
+                              cam_name,
+                              '*',
+                              'el.h5'))
+
+    return test_name
+
+
+def match_dlc_h5_views(session_metadata):
+    pass
 
 def find_folders_to_analyze(cropped_videos_parent, view_list=None):
     """
@@ -2109,7 +2141,7 @@ def parse_3d_reconstruction_pickle_name(r3d_fullpath):
     return r3d_metadata
 
 
-def find_folders_to_reconstruct(cropped_videos_parent):
+def find_folders_to_reconstruct(cropped_videos_parent, cam_names):
     '''
     find all session folders in cropped_videos_parent that contain.pickle files with labeled coordinates
     :param cropped_videos_parent:
@@ -2130,20 +2162,29 @@ def find_folders_to_reconstruct(cropped_videos_parent):
             test_direct_folder = os.path.join(session_folder, session_folder_name + '_direct')
             if not os.path.exists(test_direct_folder):
                 continue
-            # check to see if there are .pickle files containing labeled data
-            ratID, session_name = parse_session_dir_name(session_folder_name)
-            test_pickle_name = '_'.join((ratID, session_name[:-1], '*', 'full.pickle'))
-            full_test_pickle_name = os.path.join(test_direct_folder, test_pickle_name)
-            full_pickle_list = glob.glob(full_test_pickle_name)
+            # check to see if there are .h5 files containing labeled data
+            session_metadata = parse_croppedvid_dir_name(session_folder_name)
 
-            if not full_pickle_list:
-                # if full_pickle_list is empty, continue the loop; don't need calibration if bodyparts aren't labeled yet
+            h5_names = []
+            for cam_name in cam_names:
+                test_h5_name = test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=False)
+                cam_folder_name = '_'.join((session_folder_name, cam_name))
+                full_test_h5_name = os.path.join(session_folder, cam_folder_name, test_h5_name)
+                h5_names.append(glob.glob(full_test_h5_name))
+
+            # test_pickle_name = '_'.join((ratID,
+            #                              'box01',
+            #                              session_name, '*',
+            #                              'full.pickle'))
+            # full_test_pickle_name = os.path.join(test_direct_folder, test_pickle_name)
+            # full_pickle_list = glob.glob(full_test_pickle_name)
+
+            if not all(h5_names):
+                # if there aren't matching .h5 files for different views, no point in trying to triangulate
                 continue
 
-            pickle_metadata = parse_dlc_output_pickle_name(full_pickle_list[0])
-            session_metadata = {'session_folder': session_folder,
-                                'session_date': pickle_metadata['triggertime'],
-                                'session_box': pickle_metadata['boxnum']}
+            h5_metadata = parse_dlc_output_pickle_name(h5_names[0][0])
+            session_metadata['boxnum'] = h5_metadata['boxnum']
             folders_to_reconstruct.append(session_metadata)
 
     return folders_to_reconstruct
@@ -2376,7 +2417,7 @@ def fname_string_to_date(string_to_convert):
         format_string = None
 
     if format_string is None:
-        date_from_name = None
+        date_from_fname = None
     else:
         date_from_fname = datetime.strptime(string_to_convert, format_string)
 

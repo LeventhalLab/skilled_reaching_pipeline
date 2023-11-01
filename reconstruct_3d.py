@@ -141,7 +141,7 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, parent_direct
     # find matching .h5 files from each folder
     h5_list = []
     for cam_name in cams:
-        cam_folder_name = os.path.join(cropped_session_folder, '_'.join(session_folder_name, cam_name))
+        cam_folder_name = os.path.join(cropped_session_folder, '_'.join((session_folder_name, cam_name))
         test_name = navigation_utilities.test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=True)
         h5_list.append(glob.glob(os.path.join(cam_folder_name, test_name)))
 

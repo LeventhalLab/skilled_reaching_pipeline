@@ -237,8 +237,8 @@ def get_video_folders_to_crop(video_root_folder, rats_to_analyze='all'):
                             _, session_name = os.path.split(df)
                             if isvalid_ratsessiondate(session_name):
                                 # find valid skilled reaching sessions
-                                sr_folders = glob.glob(os.path.join(df, session_name + '_skilledreaching_*'))
-                                srchrim_folders = glob.glob(os.path.join(df, session_name + '_srchrimson_*'))
+                                sr_folders = glob.glob(os.path.join(df, session_name + '_sr_*'))
+                                srchrim_folders = glob.glob(os.path.join(df, session_name + '_srchrim_*'))
                                 for srf in sr_folders:
                                     if os.path.isdir(srf):
                                         vid_folders_to_crop.append(srf)

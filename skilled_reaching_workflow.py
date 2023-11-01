@@ -395,11 +395,6 @@ if __name__ == '__main__':
         'farpaw': '/home/levlab/deeplabcut_projects/ratfarpawmirrorsr-DanLeventhal-2023-07-03/config.yaml'
     }
 
-    # for DKL computer
-    # view_config_paths = {
-    #     'direct': '/home/levlab/Public/skilled_reaching_direct-Dan_Leventhal-2020-10-19/config.yaml',
-    #     'mirror': '/home/levlab/Public/skilled_reaching_mirror-Dan_Leventhal-2020-10-19/config.yaml'
-    # }
     DLC_folder_names = {'direct': 'ratdirectsr-DanLeventhal-2023-06-07',
                         'nearpaw': 'ratnearpawmirrorsr-DanLeventhal-2023-06-19',
                         'farpaw': 'ratfarpawmirrorsr-DanLeventhal-2023-07-03'}

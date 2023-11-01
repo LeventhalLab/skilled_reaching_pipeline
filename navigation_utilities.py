@@ -9,6 +9,35 @@ from datetime import datetime, timedelta
 import navigation_utilities
 
 
+def find_rat_cropped_session_folder(session_metadata, parent_directories):
+    '''
+
+    :param session_metadata:
+    :param parent_directories:
+    :return:
+    '''
+    cropped_vids_parent = parent_directories['cropped_videos_parent']
+    ratID = session_metadata['ratID']
+    rat_folder = os.path.join(cropped_vids_parent, ratID)
+
+    metadata_keys = session_metadata.keys()
+    test_datetime_keys = ['trialtime', 'date', 'time']
+    for test_key in test_datetime_keys:
+        if test_key in metadata_keys:
+            session_date = session_metadata[test_key]
+
+    session_folder_name = '_'.join((ratID,
+                                    fname_date2string(session_metadata['session_date']),
+                                    session_metadata['task'],
+                                    'session{:02d}'.format(session_metadata['session_num'])))
+    session_dir = os.path.join(rat_folder, session_folder_name)
+
+    if os.path.exists(session_dir):
+        return session_dir
+    else:
+        return None
+
+
 def find_cropped_session_folder(session_metadata, parent_directories):
     '''
 
@@ -472,8 +501,8 @@ def parse_croppedvid_dir_name(session_dir):
         yyyymmdd is the date, and z is a letter identifying distinct sessions on the same day (i.e., "a", "b", etc.)
     :return:
     """
-
     _, session_dir_name = os.path.split(session_dir)
+
     dir_name_parts = session_dir_name.split('_')
     ratID = dir_name_parts[0]
     session_name = '_'.join(dir_name_parts[1:])

@@ -12,6 +12,7 @@ import computer_vision_basics as cvb
 import shapely.geometry as sg
 import sr_visualization
 import dlc_utilities
+from aniposelib.utils import load_pose2d_fnames
 
 def test_reconstruction(parent_directories, rat_df):
     trajectories_parent = parent_directories['trajectories_parent']
@@ -129,10 +130,24 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  exp
             reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
-def reconstruct_folder_anipose(folder_to_reconstruct, calibration_data, parent_directories):
+def reconstruct_folder_anipose(session_metadata, calibration_data, parent_directories, filtered=True):
 
     cgroup = calibration_data['cgroup']
+    cams = cgroup.get_names()
 
+    # find the folders for each camera/view
+    cropped_session_folder = navigation_utilities.find_rat_cropped_session_folder(session_metadata, parent_directories)
+    _, session_folder_name = os.path.split(cropped_session_folder)
+    # find matching .h5 files from each folder
+    h5_list = []
+    for cam_name in cams:
+        cam_folder_name = os.path.join(cropped_session_folder, '_'.join(session_folder_name, cam_name))
+        test_name = navigation_utilities.test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=True)
+        h5_list.append(glob.glob(os.path.join(cam_folder_name, test_name)))
+
+    for h5_file in h5_list[0]:
+        pass
+    # d = load_pose2d_fnames(fname_dict, cam_names=cgroup.get_names())
     pass
 
 def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent, view_list=('direct', 'leftmirror', 'rightmirror'), vidtype='.avi'):

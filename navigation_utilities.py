@@ -539,6 +539,29 @@ def test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=
     return test_name
 
 
+def test_dlc_h5_name_from_h5_metadata(h5_metadata, cam_name, filtered=True):
+
+    # crop_string = '-'.join([str(cb) for cb in h5_metadata['crop_window']])
+    if filtered:
+        test_name = '_'.join((h5_metadata['ratID'],
+                              'box{:02d}'.format(h5_metadata['boxnum']),
+                              datetime_to_string_for_fname(h5_metadata['triggertime']),
+                              '{:03d}'.format(h5_metadata['video_number']),
+                              cam_name,
+                              '*',
+                              'el_filtered.h5'))
+    else:
+        test_name = '_'.join((h5_metadata['ratID'],
+                              'box{:02d}'.format(h5_metadata['boxnum']),
+                              datetime_to_string_for_fname(h5_metadata['triggertime']),
+                              '{:03d}'.format(h5_metadata['video_number']),
+                              cam_name,
+                              '*',
+                              'el.h5'))
+
+    return test_name
+
+
 def match_dlc_h5_views(session_metadata):
     pass
 
@@ -897,6 +920,76 @@ def build_video_name(video_metadata, videos_parent):
                                                   video_metadata['video_number'])
     video_name = os.path.join(videos_parent, 'videos_to_crop', video_metadata['ratID'], video_metadata['session_name'], video_name)
     return video_name
+
+
+def parse_dlc_output_h5_name(dlc_output_h5_name):
+    """
+    extract metadata information from the pickle file name
+    :param dlc_output_h5_name: video name with expected format RXXXX_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
+        where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
+        cropping windows from the original video
+    :return: cropped_vid_metadata: dictionary containing the following keys
+        ratID - rat ID as a string RXXXX
+        boxnum - box number the session was run in. useful for making sure we used the right calibration. If unknown,
+            set to 99
+        triggertime - datetime object with when the trigger event occurred (date and time)
+        video_number - number of the video (ZZZ in the filename). This number is not necessarily unique within a session
+            if it had to be restarted partway through
+        video_type - video type (e.g., '.avi', '.mp4', etc)
+        crop_window - 4-element list [left, right, top, bottom] in pixels
+    """
+
+    h5_metadata = {
+        'ratID': '',
+        'rat_num': 0,
+        'boxnum': 99,
+        'triggertime': datetime(1,1,1),
+        'video_number': 0,
+        'view': '',
+        'crop_window': [],
+        'scorername': '',
+        'h5_name': ''
+    }
+    _, h5_name = os.path.split(dlc_output_h5_name)
+    h5_metadata['h5_name'] = h5_name
+    h5_name, vid_type = os.path.splitext(h5_name)
+
+    metadata_list = h5_name.split('_')
+
+    h5_metadata['ratID'] = metadata_list[0]
+    num_string = ''.join(filter(lambda i: i.isdigit(), h5_metadata['ratID']))
+    h5_metadata['rat_num'] = int(num_string)
+
+    # if box number is stored in file name, then extract it
+    if 'box' in metadata_list[1]:
+        h5_metadata['boxnum'] = int(metadata_list[1][3:])
+        next_metadata_idx = 2
+    else:
+        next_metadata_idx = 1
+
+    datetime_str = metadata_list[next_metadata_idx] + '_' + metadata_list[1+next_metadata_idx]
+    h5_metadata['triggertime'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
+
+    h5_metadata['video_number'] = int(metadata_list[next_metadata_idx + 2])
+    h5_metadata['view'] = metadata_list[next_metadata_idx + 3]
+
+    # 'DLC' gets appended to the last cropping parameter in the filename by deeplabcut
+    crop_window_strings = metadata_list[next_metadata_idx + 4].split('-')
+    left, right, top = list(map(int, crop_window_strings[:-1]))
+
+    # find where 'DLC' starts in the last crop_window_string
+    dlc_location = crop_window_strings[-1].find('DLC')
+    bottom = int(crop_window_strings[-1][:dlc_location])
+
+    h5_metadata['crop_window'].extend((left, right, top, bottom))
+
+    #todo: write the scorername into the pickle metadata dictionary. It's also in the metadata pickle file
+    h5_metadata['scorername'] = '_'.join(('DLC',
+                                          metadata_list[next_metadata_idx + 5],
+                                          metadata_list[next_metadata_idx + 6],
+                                          metadata_list[next_metadata_idx + 7]))
+
+    return h5_metadata
 
 
 def parse_dlc_output_pickle_name(dlc_output_pickle_name):

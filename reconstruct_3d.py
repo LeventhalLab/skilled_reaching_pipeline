@@ -79,7 +79,7 @@ def reconstruct_folders(folders_to_reconstruct, parent_directories,  rat_df):
             reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
-def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  expt):
+def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  expt, filtered=True):
 
     cropped_videos_parent = parent_directories['cropped_videos_parent']
     calibration_files_parent = parent_directories['calibration_files_parent']
@@ -118,7 +118,7 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  exp
             continue
 
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
-        reconstruct_folder_anipose(folder_to_reconstruct, calibration_data, parent_directories)
+        reconstruct_folder_anipose(folder_to_reconstruct, calibration_data, parent_directories, filtered=filtered)
         cgroup = calibration_data['cgroup']
 
         calibration_folder = navigation_utilities.find_calibration_files_folder(session_date, box_num, calibration_files_parent)
@@ -132,8 +132,7 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  exp
 
 def reconstruct_folder_anipose(session_metadata, calibration_data, parent_directories, filtered=True):
 
-    cgroup = calibration_data['cgroup']
-    cams = cgroup.get_names()
+    cams = calibration_data['cgroup'].get_names()
 
     # find the folders for each camera/view
     cropped_session_folder = navigation_utilities.find_rat_cropped_session_folder(session_metadata, parent_directories)
@@ -142,12 +141,63 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, parent_direct
     h5_list = []
     for cam_name in cams:
         cam_folder_name = os.path.join(cropped_session_folder, '_'.join((session_folder_name, cam_name)))
-        test_name = navigation_utilities.test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=True)
+        test_name = navigation_utilities.test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=filtered)
+        new_h5_list = glob.glob(os.path.join(cam_folder_name, test_name))
         h5_list.append(glob.glob(os.path.join(cam_folder_name, test_name)))
 
+    # now find matching files from each view
     for h5_file in h5_list[0]:
-        pass
+        h5_vid_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)
+        h5_file_group = [h5_file]
+        for cam_name in cams[1:]:
+            cam_folder_name = os.path.join(cropped_session_folder, '_'.join((session_folder_name, cam_name)))
+            test_name = navigation_utilities.test_dlc_h5_name_from_h5_metadata(h5_vid_metadata, cam_name, filtered=filtered)
+            full_test_name = os.path.join(cam_folder_name, test_name)
+
+            view_h5_list = glob.glob(full_test_name)
+            if len(view_h5_list) == 1:
+                # found exactly one .h5 file to match the one from the direct view
+                h5_file_group.append(view_h5_list[0])
+
+        if len(h5_file_group) != 3:
+            continue
+
+        reconstruct_single_vid_anipose(h5_file_group, calibration_data)
+
     # d = load_pose2d_fnames(fname_dict, cam_names=cgroup.get_names())
+    pass
+
+
+def reconstruct_single_vid_anipose(h5_group, calibration_data):
+
+    cgroup = calibration_data['cgroup']
+    cam_names = cgroup.get_names()
+    fname_dict = dict.fromkeys(cam_names)
+    for i_cam, cam_name in enumerate(cam_names):
+        fname_dict[cam_name] = h5_group[i_cam]
+
+    d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
+
+    score_threshold = 0.5
+
+    n_cams, n_points, n_joints, _ = d['points'].shape
+    points = d['points']
+    scores = d['scores']
+
+    bodyparts = d['bodyparts']
+
+    # remove points that are below threshold
+    points[scores < score_threshold] = np.nan
+
+    points_flat = points.reshape(n_cams, -1, 2)
+    scores_flat = scores.reshape(n_cams, -1)
+
+    p3ds_flat = cgroup.triangulate(points_flat, progress=True)
+    reprojerr_flat = cgroup.reprojection_error(p3ds_flat, points_flat, mean=True)
+
+    p3ds = p3ds_flat.reshape(n_points, n_joints, 3)
+    reprojerr = reprojerr_flat.reshape(n_points, n_joints)
+
     pass
 
 def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent, view_list=('direct', 'leftmirror', 'rightmirror'), vidtype='.avi'):

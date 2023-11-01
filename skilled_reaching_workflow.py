@@ -273,7 +273,7 @@ def calibrate_all_sessions(parent_directories,
             # skilled_reaching_calibration.write_board_image(mirror_board, 600, parent_directories['calibration_vids_parent'])
 
             # todo: test if chessboard detection is sufficient for the old boards
-            calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name, calibration_files_parent)
+            # calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name, calibration_files_parent)
             calibration_pickle_name = navigation_utilities.create_calibration_summary_name(full_calib_vid_name, calibration_files_parent)
             # if os.path.exists(calibration_toml_name):
             #     cgroup = CameraGroup.load(calibration_toml_name)
@@ -366,8 +366,8 @@ def perform_calibrations(parent_directories, cam_names=('direct', 'leftmirror', 
 if __name__ == '__main__':
 
 
-    # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLightPhotometry']
-    experiment_list = ['dLightPhotometry', 'sr6OHDA']
+    # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
+    experiment_list = ['dLight', 'sr6OHDA']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
     create_marked_vids = True
@@ -407,11 +407,11 @@ if __name__ == '__main__':
     if sys.platform in ['win32']:
         # assume DKL computer
         DLC_top_folder = r'C:\Users\dleventh\Documents\deeplabcut_projects'
-        data_root_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\skilled_reaching'
+        data_root_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr'
     elif sys.platform in ['linux']:
         # lambda computer
         DLC_top_folder = '/home/dleventh/Documents/DLC_projects'
-        data_root_folder = '/home/dleventh/SharedX/Neuro-Leventhal/data/skilled_reaching'
+        data_root_folder = '/home/dleventh/SharedX/Neuro-Leventhal/data/sr'
 
     # store directory tree for each experiment
     videos_parents = {expt: os.path.join(data_root_folder, expt) for expt in experiment_list}
@@ -534,7 +534,7 @@ if __name__ == '__main__':
     # step 4: reconstruct the 3d trajectories
     for expt in experiment_list:
         folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(parent_directories[expt]['cropped_videos_parent'], cam_names)
-        reconstruct_3d.reconstruct_folders_anipose(folders_to_reconstruct, parent_directories[expt], expt)
+        reconstruct_3d.reconstruct_folders_anipose(folders_to_reconstruct, parent_directories[expt], expt, filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)
 

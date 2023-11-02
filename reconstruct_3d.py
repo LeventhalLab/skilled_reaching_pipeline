@@ -12,7 +12,7 @@ import computer_vision_basics as cvb
 import shapely.geometry as sg
 import sr_visualization
 import dlc_utilities
-from aniposelib.utils import load_pose2d_fnames
+from anipose_utils import load_pose2d_fnames
 
 def test_reconstruction(parent_directories, rat_df):
     trajectories_parent = parent_directories['trajectories_parent']

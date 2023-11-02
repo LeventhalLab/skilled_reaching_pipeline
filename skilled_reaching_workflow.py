@@ -402,7 +402,8 @@ if __name__ == '__main__':
     if sys.platform in ['win32']:
         # assume DKL computer
         DLC_top_folder = r'C:\Users\dleventh\Documents\deeplabcut_projects'
-        data_root_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr'
+        # data_root_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr'
+        data_root_folder = r'X:\data\sr'
     elif sys.platform in ['linux']:
         # lambda computer
         DLC_top_folder = '/home/dleventh/Documents/DLC_projects'

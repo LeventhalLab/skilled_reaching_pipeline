@@ -221,10 +221,7 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
         for individual in ind_names:
             for joint in joint_names:
                 if (individual, joint) in dlabs:
-                    try:
-                        dlabs.loc[:, (individual, joint, 'x')] += dx
-                    except:
-                        pass
+                    dlabs.loc[:, (individual, joint, 'x')] += dx
                     dlabs.loc[:, (individual, joint, 'y')] += dy
 
         datas.append(dlabs)

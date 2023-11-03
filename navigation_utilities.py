@@ -1031,7 +1031,7 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
     pickle_metadata['rat_num'] = int(num_string)
 
     # if box number is stored in file name, then extract it
-    if 'box' in metadata_list[1]:
+    if 'b' in metadata_list[1]:
         pickle_metadata['boxnum'] = int(metadata_list[1][-1:])
         next_metadata_idx = 2
     else:
@@ -2603,7 +2603,7 @@ def create_calibration_summary_name(full_calib_vid_name, calibration_files_paren
 
     calib_fname = '_'.join(('calibrationdata',
                             fname_time2string(calib_metadata['time']),
-                            'box{:02d}'.format(calib_metadata['boxnum']) + '.pickle'
+                            'b{:02d}'.format(calib_metadata['boxnum']) + '.pickle'
     ))
 
     full_calib_fname = os.path.join(calib_file_path, calib_fname)

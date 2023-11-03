@@ -884,7 +884,7 @@ def verify_checkerboard_points(calibration_vids, calibration_data):
         vid_obj.release()
 
 
-def crop_params_dict_from_sessionrow(session_row, view_list=['direct', 'leftmirror', 'rightmirror']):
+def crop_params_dict_from_sessionrow(session_row, view_list=['dir', 'lm', 'rm']):
     crop_params_dict = dict.fromkeys(view_list, None)
     for view in view_list:
         left_edge = session_row[view + '_left'].values[0]
@@ -1087,7 +1087,7 @@ def crop_calibration_video(calib_vid,
                            session_row,
                            calib_crop_top=100,
                            filtertype='',
-                           view_list=['direct', 'leftmirror', 'rightmirror']):
+                           view_list=['dir', 'lm', 'rm']):
 
     cc_metadata = navigation_utilities.parse_camera_calibration_video_name(calib_vid)
 

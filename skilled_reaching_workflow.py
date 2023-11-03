@@ -367,7 +367,7 @@ if __name__ == '__main__':
 
 
     # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
-    experiment_list = ['dLight', 'sr6OHDA']
+    experiment_list = ['dLight', 'sr6OHDA', 'GRABAch-rDA']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
     create_marked_vids = True
@@ -451,26 +451,26 @@ if __name__ == '__main__':
 
 
 
-    # for expt in experiment_list:
-    #
-    #     # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
-    #     session_metadata_xlsx_path = os.path.join(video_root_folders[expt], 'SR_{}_video_session_metadata.xlsx'.format(expt))
-    #     # calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
-    #     calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
-    #
-    #     crop_videos.crop_all_calibration_videos(parent_directories[expt],
-    #                                 calibration_metadata_df,
-    #                                 vidtype='.avi',
-    #                                 view_list=cam_names,
-    #                                 filtertype=filtertype,
-    #                                 rat_nums=rats_to_analyze)
-    #
-    #
-    #     calibrate_all_sessions(parent_directories[expt],
-    #                            calibration_metadata_df,
-    #                            cam_names,
-    #                            filtertype=filtertype,
-    #                            rat_nums=rats_to_analyze)
+    for expt in experiment_list:
+
+        # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
+        session_metadata_xlsx_path = os.path.join(video_root_folders[expt], 'SR_{}_video_session_metadata.xlsx'.format(expt))
+        # calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
+        calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+
+        crop_videos.crop_all_calibration_videos(parent_directories[expt],
+                                    calibration_metadata_df,
+                                    vidtype='.avi',
+                                    view_list=cam_names,
+                                    filtertype=filtertype,
+                                    rat_nums=rats_to_analyze)
+
+
+        calibrate_all_sessions(parent_directories[expt],
+                               calibration_metadata_df,
+                               cam_names,
+                               filtertype=filtertype,
+                               rat_nums=rats_to_analyze)
 
     # for expt in experiment_list:
     #     rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])

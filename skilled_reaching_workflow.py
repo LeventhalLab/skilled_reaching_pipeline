@@ -59,7 +59,7 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
                     dlc_network = 'farpaw'
                 else:
                     print('paw preference not correctly specified for {}'.format(ratID))
-            elif 'rightmirror' in view:
+            elif 'rm' in view:
                 if paw_pref.lower() in ('r', 'right'):
                     # right mirror view is the far paw view for a right-pawed rat
                     dlc_network = 'farpaw'
@@ -67,7 +67,7 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
                     # right mirror view is the near paw view for a left-pawed rat
                     dlc_network = 'nearpaw'
             else:
-                print(view + ' does not contain the keyword "direct", "leftmirror", or "rightmirror"')
+                print(view + ' does not contain the keyword "direct", "lm", or "rm"')
                 continue
             config_path = view_config_paths[dlc_network]
 
@@ -144,7 +144,7 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
                           cropped_vid_type='.avi',
                           skipdirect=False,
                           skipmirror=False,
-                          view_list=('direct', 'leftmirror', 'rightmirror')
+                          view_list=('direct', 'lm', 'rm')
 ):
     '''
     
@@ -335,7 +335,7 @@ def calibrate_all_sessions(parent_directories,
         #     # now perform the actual calibration
         #     skilled_reaching_calibration.multi_mirror_calibration(calibration_data, calibration_summary_name)
 
-def perform_calibrations(parent_directories, cam_names=('direct', 'leftmirror', 'rightmirror'),
+def perform_calibrations(parent_directories, cam_names=('dir', 'lm', 'rm'),
                          vidtype='.avi', filtertype='h264', rat_nums='all'):
 
     experiment_list = list(parent_directories.keys())
@@ -382,7 +382,7 @@ if __name__ == '__main__':
 
     gputouse = 3
 
-    cam_names = ('direct', 'leftmirror', 'rightmirror')
+    cam_names = ('dir', 'lm', 'rm')
     n_cams = len(cam_names)
     # cgroup = CameraGroup.from_names(cam_names, fisheye=False)
 
@@ -390,14 +390,14 @@ if __name__ == '__main__':
 
     # for lambda computer
     view_config_paths = {
-        'direct': '/home/levlab/deeplabcut_projects/ratdirectsr-DanLeventhal-2023-06-07/config.yaml',
-        'nearpaw': '/home/levlab/deeplabcut_projects/ratnearpawmirrorsr-DanLeventhal-2023-06-19/config.yaml',
-        'farpaw': '/home/levlab/deeplabcut_projects/ratfarpawmirrorsr-DanLeventhal-2023-07-03/config.yaml'
+        'direct': '/home/levlab/deeplabcut_projects/ratdirsr-DL-2023-06-07/config.yaml',
+        'nearpaw': '/home/levlab/deeplabcut_projects/ratnearpawmirrsr-DL-2023-06-19/config.yaml',
+        'farpaw': '/home/levlab/deeplabcut_projects/ratfarpawmirrsr-DL-2023-07-03/config.yaml'
     }
 
-    DLC_folder_names = {'direct': 'ratdirectsr-DanLeventhal-2023-06-07',
-                        'nearpaw': 'ratnearpawmirrorsr-DanLeventhal-2023-06-19',
-                        'farpaw': 'ratfarpawmirrorsr-DanLeventhal-2023-07-03'}
+    DLC_folder_names = {'direct': 'ratdirsr-DL-2023-06-07',
+                        'nearpaw': 'ratnearpawmirrsr-DL-2023-06-19',
+                        'farpaw': 'ratfarpawmirrsr-DL-2023-07-03'}
 
     if sys.platform in ['win32']:
         # assume DKL computer

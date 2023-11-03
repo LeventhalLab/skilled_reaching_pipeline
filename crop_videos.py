@@ -13,7 +13,7 @@ import navigation_utilities
 import skilled_reaching_io
 
 
-def crop_params_dict_from_df(crop_params_df, session_date, box_num, view_list=['direct', 'leftmirror', 'rightmirror']):
+def crop_params_dict_from_df(crop_params_df, session_date, box_num, view_list=['dir', 'lm', 'rm']):
 
     # find the row with the relevant session data and box number
     date_box_row = crop_params_df[(crop_params_df['date'] == session_date) & (crop_params_df['box_num'] == box_num)]
@@ -57,7 +57,7 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
     """
     :param video_folder_list:
     :param cropped_vids_parent:
-    :param crop_params: either a dictionary with keys 'direct', 'leftmirror', 'rightmirror', each with a 4-element list [left, right, top, bottom]
+    :param crop_params: either a dictionary with keys 'dir', 'lm', 'rm', each with a 4-element list [left, right, top, bottom]
             OR a pandas dataframe with columns 'date', 'box_num', 'direct_left', 'direct_right',...
     :param vidtype:
     :return:
@@ -91,7 +91,7 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
             continue
 
         for i_view, view_name in enumerate(view_list):
-            if 'rightmirror' in view_name:
+            if 'rm' in view_name:
                 fliplr = True
             else:
                 fliplr = False
@@ -145,7 +145,7 @@ def cropped_vid_name(full_vid_path, dest_folder, view_name, crop_params, fliplr=
     function to return the name to be used for the cropped video
     :param full_vid_path:
     :param dest_folder: path in which to put the new folder with the cropped videos
-    :param view_name: "direct", "leftmirror", or "rightmirror"
+    :param view_name: "dir", "lm", or "rm"
     :param crop_params: 4-element list [left, right, top, bottom]
     :return: full_dest_name - name of output file. Is name of input file with "_cropped_left-top-width-height" appended
     """
@@ -177,7 +177,7 @@ def cropped_vid_name(full_vid_path, dest_folder, view_name, crop_params, fliplr=
 def crop_all_calibration_videos(parent_directories,
                                calibration_metadata_df,
                                vidtype='.avi',
-                               view_list=['direct', 'leftmirror', 'rightmirror'],
+                               view_list=['dir', 'lm', 'rm'],
                                filtertype='h264',
                                rat_nums='all'):
 
@@ -287,7 +287,7 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
         for jpg_name in tqdm(jpg_list):
             img = cv2.imread(jpg_name)
             cropped_img = img[y1-1:y2-1, x1-1:x2-1, :]
-            # if view_name == 'rightmirror' or fliplr==True:
+            # if view_name == 'rm' or fliplr==True:
             if fliplr == True:
                 # flip the image left to right so it can be run through a single "side mirror" DLC network
                 # or, if this is a calibration video, both mirror views should be flipped
@@ -304,7 +304,7 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
         # destroy the temp jpeg folder
         shutil.rmtree(jpg_temp_folder)
     elif filtertype == 'h264':
-        # if view_name == 'rightmirror' or fliplr==True:
+        # if view_name == 'rm' or fliplr==True:
         if fliplr == True:
             # flip the image left to right so it can be run through a single "side mirror" DLC network
             # or, if this is a calibration video, both mirror views should be flipped

@@ -379,7 +379,7 @@ def find_cropped_optitrack_videos(cropped_vids_parent, metadata, num_cams=2, vid
 def create_cropped_video_destination_list(cropped_vids_parent, video_folder_list, view_list):
     """
     create subdirectory trees in which to store the cropped videos. Directory structure is ratID-->sessionID-->
-        [sessionID_direct/leftmirror/rightmirror]
+        [sessionID_direct/lm/rm]
     :param cropped_vids_parent: parent directory in which to create directory tree
     :param video_folder_list: list of lowest level directories containing the original videos
     :return: cropped_video_directories
@@ -395,11 +395,11 @@ def create_cropped_video_destination_list(cropped_vids_parent, video_folder_list
         direct_view_directory = os.path.join(cropped_vids_parent, ratID, session_dir, cropped_vid_dir)
 
         # create left mirror view directory for this raw video directory
-        cropped_vid_dir = session_dir + '_leftmirror'
+        cropped_vid_dir = session_dir + '_lm'
         left_view_directory = os.path.join(cropped_vids_parent, ratID, session_dir, cropped_vid_dir)
 
         # create right mirror view directory for this raw video directory
-        cropped_vid_dir = session_dir + '_rightmirror'
+        cropped_vid_dir = session_dir + '_rm'
         right_view_directory = os.path.join(cropped_vids_parent, ratID, session_dir, cropped_vid_dir)
 
         cropped_video_directories[0].append(direct_view_directory)
@@ -461,7 +461,7 @@ def parse_paw_trajectory_fname(paw_trajectory_fname):
     ratID = fname_parts[0]
     rat_num = int(ratID[1:])
 
-    box_num = int(fname_parts[1][3:])
+    box_num = int(fname_parts[1][-1:])
 
     triggertime = fname_string_to_datetime(fname_parts[2] + '_' + fname_parts[3])
 
@@ -521,7 +521,7 @@ def test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=
 
     if filtered:
         test_name = '_'.join((session_metadata['ratID'],
-                              'box*',
+                              'b*',
                               date_to_string_for_fname(session_metadata['session_date']),
                               '*',
                               cam_name,
@@ -529,7 +529,7 @@ def test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=
                               'el_filtered.h5'))
     else:
         test_name = '_'.join((session_metadata['ratID'],
-                              'box*',
+                              'b*',
                               date_to_string_for_fname(session_metadata['session_date']),
                               '*',
                               cam_name,
@@ -569,14 +569,14 @@ def find_folders_to_analyze(cropped_videos_parent, view_list=None):
     """
     get the full list of directories containing cropped videos in the videos_to_analyze folder
     :param cropped_videos_parent: parent directory with subfolders direct_view and mirror_views, which have subfolders
-        RXXXX-->RXXXXyyyymmddz[direct/leftmirror/rightmirror] (assuming default view list)
+        RXXXX-->RXXXXyyyymmddz[direct/lm/rm] (assuming default view list)
     :param view_list:
     :return: folders_to_analyze: dictionary containing a key for each member of view_list. Each key holds a list of
         folders to run through deeplabcut
     """
 
     if view_list is None:
-        view_list = ('direct', 'leftmirror', 'rightmirror')
+        view_list = ('dir', 'lm', 'rm')
 
     folders_to_analyze = dict(zip(view_list, ([] for _ in view_list)))
 
@@ -603,7 +603,7 @@ def find_optitrack_folders_to_analyze(parent_directories, cam_list=(1, 2)):
     """
     get the full list of directories containing cropped videos in the videos_to_analyze folder
     :param cropped_videos_parent: parent directory with subfolders direct_view and mirror_views, which have subfolders
-        RXXXX-->RXXXXyyyymmddz[direct/leftmirror/rightmirror] (assuming default view list)
+        RXXXX-->RXXXXyyyymmddz[direct/lm/rm] (assuming default view list)
     :param view_list:
     :return: folders_to_analyze: dictionary containing a key for each member of view_list. Each key holds a list of
         folders to run through deeplabcut
@@ -643,7 +643,7 @@ def parse_cropped_video_name(cropped_video_name):
     """
     extract metadata information from the video name
     :param cropped_video_name: video name with expected format RXXXX_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
-        where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
+        where [view] is 'dir', 'lm', or 'rm', and l-r-t-b are left, right, top, and bottom of the
         cropping windows from the original video
     :return: cropped_vid_metadata: dictionary containing the following keys
         ratID - rat ID as a string RXXXX
@@ -679,7 +679,7 @@ def parse_cropped_video_name(cropped_video_name):
 
     # if box number is stored in file name, then extract it
     if 'box' in metadata_list[1]:
-        cropped_vid_metadata['boxnum'] = int(metadata_list[1][3:])
+        cropped_vid_metadata['boxnum'] = int(metadata_list[1][-1:])
         next_metadata_idx = 2
     else:
         next_metadata_idx = 1
@@ -701,7 +701,7 @@ def parse_cropped_optitrack_video_name(cropped_video_name):
     """
     extract metadata information from the video name
     :param cropped_video_name: video name with expected format RXXXX_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
-        where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
+        where [view] is 'dir', 'lm', or 'rm', and l-r-t-b are left, right, top, and bottom of the
         cropping windows from the original video
     :return: cropped_vid_metadata: dictionary containing the following keys
         ratID - rat ID as a string RXXXX
@@ -748,7 +748,7 @@ def parse_cropped_optitrack_video_folder(cropped_video_folder):
     """
     extract metadata information from the video name
     :param cropped_video_name: video name with expected format mouseID_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
-        where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
+        where [view] is 'dir', 'lm', or 'rm', and l-r-t-b are left, right, top, and bottom of the
         cropping windows from the original video
     :return: cropped_vid_metadata: dictionary containing the following keys
         ratID - rat ID as a string RXXXX
@@ -790,7 +790,7 @@ def parse_cropped_optitrack_video_name(cropped_video_name):
     """
     extract metadata information from the video name
     :param cropped_video_name: video name with expected format mouseID_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
-        where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
+        where [view] is 'dir', 'lm', or 'rm', and l-r-t-b are left, right, top, and bottom of the
         cropping windows from the original video
     :return: cropped_vid_metadata: dictionary containing the following keys
         ratID - rat ID as a string RXXXX
@@ -855,7 +855,7 @@ def parse_video_name(video_name):
     """
     extract metadata information from the video name
     :param video_name: video name with expected format RXXXX_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
-        where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
+        where [view] is 'dir', 'lm', or 'rm', and l-r-t-b are left, right, top, and bottom of the
         cropping windows from the original video
     :return: video_metadata: dictionary containing the following keys
         ratID - rat ID as a string RXXXX
@@ -898,7 +898,7 @@ def parse_video_name(video_name):
 
     # if box number is stored in file name, then extract it
     if 'box' in metadata_list[1]:
-        video_metadata['boxnum'] = int(metadata_list[1][3:])
+        video_metadata['boxnum'] = int(metadata_list[1][-1:])
         next_metadata_idx = 2
     else:
         next_metadata_idx = 1
@@ -926,7 +926,7 @@ def parse_dlc_output_h5_name(dlc_output_h5_name):
     """
     extract metadata information from the pickle file name
     :param dlc_output_h5_name: video name with expected format RXXXX_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
-        where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
+        where [view] is 'dir', 'lm', or 'rm', and l-r-t-b are left, right, top, and bottom of the
         cropping windows from the original video
     :return: cropped_vid_metadata: dictionary containing the following keys
         ratID - rat ID as a string RXXXX
@@ -962,7 +962,7 @@ def parse_dlc_output_h5_name(dlc_output_h5_name):
 
     # if box number is stored in file name, then extract it
     if 'box' in metadata_list[1]:
-        h5_metadata['boxnum'] = int(metadata_list[1][3:])
+        h5_metadata['boxnum'] = int(metadata_list[1][-1:])
         next_metadata_idx = 2
     else:
         next_metadata_idx = 1
@@ -996,7 +996,7 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
     """
     extract metadata information from the pickle file name
     :param dlc_output_pickle_name: video name with expected format RXXXX_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
-        where [view] is 'direct', 'leftmirror', or 'rightmirror', and l-r-t-b are left, right, top, and bottom of the
+        where [view] is 'dir', 'lm', or 'rm', and l-r-t-b are left, right, top, and bottom of the
         cropping windows from the original video
     :return: cropped_vid_metadata: dictionary containing the following keys
         ratID - rat ID as a string RXXXX
@@ -1032,7 +1032,7 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
 
     # if box number is stored in file name, then extract it
     if 'box' in metadata_list[1]:
-        pickle_metadata['boxnum'] = int(metadata_list[1][3:])
+        pickle_metadata['boxnum'] = int(metadata_list[1][-1:])
         next_metadata_idx = 2
     else:
         next_metadata_idx = 1
@@ -1163,7 +1163,7 @@ def parse_dlc_output_pickle_name_optitrack(dlc_output_pickle_name):
 
     # if box number is stored in file name, then extract it
     if 'box' in metadata_list[1]:
-        pickle_metadata['boxnum'] = int(metadata_list[1][3:])
+        pickle_metadata['boxnum'] = int(metadata_list[1][-1:])
         next_metadata_idx = 2
     else:
         next_metadata_idx = 1
@@ -1496,7 +1496,7 @@ def find_dlc_output_pickles(video_metadata, marked_videos_parent, view_list=None
     :return:
     """
     if view_list is None:
-        view_list = ('direct', 'leftmirror', 'rightmirror')
+        view_list = ('dir', 'lm', 'rm')
 
     session_name = video_metadata['session_name']
     rat_pickle_folder = os.path.join(marked_videos_parent, video_metadata['ratID'])
@@ -1541,7 +1541,7 @@ def construct_dlc_output_pickle_names(video_metadata, view):
     """
 
     :param video_metadata:
-    :param view: string containing 'direct', 'leftmirror', or 'rightmirror'
+    :param view: string containing 'dir', 'lm', or 'rm'
     :return:
     """
     if video_metadata['boxnum'] == 99:
@@ -1600,7 +1600,7 @@ def find_calibration_video(video_metadata, calibration_parent, vidtype='.avi'):
     time_string = fname_time2string(video_metadata['time'])
     month_folder = os.path.join(calibration_parent, 'calibration_videos_{}'.format(time_string[0:6]))
 
-    test_name = 'GridCalibration_box{:02d}_{}{}'.format(video_metadata['boxnum'], time_string, vidtype)
+    test_name = 'GridCalibration_b{:02d}_{}{}'.format(video_metadata['boxnum'], time_string, vidtype)
     test_name = os.path.join(month_folder, test_name)
 
     if os.path.exists(test_name):
@@ -1660,7 +1660,7 @@ def create_trajectory_filename(video_metadata):
 #     month_folder = os.path.join(year_folder, date_string[0:6] + '_calibration')
 #     calibration_video_folder = os.path.join(month_folder, 'camera_calibration_videos_' + date_string[0:6])
 #
-#     test_name = 'CameraCalibration_box{:02d}_{}_*.mat'.format(video_metadata['boxnum'], date_string)
+#     test_name = 'CameraCalibration_b{:02d}_{}_*.mat'.format(video_metadata['boxnum'], date_string)
 #     test_name = os.path.join(calibration_video_folder, test_name)
 #
 #     calibration_video_list = glob.glob(test_name)
@@ -1688,7 +1688,7 @@ def create_trajectory_filename(video_metadata):
 def parse_camera_calibration_video_name(calibration_video_name):
     """
 
-    :param calibration_video_name: form of GridCalibration_boxXX_YYYYMMDD_HH-mm-ss.avi
+    :param calibration_video_name: form of GridCalibration_bXX_YYYYMMDD_HH-mm-ss.avi
     :return:
     """
     camera_calibration_metadata = {
@@ -1703,7 +1703,7 @@ def parse_camera_calibration_video_name(calibration_video_name):
 
     cal_vid_name_parts = cal_vid_name.split('_')
 
-    camera_calibration_metadata['boxnum'] = int(cal_vid_name_parts[1][3:])
+    camera_calibration_metadata['boxnum'] = int(cal_vid_name_parts[1][-1:])
 
     datetime_str = cal_vid_name_parts[2] + '_' + cal_vid_name_parts[3]
     camera_calibration_metadata['time'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')
@@ -1766,9 +1766,9 @@ def find_marked_vids_for_3d_reconstruction(marked_vids_parent, dlc_mat_output_pa
             rat_num = int(ratID[1:])
             paw_pref = rat_df[rat_df['ratID'] == rat_num]['pawPref'].values[0]
             if paw_pref == 'right':
-                mirrorview = 'leftmirror'
+                mirrorview = 'lm'
             else:
-                mirrorview = 'rightmirror'
+                mirrorview = 'rm'
             # find the paw preference for this rat
 
             session_folders = glob.glob(os.path.join(rat_folder, ratID + '_*'))
@@ -1800,7 +1800,7 @@ def find_marked_vids_for_3d_reconstruction(marked_vids_parent, dlc_mat_output_pa
                             #                                                   pickle_metadata['crop_window'][3]
                             #                                                   )
                             meta_direct_file = os.path.join(direct_marked_folder, pickle_name.replace('full', 'meta'))
-                            vid_prefix = pickle_name[:pickle_name.find('direct')]
+                            vid_prefix = pickle_name[:pickle_name.find('dir')]
                             test_mirror_name = vid_prefix + '*_full.pickle'
                             full_mirror_name_list = glob.glob(os.path.join(mirror_marked_folder, test_mirror_name))
                             if len(full_mirror_name_list) == 1:
@@ -2281,7 +2281,7 @@ def find_folders_to_reconstruct(cropped_videos_parent, cam_names):
             _, session_folder_name = os.path.split(session_folder)
 
             # check for a direct view folder; if doesn't exist, just continue the loop
-            test_direct_folder = os.path.join(session_folder, session_folder_name + '_direct')
+            test_direct_folder = os.path.join(session_folder, session_folder_name + '_dir')
             if not os.path.exists(test_direct_folder):
                 continue
             # check to see if there are .h5 files containing labeled data
@@ -2408,7 +2408,7 @@ def get_Burgess_video_folders_to_crop(video_root_folder):
 def create_Burgess_cropped_video_destination_list(cropped_vids_parent, video_folder_list, cam_list):
     """
     create subdirectory trees in which to store the cropped videos. Directory structure is ratID-->sessionID-->
-        [sessionID_direct/leftmirror/rightmirror]
+        [sessionID_direct/lm/rm]
     :param cropped_vids_parent: parent directory in which to create directory tree
     :param video_folder_list: list of lowest level directories containing the original videos
     :param cam_list: list/tuple of camera numbers as integers
@@ -2560,7 +2560,7 @@ def parse_cropped_calibration_video_name(cropped_calibration_vid_name):
 
     cal_vid_name_parts = cropped_cal_vid_name.split('_')
 
-    cropped_cal_vid_metadata['boxnum'] = int(cal_vid_name_parts[1][3:])
+    cropped_cal_vid_metadata['boxnum'] = int(cal_vid_name_parts[1][-1:])
 
     datetime_str = cal_vid_name_parts[2] + '_' + cal_vid_name_parts[3]
     cropped_cal_vid_metadata['time'] = datetime.strptime(datetime_str, '%Y%m%d_%H-%M-%S')

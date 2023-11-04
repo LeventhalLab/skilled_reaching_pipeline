@@ -2385,9 +2385,9 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
             if isinstance(board, Checkerboard):
                 # make sure the top left corner is always labeled first in the direct view and the labels go left->right across rows
                 # make sure the top right corner is labeled first in the mirror views and labels go right->left across rows
-                if 'direct' in cropped_vid:
+                if 'dir' in cropped_vid:
                     fliplr = False
-                elif 'mirror' in cropped_vid:
+                elif 'mirr' in cropped_vid:
                     fliplr = True
                 corners_ud = reorder_checkerboard_points(corners_ud, board.get_size(), fliplr)
                 filled_ud = reorder_checkerboard_points(filled_ud, board.get_size(), fliplr)

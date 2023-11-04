@@ -1549,10 +1549,10 @@ def collect_matched_mirror_points(merged, board):
     # first dictionary in this list is for the left mirror, second dictionary is for the right mirror
     matched_points_metadata = [{'framenumbers': [],'ptids': []}, {'framenumbers': [],'ptids': []}]
     if type(board) is Checkerboard:
-        pts_per_frame = np.shape(merged[0]['direct']['corners'])[0]
+        pts_per_frame = np.shape(merged[0]['dir']['corners'])[0]
         # count up all merged rows that contain leftmirror points
-        leftmirror_rows = [mr for mr in merged if 'leftmirror' in mr.keys() and 'direct' in mr.keys()]
-        rightmirror_rows = [mr for mr in merged if 'rightmirror' in mr.keys() and 'direct' in mr.keys()]
+        leftmirror_rows = [mr for mr in merged if 'lm' in mr.keys() and 'dir' in mr.keys()]
+        rightmirror_rows = [mr for mr in merged if 'rm' in mr.keys() and 'dir' in mr.keys()]
 
         num_leftmirror_rows = len(leftmirror_rows)
         num_leftmirror_pts = num_leftmirror_rows * pts_per_frame
@@ -1572,40 +1572,40 @@ def collect_matched_mirror_points(merged, board):
         current_lm_row = 0
         current_rm_row = 0
         for merged_row in leftmirror_rows:
-            imgp_direct = merged_row['direct']['corners']
-            imgp_mirror = merged_row['leftmirror']['corners']
+            imgp_direct = merged_row['dir']['corners']
+            imgp_mirror = merged_row['lm']['corners']
             leftmirror_imgp[current_lm_row:current_lm_row+pts_per_frame, :, :] = imgp_mirror
             directleft_imgp[current_lm_row:current_lm_row+pts_per_frame, :, :] = imgp_direct
 
             left_objp[current_lm_row:current_lm_row+pts_per_frame, :] = board.get_object_points()
 
-            matched_points_metadata[0]['framenumbers'].append(merged_row['direct']['framenum'])
-            matched_points_metadata[0]['ptids'].append(merged_row['direct']['ids'])
+            matched_points_metadata[0]['framenumbers'].append(merged_row['dir']['framenum'])
+            matched_points_metadata[0]['ptids'].append(merged_row['dir']['ids'])
 
             current_lm_row += pts_per_frame
 
         for merged_row in rightmirror_rows:
-            imgp_direct = merged_row['direct']['corners']
-            imgp_mirror = merged_row['rightmirror']['corners']
+            imgp_direct = merged_row['dir']['corners']
+            imgp_mirror = merged_row['rm']['corners']
             rightmirror_imgp[current_rm_row:current_rm_row + pts_per_frame, :, :] = imgp_mirror
             directright_imgp[current_rm_row:current_rm_row + pts_per_frame, :, :] = imgp_direct
 
             right_objp[current_rm_row:current_rm_row + pts_per_frame, :] = board.get_object_points()
 
-            matched_points_metadata[1]['framenumbers'].append(merged_row['direct']['framenum'])
-            matched_points_metadata[1]['ptids'].append(merged_row['direct']['ids'])
+            matched_points_metadata[1]['framenumbers'].append(merged_row['dir']['framenum'])
+            matched_points_metadata[1]['ptids'].append(merged_row['dir']['ids'])
 
             current_rm_row += pts_per_frame
 
     elif type(board) is CharucoBoard:
-        leftmirror_rows = [mr for mr in merged if 'leftmirror' in mr.keys() and 'direct' in mr.keys()]
-        rightmirror_rows = [mr for mr in merged if 'rightmirror' in mr.keys() and 'direct' in mr.keys()]
+        leftmirror_rows = [mr for mr in merged if 'lm' in mr.keys() and 'dir' in mr.keys()]
+        rightmirror_rows = [mr for mr in merged if 'rm' in mr.keys() and 'dir' in mr.keys()]
 
         objp = board.get_object_points()
 
         num_left_rows_in_imgp = 0
         for merged_row in leftmirror_rows:
-            sorted_direct_imgp, sorted_mirror_imgp, sorted_objp, sorted_corner_idx = match_points_in_charuco_row(merged_row, objp, 'leftmirror')
+            sorted_direct_imgp, sorted_mirror_imgp, sorted_objp, sorted_corner_idx = match_points_in_charuco_row(merged_row, objp, 'lm')
 
             if sorted_direct_imgp.any():
                 # if matched points were found for this row
@@ -1618,7 +1618,7 @@ def collect_matched_mirror_points(merged, board):
                     directleft_imgp = np.vstack((directleft_imgp, sorted_direct_imgp))
                     left_objp = np.vstack((left_objp, sorted_objp))
 
-                matched_points_metadata[0]['framenumbers'].append(merged_row['direct']['framenum'])
+                matched_points_metadata[0]['framenumbers'].append(merged_row['dir']['framenum'])
                 matched_points_metadata[0]['ptids'].append(sorted_corner_idx)
                 # matched_points_metadata[0]['ptids'].append(merged_row['direct']['ids'])
 
@@ -1627,7 +1627,7 @@ def collect_matched_mirror_points(merged, board):
         num_right_rows_in_imgp = 0
         for merged_row in rightmirror_rows:
             sorted_direct_imgp, sorted_mirror_imgp, sorted_objp, sorted_corner_idx = match_points_in_charuco_row(
-                merged_row, objp, 'rightmirror')
+                merged_row, objp, 'rm')
 
             if sorted_direct_imgp.any():
                 # if matched points were found for this row
@@ -1640,7 +1640,7 @@ def collect_matched_mirror_points(merged, board):
                     directright_imgp = np.vstack((directright_imgp, sorted_direct_imgp))
                     right_objp = np.vstack((right_objp, sorted_objp))
 
-                matched_points_metadata[1]['framenumbers'].append(merged_row['direct']['framenum'])
+                matched_points_metadata[1]['framenumbers'].append(merged_row['dir']['framenum'])
                 # matched_points_metadata[1]['ptids'].append(merged_row['direct']['ids'])
                 matched_points_metadata[1]['ptids'].append(sorted_corner_idx)
 
@@ -1658,21 +1658,20 @@ def collect_matched_mirror_points(merged, board):
             directright_imgp = None
             right_objp = None
 
-    try:
-        stereo_cal_points = {'leftmirror': leftmirror_imgp,
-                             'directleft': directleft_imgp,
-                             'left_objp': left_objp,
-                             'rightmirror': rightmirror_imgp,
-                             'directright': directright_imgp,
-                             'right_objp': right_objp}
-    except:
-        pass
+
+    stereo_cal_points = {'leftmirror': leftmirror_imgp,
+                         'directleft': directleft_imgp,
+                         'left_objp': left_objp,
+                         'rightmirror': rightmirror_imgp,
+                         'directright': directright_imgp,
+                         'right_objp': right_objp}
+
 
     return stereo_cal_points, matched_points_metadata
 
 
 def match_points_in_charuco_row(merged_row, objp, mirror_view):
-    imgp_direct = merged_row['direct']['corners']
+    imgp_direct = merged_row['dir']['corners']
     imgp_mirror = merged_row[mirror_view]['corners']
 
     # if there is only one identified point in one (or both) of the views, the array dimensions get messed up.
@@ -1680,10 +1679,10 @@ def match_points_in_charuco_row(merged_row, objp, mirror_view):
     imgp_direct = np.reshape(imgp_direct, (-1, 1, 2))
     imgp_mirror = np.reshape(imgp_mirror, (-1, 1, 2))
 
-    if np.shape(merged_row['direct']['ids'])[0] == 1:
-        direct_ids = merged_row['direct']['ids'][0]
+    if np.shape(merged_row['dir']['ids'])[0] == 1:
+        direct_ids = merged_row['dir']['ids'][0]
     else:
-        direct_ids = np.squeeze(merged_row['direct']['ids'])
+        direct_ids = np.squeeze(merged_row['dir']['ids'])
     mirror_ids = np.squeeze(merged_row[mirror_view]['ids'])
 
     # make sure points with the same id's are matched

@@ -207,7 +207,7 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
             scorer = dlabs.columns.levels[0][0]
             dlabs = dlabs.loc[:, scorer]
 
-        if 'mirror' in cam_name:
+        if 'm' in cam_name:
             # rename "near" and "far" bodyparts to "left" and "right" depending on the mirror
             dlabs = rename_mirror_columns(cam_name, dlabs)
 
@@ -235,12 +235,13 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
     scores = np.full((n_cams, n_frames, n_joints), np.zeros(1), 'float')
 
     for cam_ix, dlabs in enumerate(datas):
-        for joint_ix, joint_name in enumerate(joint_names):
-            try:
-                points[cam_ix, :, joint_ix] = np.array(dlabs.loc[:, (joint_name, ('x', 'y'))])[:n_frames]
-                scores[cam_ix, :, joint_ix] = np.array(dlabs.loc[:, (joint_name, ('likelihood'))])[:n_frames].ravel()
-            except KeyError:
-                pass
+        for individual in ind_names:
+            for joint_ix, joint_name in enumerate(joint_names):
+                try:
+                    points[cam_ix, :, joint_ix] = np.array(dlabs.loc[:, (individual, joint_name, ('x', 'y'))])[:n_frames]
+                    scores[cam_ix, :, joint_ix] = np.array(dlabs.loc[:, (individual, joint_name, ('likelihood'))])[:n_frames].ravel()
+                except KeyError:
+                    pass
 
     return {
         'cam_names': cam_names,
@@ -257,10 +258,10 @@ def rename_mirror_columns(cam_name, dlabs):
     joint_names = list(dlabs.columns.get_level_values(bp_index).unique())
     ind_names = list(dlabs.columns.get_level_values(ind_index).unique())
 
-    if cam_name == 'leftmirror':
+    if cam_name == 'lm':
         near_side = 'right'
         far_side = 'left'
-    elif cam_name == 'rightmirror':
+    elif cam_name == 'rm':
         near_side = 'left'
         far_side = 'right'
 

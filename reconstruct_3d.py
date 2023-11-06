@@ -179,8 +179,8 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
     d = crop_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
 
-    # h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_group[0])
-    # test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)
+    h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_group[0])
+    test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)
 
     score_threshold = 0.5
 
@@ -202,6 +202,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     p3ds = p3ds_flat.reshape(n_points, n_joints, 3)
     reprojerr = reprojerr_flat.reshape(n_points, n_joints)
 
+    # todo: write code to save a pickled file with the reconstruction so we can create an animation
     pass
 
 
@@ -254,14 +255,20 @@ def test_pose_data(h5_metadata, session_metadata, pose_data, cam_intrinsics, par
 
     img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
 
+    w = np.shape(img_ud)[1]
+    h = np.shape(img_ud)[0]
+
+
     fig = plt.figure()
     ax = fig.add_subplot()
     ax.imshow(img_ud)
-
+    pts_per_frame = np.shape(pose_data['points'])[2]
     for i_view in range(3):
-        ax.scatter(pose_data['points'][i_view, test_frame, :, 0], pose_data['points'][i_view, test_frame, :, 1])
+        for i_pt in range(pts_per_frame):
+            ax.text(pose_data['points'][i_view, test_frame, i_pt, 0], pose_data['points'][i_view, test_frame, i_pt, 1], '{:d}'.format(i_pt))
 
 
+    ax.scatter(w/2, h/2, s=10, marker='*', c='r')
     plt.show()
     pass
 

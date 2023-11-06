@@ -17,7 +17,7 @@ def overlay_pts_on_video(paw_trajectory, cal_data, bodyparts, orig_vid_name, cro
 
     pass
 
-def create_vids_plus_3danimation_figure(figsize=(18, 10), dpi=100.):
+def create_vids_plus_3danimation_figure(figsize=(18, 10), num_views=2, dpi=100.):
     '''
 
     :param figsize:
@@ -27,21 +27,22 @@ def create_vids_plus_3danimation_figure(figsize=(18, 10), dpi=100.):
     fig = plt.figure(figsize=figsize, dpi=dpi)
 
     axs = []
-    axs.append(fig.add_subplot(1, 3, 1))
-    axs.append(fig.add_subplot(1, 3, 2))
-    axs.append(fig.add_subplot(1, 3, 3, projection='3d'))
+    for i_ax in range(num_views):
+        axs.append(fig.add_subplot(1, num_views+1, i_ax))
 
-    for ax in axs[:2]:
+    axs.append(fig.add_subplot(1, num_views+1, num_views+1, projection='3d'))
+
+    for ax in axs[:num_views]:
         ax.xaxis.set_visible(False)
         ax.yaxis.set_visible(False)
 
-    axs[2].xaxis.set_ticks([])
-    axs[2].yaxis.set_ticks([])
-    axs[2].zaxis.set_ticks([])
+    axs[num_views].xaxis.set_ticks([])
+    axs[num_views].yaxis.set_ticks([])
+    axs[num_views].zaxis.set_ticks([])
 
-    axs[2].set_xlabel('x')
-    axs[2].set_ylabel('y')
-    axs[2].set_zlabel('z')
+    axs[num_views].set_xlabel('x')
+    axs[num_views].set_ylabel('y')
+    axs[num_views].set_zlabel('z')
 
     return fig, axs
 

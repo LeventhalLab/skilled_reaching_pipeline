@@ -177,6 +177,7 @@ def reconstruct_single_vid_anipose(h5_group, calibration_data):
         fname_dict[cam_name] = h5_group[i_cam]
 
     d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
+    d = crop_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
 
     score_threshold = 0.5
 
@@ -200,6 +201,28 @@ def reconstruct_single_vid_anipose(h5_group, calibration_data):
 
     pass
 
+
+def crop_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
+    '''
+
+    :param pose_data: dictionary containing: cam_names, points, scores, bodyparts
+        cam_names = name of each camera
+        points = num_cams x num_frames x num_joints x 2 array containing points as identified in the cropped views
+        scores = num_cams x num_frames x num_joints array containing the DLC score for each point
+        bodyparts = list of joints
+    :param h5_group:
+    :return:
+    '''
+
+    num_frames = np.shape(pose_data['points'])[1]
+    for i_file, h5_file in enumerate(h5_group):
+        h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)
+        dx = h5_metadata
+        dy = h5_metadata
+        for i_frame in range(num_frames):
+
+            # pose_data['points'][i_file, i_frame, :, 0] +=
+            pass
 def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent, view_list=('direct', 'leftmirror', 'rightmirror'), vidtype='.avi'):
 
     if vidtype[0] != '.':

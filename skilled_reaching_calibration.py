@@ -2523,7 +2523,7 @@ def get_rows_cropped_vids_anipose(cropped_vids, cam_intrinsics, board, parent_di
             corners_ud_y = orig_ud[:,1] - cropped_vid_metadata['crop_params'][2]
 
             fliplr = False
-            if 'mirror' in cropped_vid:
+            if 'mirr' in cropped_vid:
                 # need to flip the undistorted points left-right for proper camera group calibration
                 # w = width of the cropped image
                 w = cropped_vid_metadata['crop_params'][1] - cropped_vid_metadata['crop_params'][0] + 1

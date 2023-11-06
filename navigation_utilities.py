@@ -426,15 +426,22 @@ def find_orig_rat_video(video_metadata, video_root_folder, vidtype='.avi'):
 
     rat_folder = os.path.join(video_root_folder, video_metadata['ratID'])
     datestring = date_to_string_for_fname(video_metadata['triggertime'])
-    session_folder_test = os.path.join(rat_folder, video_metadata['ratID'] + '_' + datestring + '*')
-    session_folder_list = glob.glob(session_folder_test)
-    if len(session_folder_list) == 1:
-        session_folder = session_folder_list[0]
-    elif len(session_folder_list) > 1:
+    date_folder_test = os.path.join(rat_folder, video_metadata['ratID'] + '_' + datestring + '*')
+    date_folder_list = glob.glob(date_folder_test)
+    if len(date_folder_list) == 1:
+        date_folder = date_folder_list[0]
+    elif len(date_folder_list) > 1:
         print('more than one session folder for {} on {}', video_metadata['ratID'], datestring)
         return None
     else:
         print('no session folders for {} on {}', video_metadata['ratID'], datestring)
+        return None
+
+    _, date_foldername = os.path.split(date_folder)
+    session_folder = '_'.join((date_foldername, video_metadata['task'], 'ses{:02d}'.format(video_metadata['session_num'])))
+    session_folder = os.path.join(date_folder, session_folder)
+
+    if not os.path.exists(session_folder):
         return None
 
     if 'vid_num' in video_metadata.keys():
@@ -444,10 +451,14 @@ def find_orig_rat_video(video_metadata, video_root_folder, vidtype='.avi'):
 
     timestring = datetime_to_string_for_fname(video_metadata['triggertime'])
     vid_name = '_'.join((video_metadata['ratID'],
+                         'b{:02d}'.format(video_metadata['boxnum']),
                          timestring,
                          '{:03d}.avi'.format(vid_num)
                          ))
     orig_vid_name = os.path.join(session_folder, vid_name)
+
+    if not os.path.exists(orig_vid_name):
+        return None
 
     return orig_vid_name
 

@@ -162,13 +162,13 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, parent_direct
         if len(h5_file_group) != 3:
             continue
 
-        reconstruct_single_vid_anipose(h5_file_group, calibration_data)
+        reconstruct_single_vid_anipose(h5_file_group, session_metadata, calibration_data, parent_directories)
 
     # d = load_pose2d_fnames(fname_dict, cam_names=cgroup.get_names())
     pass
 
 
-def reconstruct_single_vid_anipose(h5_group, calibration_data):
+def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, parent_directories):
 
     cgroup = calibration_data['cgroup']
     cam_names = cgroup.get_names()
@@ -178,6 +178,9 @@ def reconstruct_single_vid_anipose(h5_group, calibration_data):
 
     d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
     d = crop_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
+
+    # h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_group[0])
+    # test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)
 
     score_threshold = 0.5
 
@@ -217,13 +220,53 @@ def crop_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
     num_frames = np.shape(pose_data['points'])[1]
     for i_file, h5_file in enumerate(h5_group):
         h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)
-        dx = h5_metadata
-        dy = h5_metadata
+        dx = h5_metadata['crop_window'][0]
+        dy = h5_metadata['crop_window'][2]
+        crop_w = h5_metadata['crop_window'][1] - h5_metadata['crop_window'][0] + 1
         for i_frame in range(num_frames):
+            # translate points from the cropped video to the full frame
+            if 'fliplr' in h5_file:
+                # video was flipped left-right
+                pose_data['points'][i_file, i_frame, :, 0] = crop_w - pose_data['points'][i_file, i_frame, :, 0]
+            pose_data['points'][i_file, i_frame, :, 0] += dx
+            pose_data['points'][i_file, i_frame, :, 1] += dy
 
-            # pose_data['points'][i_file, i_frame, :, 0] +=
-            pass
-def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent, view_list=('direct', 'leftmirror', 'rightmirror'), vidtype='.avi'):
+            # now undistort the full frame points
+            pts_ud_norm = cv2.undistortPoints(pose_data['points'][i_file, i_frame, :, :], cam_intrinsics['mtx'], cam_intrinsics['dist'])
+            pts_ud = cvb.unnormalize_points(pts_ud_norm, cam_intrinsics['mtx'])
+
+            pose_data['points'][i_file, i_frame, :, :] = pts_ud
+
+    return pose_data
+
+
+def test_pose_data(h5_metadata, session_metadata, pose_data, cam_intrinsics, parent_directories, test_frame=300):
+
+    orig_vid_metadata = h5_metadata
+    orig_vid_metadata['session_num'] = session_metadata['session_num']
+    orig_vid_metadata['task'] = session_metadata['task']
+    orig_vid = navigation_utilities.find_orig_rat_video(orig_vid_metadata, parent_directories['videos_root_folder'])
+
+    cap = cv2.VideoCapture(orig_vid)
+
+    cap.set(cv2.CAP_PROP_POS_FRAMES, test_frame)
+    ret, img = cap.read()
+
+    img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    ax.imshow(img_ud)
+
+    for i_view in range(3):
+        ax.scatter(pose_data['points'][i_view, test_frame, :, 0], pose_data['points'][i_view, test_frame, :, 1])
+
+
+    plt.show()
+    pass
+
+
+def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent, view_list=('dir', 'lm', 'rm'), vidtype='.avi'):
 
     if vidtype[0] != '.':
         vidtype = '.' + vidtype
@@ -238,11 +281,11 @@ def reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_par
     paw_pref = rat_df[rat_df['ratID'] == rat_num]['pawPref'].values[0]
 
     if paw_pref == 'left':
-        mirror_view = 'rightmirror'
-        mirror_view_dir = [view_dir for view_dir in view_dirs if 'right' in view_dir][0]
+        mirror_view = 'rm'
+        mirror_view_dir = [view_dir for view_dir in view_dirs if 'rm' in view_dir][0]
     elif paw_pref == 'right':
-        mirror_view = 'leftmirror'
-        mirror_view_dir = [view_dir for view_dir in view_dirs if 'left' in view_dir][0]
+        mirror_view = 'lm'
+        mirror_view_dir = [view_dir for view_dir in view_dirs if 'lm' in view_dir][0]
     else:
         print('no paw preference found for rat {}'.format(ratID))
         return

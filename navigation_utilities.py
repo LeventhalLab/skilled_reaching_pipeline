@@ -544,7 +544,7 @@ def test_dlc_h5_name_from_h5_metadata(h5_metadata, cam_name, filtered=True):
     # crop_string = '-'.join([str(cb) for cb in h5_metadata['crop_window']])
     if filtered:
         test_name = '_'.join((h5_metadata['ratID'],
-                              'box{:02d}'.format(h5_metadata['boxnum']),
+                              'b{:02d}'.format(h5_metadata['boxnum']),
                               datetime_to_string_for_fname(h5_metadata['triggertime']),
                               '{:03d}'.format(h5_metadata['video_number']),
                               cam_name,
@@ -552,7 +552,7 @@ def test_dlc_h5_name_from_h5_metadata(h5_metadata, cam_name, filtered=True):
                               'el_filtered.h5'))
     else:
         test_name = '_'.join((h5_metadata['ratID'],
-                              'box{:02d}'.format(h5_metadata['boxnum']),
+                              'b{:02d}'.format(h5_metadata['boxnum']),
                               datetime_to_string_for_fname(h5_metadata['triggertime']),
                               '{:03d}'.format(h5_metadata['video_number']),
                               cam_name,
@@ -961,7 +961,7 @@ def parse_dlc_output_h5_name(dlc_output_h5_name):
     h5_metadata['rat_num'] = int(num_string)
 
     # if box number is stored in file name, then extract it
-    if 'box' in metadata_list[1]:
+    if 'b' in metadata_list[1]:
         h5_metadata['boxnum'] = int(metadata_list[1][-1:])
         next_metadata_idx = 2
     else:
@@ -2593,7 +2593,10 @@ def create_calibration_summary_name(full_calib_vid_name, calibration_files_paren
     '''
 
     # store the pickle file with the calibration parameters in the same folder as the calibration video
-    calib_vid_path, _ = os.path.split(full_calib_vid_name)
+    try:
+        calib_vid_path, _ = os.path.split(full_calib_vid_name)
+    except:
+        pass
     calib_metadata = parse_camera_calibration_video_name(full_calib_vid_name)
 
     calib_file_path = create_calibration_file_path(calibration_files_parent, calib_metadata)

@@ -143,7 +143,7 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts
 
     dlc_coords = r3d_data['dlc_output']['points']
     num_frames = np.shape(r3d_data['points3d'])[0]
-    cam_intrinsics = r3d_data['']
+    cam_intrinsics = r3d_data['calibration_data']['cam_intrinsics']
 
     cap = cv2.VideoCapture(orig_vid)
 

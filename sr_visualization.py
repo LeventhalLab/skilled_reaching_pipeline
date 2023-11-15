@@ -8,6 +8,9 @@ import reconstruct_3d_optitrack
 import computer_vision_basics as cvb
 import subprocess
 
+import skilled_reaching_io
+
+
 def plot_3d_skeleton(paw_trajectory, bodyparts, ax=None, trail_pts=3):
 
     pass
@@ -15,6 +18,86 @@ def plot_3d_skeleton(paw_trajectory, bodyparts, ax=None, trail_pts=3):
 
 def overlay_pts_on_video(paw_trajectory, cal_data, bodyparts, orig_vid_name, crop_region, frame_num, ax=None, trail_pts=3):
 
+    pass
+
+def plot_anipose_results(traj3d_fname, parent_directories, test_frame=297, bpts2plot=['rightpawdorsum', 'rightmcp1', 'rightmcp2', 'rightmcp3','rightmcp4', 'rightpip1', 'rightpip2', 'rightpip3','rightpip4', 'rightdig1','rightdig2','rightdig3','rightdig4']):
+    bpts2plot = ['rightdig2']
+    r3d_data = skilled_reaching_io.read_pickle(traj3d_fname)
+
+    fig_2dproj = plt.figure(figsize=(9.4, 12))
+    axs_2dproj = [fig_2dproj.add_subplot(411)]
+    axs_2dproj.append(fig_2dproj.add_subplot(412))
+    axs_2dproj.append(fig_2dproj.add_subplot(413))
+    axs_2dproj.append(fig_2dproj.add_subplot(414))
+
+    # fig_2dtrack = plt.figure(figsize=(9.4,12))
+    # axs_2dtrack = [fig_2dtrack.add_subplot(321)]
+    # axs_2dtrack.append([fig_2dtrack.add_subplot(322)])
+    # axs_2dtrack.append([fig_2dtrack.add_subplot(323)])
+    # axs_2dtrack.append([fig_2dtrack.add_subplot(324)])
+    # axs_2dtrack.append([fig_2dtrack.add_subplot(325)])
+    # axs_2dtrack.append([fig_2dtrack.add_subplot(326)])
+
+    # fig_3d = plt.figure(figsize=(6, 6))
+
+    bpt_idx = []
+    for bpt2plot in bpts2plot:
+        bpt_idx.append(r3d_data['dlc_output']['bodyparts'].index(bpt2plot))
+
+        for i_axis in range(3):
+            axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis])
+            axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis])
+            axs_2dproj[i_axis].set_xlim([200, 500])
+
+        for i_cam in range(3):
+            axs_2dproj[3].plot(np.squeeze(r3d_data['dlc_output']['scores'][i_cam, :, bpt_idx]))
+        axs_2dproj[3].set_xlim([200, 500])
+
+    axs_2dproj[0].set_title('x')
+    axs_2dproj[1].set_title('y')
+    axs_2dproj[2].set_title('z')
+
+    # for bpt2plot in bpts2plot:
+    #     bpt_idx.append(r3d_data['dlc_output']['bodyparts'].index(bpt2plot))
+    #
+    #     for i_axis in range(3):
+    #         axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis])
+    #         axs_2dproj[i_axis].set_xlim([200, 500])
+    #
+    # axs_2dproj[0].set_title('x')
+    # axs_2dproj[1].set_title('y')
+    # axs_2dproj[2].set_title('z')
+
+
+    # show individual bodypart data
+    traj_metadata = navigation_utilities.parse_trajectory_name(traj3d_fname)
+
+    orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
+
+    cap = cv2.VideoCapture(orig_vid)
+
+    cap.set(cv2.CAP_PROP_POS_FRAMES, test_frame)
+    ret, img = cap.read()
+
+    cam_intrinsics = r3d_data['calibration_data']['cam_intrinsics']
+    img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+
+    w = np.shape(img_ud)[1]
+    h = np.shape(img_ud)[0]
+
+
+    fig_img = plt.figure()
+    ax_img = fig_img.add_subplot()
+    ax_img.imshow(img_ud)
+
+    dlc_coords = r3d_data['dlc_output']['points']
+    for i_view in range(3):
+        for bpt2plot in bpts2plot:
+            cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
+
+            ax_img.scatter(dlc_coords[i_view, test_frame, cur_bpt_idx, 0], dlc_coords[i_view, test_frame, cur_bpt_idx, 1])
+
+    plt.show()
     pass
 
 def create_vids_plus_3danimation_figure(figsize=(18, 10), num_views=2, dpi=100.):

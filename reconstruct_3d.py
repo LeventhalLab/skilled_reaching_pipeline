@@ -164,11 +164,23 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, parent_direct
 
         reconstruct_single_vid_anipose(h5_file_group, session_metadata, calibration_data, parent_directories)
 
+        h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file_group[0])
+        trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
+                                                                       parent_directories)
+        sr_visualization.plot_anipose_results(trajectory_fname, parent_directories)
+        pass
+
     # d = load_pose2d_fnames(fname_dict, cam_names=cgroup.get_names())
     pass
 
 
 def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, parent_directories):
+    h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_group[0])
+    trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
+                                                                   parent_directories)
+
+    if os.path.exists(trajectory_fname):
+        return
 
     cgroup = calibration_data['cgroup']
     cam_names = cgroup.get_names()
@@ -179,8 +191,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
     d = crop_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
 
-    h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_group[0])
-    test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)
+    # test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)
 
     score_threshold = 0.5
 
@@ -203,7 +214,13 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     reprojerr = reprojerr_flat.reshape(n_points, n_joints)
 
     # todo: write code to save a pickled file with the reconstruction so we can create an animation
-    pass
+
+
+    r3d_data = {'points3d': p3ds,
+                'calibration_data': calibration_data,
+                'h5_group': h5_group,
+                'dlc_output': d}
+    skilled_reaching_io.write_pickle(trajectory_fname, r3d_data)
 
 
 def crop_points_2_full_frame(pose_data, h5_group, cam_intrinsics):

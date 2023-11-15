@@ -409,6 +409,46 @@ def create_cropped_video_destination_list(cropped_vids_parent, video_folder_list
     return cropped_video_directories
 
 
+def create_trajectory_name(h5_metadata, session_metadata, calibration_data, parent_directories):
+
+    # need to create session name here
+    session_name = '_'.join((h5_metadata['ratID'],
+                             date_to_string_for_fname(h5_metadata['triggertime']),
+                             session_metadata['task'],
+                             'ses{:02d}'.format(session_metadata['session_num'])))
+    traj_folder = os.path.join(parent_directories['trajectories_parent'], h5_metadata['ratID'], session_name)
+
+    if not os.path.exists(traj_folder):
+        os.makedirs(traj_folder)
+
+    traj_fname = '_'.join((h5_metadata['ratID'],
+                           'b{:02d}'.format(h5_metadata['boxnum']),
+                           datetime_to_string_for_fname(h5_metadata['triggertime']),
+                           '{:03d}_r3d.pickle'.format(h5_metadata['video_number'])))
+
+    traj_fname = os.path.join(traj_folder, traj_fname)
+
+    return traj_fname
+
+
+def parse_trajectory_name(full_traj_path):
+
+    _, traj_name = os.path.split(full_traj_path)
+    traj_name, _ = os.path.splitext(traj_name)
+
+    traj_metadata_list = traj_name.split('_')
+
+    trigtime_str = traj_metadata_list[2] + '_' + traj_metadata_list[3]
+
+    traj_metadata = {'ratID': traj_metadata_list[0],
+                     'boxnum': int(traj_metadata_list[1][1:]),
+                     'triggertime': datetime.strptime(trigtime_str, '%Y%m%d_%H-%M-%S'),
+                     'video_number': traj_metadata_list[4]
+                     }
+
+    return traj_metadata
+
+
 def trajectory_folder(trajectories_parent, ratID, session_name):
 
     session_folder = ratID + '_' + session_name

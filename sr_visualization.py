@@ -67,7 +67,7 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
         axs_scores[i_bpt].set_title(bpt2plot)
         if i_bpt < num_bpts:
             axs_scores[i_bpt].tick_params(labelbottom=False)
-    axs_scores[num_bpts].set_xlabel('frame number')
+    axs_scores[num_bpts-1].set_xlabel('frame number')
 
     axs_2dproj[0].set_title('x')
     axs_2dproj[1].set_title('y')

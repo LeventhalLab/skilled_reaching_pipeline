@@ -431,6 +431,41 @@ def create_trajectory_name(h5_metadata, session_metadata, calibration_data, pare
     return traj_fname
 
 
+def get_3dsummaries_folder(session_metadata, parent_directories):
+
+    rat_traj_summary_folder = os.path.join(parent_directories['trajectory_summaries'], session_metadata['ratID'])
+    if 'date' in session_metadata.keys():
+        session_name = '_'.join((session_metadata['ratID'],
+                                 date_to_string_for_fname(session_metadata['date']),
+                                 session_metadata['task'],
+                                 'ses{:02d}'.format(session_metadata['session_num'])))
+    elif 'session_date' in session_metadata.keys():
+        session_name = '_'.join((session_metadata['ratID'],
+                                 date_to_string_for_fname(session_metadata['session_date']),
+                                 session_metadata['task'],
+                                 'ses{:02d}'.format(session_metadata['session_num'])))
+
+    session_traj_summary_folder = os.path.join(rat_traj_summary_folder, session_name)
+
+    if not os.path.exists(session_traj_summary_folder):
+        os.makedirs(session_traj_summary_folder)
+
+    return session_traj_summary_folder
+
+
+def get_3dsummaries_basename(traj_metadata, session_metadata, parent_directories):
+    session_traj_summary_folder = get_3dsummaries_folder(session_metadata, parent_directories)
+
+    basename = '_'.join((session_metadata['ratID'],
+                         'b{:02d}'.format(traj_metadata['boxnum']),
+                         datetime_to_string_for_fname(traj_metadata['triggertime']),
+                         '{:03d}'.format(traj_metadata['video_number'])))
+
+    basename_3dsummary = os.path.join(session_traj_summary_folder, basename)
+
+    return basename_3dsummary
+
+
 def parse_trajectory_name(full_traj_path):
 
     _, traj_name = os.path.split(full_traj_path)

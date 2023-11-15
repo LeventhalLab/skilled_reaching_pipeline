@@ -22,6 +22,14 @@ def overlay_pts_on_video(paw_trajectory, cal_data, bodyparts, orig_vid_name, cro
 
 def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_directories, test_frame=297, pawparts2plot=['pawdorsum', 'dig1','dig2','dig3','dig4']):
 
+    traj_metadata = navigation_utilities.parse_trajectory_name(traj3d_fname)
+    traj_metadata['session_num'] = session_metadata['session_num']
+    traj_metadata['task'] = session_metadata['task']
+
+    summary_3dbasename = navigation_utilities.get_3dsummaries_basename(traj_metadata, session_metadata, parent_directories)
+    scores_fname = summary_3dbasename + '_scores.pdf'
+    pawtraces_fname = summary_3dbasename + '_pawtraces.pdf'
+
     _, traj_name = os.path.split(traj3d_fname)
     traj_name, _ = os.path.splitext(traj_name)
 
@@ -72,9 +80,13 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
     axs_2dproj[0].set_title('x')
     axs_2dproj[1].set_title('y')
     axs_2dproj[2].set_title('z')
+    axs_2dproj[2].set_xlabel('frame number')
 
     fig_2dproj.suptitle(traj_name, fontsize=16)
+    plt.savefig(pawtraces_fname, format='pdf')
+
     fig_scores.suptitle(traj_name, fontsize=16)
+    plt.savefig(scores_fname, format='pdf')
 
     # for bpt2plot in bpts2plot:
     #     bpt_idx.append(r3d_data['dlc_output']['bodyparts'].index(bpt2plot))
@@ -89,9 +101,7 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
 
 
     # show individual bodypart data
-    traj_metadata = navigation_utilities.parse_trajectory_name(traj3d_fname)
-    traj_metadata['session_num'] = session_metadata['session_num']
-    traj_metadata['task'] = session_metadata['task']
+
 
     orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
 

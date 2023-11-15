@@ -530,8 +530,9 @@ if __name__ == '__main__':
 
     # step 4: reconstruct the 3d trajectories
     for expt in experiment_list:
+        rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
         folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(parent_directories[expt]['cropped_videos_parent'], cam_names)
-        reconstruct_3d.reconstruct_folders_anipose(folders_to_reconstruct, parent_directories[expt], expt, filtered=False)
+        reconstruct_3d.reconstruct_folders_anipose(folders_to_reconstruct, parent_directories[expt], expt, rat_df, filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)
 

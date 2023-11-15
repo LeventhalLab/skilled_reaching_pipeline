@@ -20,15 +20,26 @@ def overlay_pts_on_video(paw_trajectory, cal_data, bodyparts, orig_vid_name, cro
 
     pass
 
-def plot_anipose_results(traj3d_fname, session_metadata, parent_directories, test_frame=297, bpts2plot=['rightpawdorsum', 'rightmcp1', 'rightmcp2', 'rightmcp3','rightmcp4', 'rightpip1', 'rightpip2', 'rightpip3','rightpip4', 'rightdig1','rightdig2','rightdig3','rightdig4']):
-    bpts2plot = ['rightdig2']
+def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_directories, test_frame=297, pawparts2plot=['pawdorsum', 'dig1','dig2','dig3','dig4']):
+
+    _, traj_name = os.path.split(traj3d_fname)
+    traj_name, _ = os.path.splitext(traj_name)
+
+    df_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
+    pawpref = df_row['pawpref'].values[0]
+    bpts2plot = [pawpref.lower() + pawpart for pawpart in pawparts2plot]#  'rightpawdorsum', 'rightdig1', 'rightdig2', 'rightdig3', 'rightdig4']
+    num_bpts = len(bpts2plot)
     r3d_data = skilled_reaching_io.read_pickle(traj3d_fname)
 
-    fig_2dproj = plt.figure(figsize=(9.4, 12))
-    axs_2dproj = [fig_2dproj.add_subplot(411)]
-    axs_2dproj.append(fig_2dproj.add_subplot(412))
-    axs_2dproj.append(fig_2dproj.add_subplot(413))
-    axs_2dproj.append(fig_2dproj.add_subplot(414))
+    fig_2dproj = plt.figure(figsize=(8.5, 11))
+    axs_2dproj = [fig_2dproj.add_subplot(311)]
+    axs_2dproj.append(fig_2dproj.add_subplot(312))
+    axs_2dproj.append(fig_2dproj.add_subplot(313))
+
+    fig_scores = plt.figure(figsize=(8.5, 11))
+    axs_scores = [fig_scores.add_subplot(num_bpts, 1, 1)]
+    for i_bpt in range(1, num_bpts):
+        axs_scores.append(fig_scores.add_subplot(num_bpts, 1, i_bpt + 1))
 
     # fig_2dtrack = plt.figure(figsize=(9.4,12))
     # axs_2dtrack = [fig_2dtrack.add_subplot(321)]
@@ -41,8 +52,9 @@ def plot_anipose_results(traj3d_fname, session_metadata, parent_directories, tes
     # fig_3d = plt.figure(figsize=(6, 6))
 
     bpt_idx = []
-    for bpt2plot in bpts2plot:
+    for i_bpt, bpt2plot in enumerate(bpts2plot):
         bpt_idx.append(r3d_data['dlc_output']['bodyparts'].index(bpt2plot))
+        cur_bpt_idx = bpt_idx[i_bpt]
 
         for i_axis in range(3):
             axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis])
@@ -50,12 +62,15 @@ def plot_anipose_results(traj3d_fname, session_metadata, parent_directories, tes
             axs_2dproj[i_axis].set_xlim([200, 500])
 
         for i_cam in range(3):
-            axs_2dproj[3].plot(np.squeeze(r3d_data['dlc_output']['scores'][i_cam, :, bpt_idx]))
-        axs_2dproj[3].set_xlim([200, 500])
+            axs_scores[i_bpt].plot(np.squeeze(r3d_data['dlc_output']['scores'][i_cam, :, cur_bpt_idx]))
+        axs_scores[i_bpt].set_xlim([200, 500])
 
     axs_2dproj[0].set_title('x')
     axs_2dproj[1].set_title('y')
     axs_2dproj[2].set_title('z')
+
+    fig_2dproj.suptitle(traj_name, fontsize=16)
+    fig_scores.suptitle(traj_name, fontsize=16)
 
     # for bpt2plot in bpts2plot:
     #     bpt_idx.append(r3d_data['dlc_output']['bodyparts'].index(bpt2plot))
@@ -82,6 +97,7 @@ def plot_anipose_results(traj3d_fname, session_metadata, parent_directories, tes
     ret, img = cap.read()
 
     cam_intrinsics = r3d_data['calibration_data']['cam_intrinsics']
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
     img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
 
     w = np.shape(img_ud)[1]
@@ -102,6 +118,10 @@ def plot_anipose_results(traj3d_fname, session_metadata, parent_directories, tes
     plt.show()
     pass
 
+
+def create_anipose_vids(traj3d_fname):
+
+    pass
 def create_vids_plus_3danimation_figure(figsize=(18, 10), num_views=2, dpi=100.):
     '''
 

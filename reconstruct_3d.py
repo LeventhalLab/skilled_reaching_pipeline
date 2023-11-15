@@ -12,6 +12,7 @@ import computer_vision_basics as cvb
 import shapely.geometry as sg
 import sr_visualization
 import dlc_utilities
+import copy
 from anipose_utils import load_pose2d_fnames
 
 def test_reconstruction(parent_directories, rat_df):
@@ -79,7 +80,7 @@ def reconstruct_folders(folders_to_reconstruct, parent_directories,  rat_df):
             reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
-def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  expt, filtered=True):
+def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt, rat_df, filtered=True):
 
     cropped_videos_parent = parent_directories['cropped_videos_parent']
     calibration_files_parent = parent_directories['calibration_files_parent']
@@ -118,7 +119,7 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  exp
             continue
 
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
-        reconstruct_folder_anipose(folder_to_reconstruct, calibration_data, parent_directories, filtered=filtered)
+        reconstruct_folder_anipose(folder_to_reconstruct, calibration_data, rat_df, parent_directories, filtered=filtered)
         cgroup = calibration_data['cgroup']
 
         calibration_folder = navigation_utilities.find_calibration_files_folder(session_date, box_num, calibration_files_parent)
@@ -130,7 +131,7 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories,  exp
             reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
-def reconstruct_folder_anipose(session_metadata, calibration_data, parent_directories, filtered=True):
+def reconstruct_folder_anipose(session_metadata, calibration_data, rat_df, parent_directories, filtered=True):
 
     cams = calibration_data['cgroup'].get_names()
 
@@ -167,7 +168,7 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, parent_direct
         h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file_group[0])
         trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
                                                                        parent_directories)
-        sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, parent_directories)
+        sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories)
         pass
 
     # d = load_pose2d_fnames(fname_dict, cam_names=cgroup.get_names())
@@ -196,7 +197,9 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     score_threshold = 0.5
 
     n_cams, n_points, n_joints, _ = d['points'].shape
-    points = d['points']
+
+    # need to copy so full dlc_output gets written to r3d_data
+    points = copy.deepcopy(d['points'])
     scores = d['scores']
 
     bodyparts = d['bodyparts']

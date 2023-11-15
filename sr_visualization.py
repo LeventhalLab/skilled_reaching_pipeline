@@ -64,6 +64,10 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
         for i_cam in range(3):
             axs_scores[i_bpt].plot(np.squeeze(r3d_data['dlc_output']['scores'][i_cam, :, cur_bpt_idx]))
         axs_scores[i_bpt].set_xlim([200, 500])
+        axs_scores[i_bpt].set_title(bpt2plot)
+        if i_bpt < num_bpts:
+            axs_scores[i_bpt].tick_params(labelbottom=False)
+    axs_scores[num_bpts].set_xlabel('frame number')
 
     axs_2dproj[0].set_title('x')
     axs_2dproj[1].set_title('y')

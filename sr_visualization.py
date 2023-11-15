@@ -20,7 +20,7 @@ def overlay_pts_on_video(paw_trajectory, cal_data, bodyparts, orig_vid_name, cro
 
     pass
 
-def plot_anipose_results(traj3d_fname, parent_directories, test_frame=297, bpts2plot=['rightpawdorsum', 'rightmcp1', 'rightmcp2', 'rightmcp3','rightmcp4', 'rightpip1', 'rightpip2', 'rightpip3','rightpip4', 'rightdig1','rightdig2','rightdig3','rightdig4']):
+def plot_anipose_results(traj3d_fname, session_metadata, parent_directories, test_frame=297, bpts2plot=['rightpawdorsum', 'rightmcp1', 'rightmcp2', 'rightmcp3','rightmcp4', 'rightpip1', 'rightpip2', 'rightpip3','rightpip4', 'rightdig1','rightdig2','rightdig3','rightdig4']):
     bpts2plot = ['rightdig2']
     r3d_data = skilled_reaching_io.read_pickle(traj3d_fname)
 
@@ -71,6 +71,8 @@ def plot_anipose_results(traj3d_fname, parent_directories, test_frame=297, bpts2
 
     # show individual bodypart data
     traj_metadata = navigation_utilities.parse_trajectory_name(traj3d_fname)
+    traj_metadata['session_num'] = session_metadata['session_num']
+    traj_metadata['task'] = session_metadata['task']
 
     orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
 

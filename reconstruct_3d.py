@@ -167,7 +167,7 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, parent_direct
         h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file_group[0])
         trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
                                                                        parent_directories)
-        sr_visualization.plot_anipose_results(trajectory_fname, parent_directories)
+        sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, parent_directories)
         pass
 
     # d = load_pose2d_fnames(fname_dict, cam_names=cgroup.get_names())

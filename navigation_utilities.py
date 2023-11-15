@@ -443,7 +443,7 @@ def parse_trajectory_name(full_traj_path):
     traj_metadata = {'ratID': traj_metadata_list[0],
                      'boxnum': int(traj_metadata_list[1][1:]),
                      'triggertime': datetime.strptime(trigtime_str, '%Y%m%d_%H-%M-%S'),
-                     'video_number': traj_metadata_list[4]
+                     'video_number': int(traj_metadata_list[4])
                      }
 
     return traj_metadata

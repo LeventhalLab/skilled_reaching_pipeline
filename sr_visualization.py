@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import cv2
 import numpy as np
 import os
@@ -20,7 +21,9 @@ def overlay_pts_on_video(paw_trajectory, cal_data, bodyparts, orig_vid_name, cro
 
     pass
 
-def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_directories, test_frame=297, pawparts2plot=['pawdorsum', 'dig1','dig2','dig3','dig4']):
+def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_directories, test_frame=297, pawparts2plot=['pawdorsum', 'palm', 'dig1','dig2','dig3','dig4']):
+    prop_cycle = plt.rcParams['axes.prop_cycle']
+    color_cycle = prop_cycle.by_key()['color']
 
     traj_metadata = navigation_utilities.parse_trajectory_name(traj3d_fname)
     traj_metadata['session_num'] = session_metadata['session_num']
@@ -29,6 +32,7 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
     summary_3dbasename = navigation_utilities.get_3dsummaries_basename(traj_metadata, session_metadata, parent_directories)
     scores_fname = summary_3dbasename + '_scores.pdf'
     pawtraces_fname = summary_3dbasename + '_pawtraces.pdf'
+    imgsamp_fname = summary_3dbasename + '_imgsamp.tiff'
 
     _, traj_name = os.path.split(traj3d_fname)
     traj_name, _ = os.path.splitext(traj_name)
@@ -83,25 +87,12 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
     axs_2dproj[2].set_xlabel('frame number')
 
     fig_2dproj.suptitle(traj_name, fontsize=16)
-    plt.savefig(pawtraces_fname, format='pdf')
-
     fig_scores.suptitle(traj_name, fontsize=16)
+
+    plt.figure(fig_2dproj)
+    plt.savefig(pawtraces_fname, format='pdf')
+    plt.figure(fig_scores)
     plt.savefig(scores_fname, format='pdf')
-
-    # for bpt2plot in bpts2plot:
-    #     bpt_idx.append(r3d_data['dlc_output']['bodyparts'].index(bpt2plot))
-    #
-    #     for i_axis in range(3):
-    #         axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis])
-    #         axs_2dproj[i_axis].set_xlim([200, 500])
-    #
-    # axs_2dproj[0].set_title('x')
-    # axs_2dproj[1].set_title('y')
-    # axs_2dproj[2].set_title('z')
-
-
-    # show individual bodypart data
-
 
     orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
 
@@ -110,13 +101,11 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
     cap.set(cv2.CAP_PROP_POS_FRAMES, test_frame)
     ret, img = cap.read()
 
+    cap.release()
+
     cam_intrinsics = r3d_data['calibration_data']['cam_intrinsics']
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
     img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
-
-    w = np.shape(img_ud)[1]
-    h = np.shape(img_ud)[0]
-
 
     fig_img = plt.figure()
     ax_img = fig_img.add_subplot()
@@ -124,18 +113,77 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
 
     dlc_coords = r3d_data['dlc_output']['points']
     for i_view in range(3):
-        for bpt2plot in bpts2plot:
+        for i_bpt, bpt2plot in enumerate(bpts2plot):
             cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
 
-            ax_img.scatter(dlc_coords[i_view, test_frame, cur_bpt_idx, 0], dlc_coords[i_view, test_frame, cur_bpt_idx, 1])
+            ax_img.scatter(dlc_coords[i_view, test_frame, cur_bpt_idx, 0], dlc_coords[i_view, test_frame, cur_bpt_idx, 1], s=2, color=color_cycle[i_bpt])
 
-    plt.show()
+    plt.savefig(imgsamp_fname, format='tiff', dpi=600)
+
+    plt.close('all')
+
+    create_anipose_vids(traj3d_fname, session_metadata, parent_directories)
+
+
+
+def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts2plot='all'):
+    cmap = cm.get_cmap('rainbow')
+
+    r3d_data = skilled_reaching_io.read_pickle(traj3d_fname)
+
+    if bpts2plot == 'all':
+        bpts2plot = r3d_data['dlc_output']['bodyparts']
+    num_bpts = len(bpts2plot)
+
+    traj_metadata = navigation_utilities.parse_trajectory_name(traj3d_fname)
+    traj_metadata['session_num'] = session_metadata['session_num']
+    traj_metadata['task'] = session_metadata['task']
+
+    orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
+
+    dlc_coords = r3d_data['dlc_output']['points']
+    num_frames = np.shape(r3d_data['points3d'])[0]
+    cam_intrinsics = r3d_data['']
+
+    cap = cv2.VideoCapture(orig_vid)
+
+    for i_frame in range(num_frames):
+
+        frame_fig = plt.figure(figsize=(16, 10))
+
+        vid_ax = frame_fig.add_subplot(1, 2, 1)
+        ax3d = frame_fig.add_subplot(1, 2, 2, projection='3d')
+
+        cap.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
+        ret, img = cap.read()
+
+        img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+
+        vid_ax.imshow(img_ud)
+        for i_view in range(3):
+            for i_bpt, bpt2plot in enumerate(bpts2plot):
+                cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
+
+                col = cmap(i_bpt / num_bpts)
+
+                p3d = r3d_data['points3d'][i_frame, cur_bpt_idx, :]
+                reproj = r3d_data['calibration_data']['cgroup'].cameras[i_view].project(p3d).reshape([1, 2])
+                vid_ax.scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0],
+                               dlc_coords[i_view, i_frame, cur_bpt_idx, 1], s=2, color=col)
+                vid_ax.scatter(reproj[0], reproj[1], s=2, color=col, marker='+')
+
+                plt.show()
+                pass
+
+
+
+    cap.release()
+
+
+
     pass
 
 
-def create_anipose_vids(traj3d_fname):
-
-    pass
 def create_vids_plus_3danimation_figure(figsize=(18, 10), num_views=2, dpi=100.):
     '''
 

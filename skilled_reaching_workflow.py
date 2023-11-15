@@ -92,7 +92,7 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
                                           videotype=cropped_vid_type,
                                           gputouse=gputouse,
                                           save_as_csv=save_as_csv)
-                # todo: might want to add additional options to these commands
+                # might want to add additional options to these commands
                 deeplabcut.convert_detections2tracklets(config_path, vids_to_analyze, videotype=cropped_vid_type)
                 deeplabcut.filterpredictions(config_path, vids_to_analyze, videotype=cropped_vid_type)
             else:

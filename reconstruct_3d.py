@@ -175,7 +175,7 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, rat_df, paren
     pass
 
 
-def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, parent_directories):
+def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, parent_directories, score_thresh=0.9):
     h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_group[0])
     trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
                                                                    parent_directories)
@@ -194,8 +194,6 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
 
     # test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)
 
-    score_threshold = 0.5
-
     n_cams, n_points, n_joints, _ = d['points'].shape
 
     # need to copy so full dlc_output gets written to r3d_data
@@ -205,7 +203,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     bodyparts = d['bodyparts']
 
     # remove points that are below threshold
-    points[scores < score_threshold] = np.nan
+    points[scores < score_thresh] = np.nan
 
     points_flat = points.reshape(n_cams, -1, 2)
     scores_flat = scores.reshape(n_cams, -1)

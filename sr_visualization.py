@@ -167,13 +167,13 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts
                 col = cmap(i_bpt / num_bpts)
 
                 p3d = r3d_data['points3d'][i_frame, cur_bpt_idx, :]
-                reproj = r3d_data['calibration_data']['cgroup'].cameras[i_view].project(p3d).reshape([1, 2])
+                reproj = np.squeeze(r3d_data['calibration_data']['cgroup'].cameras[i_view].project(p3d).reshape([1, 2]))
                 vid_ax.scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0],
                                dlc_coords[i_view, i_frame, cur_bpt_idx, 1], s=2, color=col)
                 vid_ax.scatter(reproj[0], reproj[1], s=2, color=col, marker='+')
 
-                plt.show()
-                pass
+        plt.show()
+        pass
 
 
 

@@ -127,7 +127,11 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
 
 
 def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts2plot='all'):
+
+    markersize = 4
     cmap = cm.get_cmap('rainbow')
+
+    bpts2connect = rat_sr_bodyparts2connect()
 
     r3d_data = skilled_reaching_io.read_pickle(traj3d_fname)
 
@@ -139,49 +143,113 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts
     traj_metadata['session_num'] = session_metadata['session_num']
     traj_metadata['task'] = session_metadata['task']
 
+    animation_name = navigation_utilities.create_3dvid_name(traj_metadata, session_metadata, parent_directories)
+
     orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
 
     dlc_coords = r3d_data['dlc_output']['points']
     num_frames = np.shape(r3d_data['points3d'])[0]
     cam_intrinsics = r3d_data['calibration_data']['cam_intrinsics']
-
+    scores = r3d_data['dlc_output']['scores']
+    min_valid_score = r3d_data['min_valid_score']
     cap = cv2.VideoCapture(orig_vid)
+
+    session_folder, _ = os.path.split(traj3d_fname)
+    jpg_folder = os.path.join(session_folder, 'temp')
+    if not os.path.exists(jpg_folder):
+        os.makedirs(jpg_folder)
 
     for i_frame in range(num_frames):
 
-        frame_fig = plt.figure(figsize=(16, 10))
+        frame_fig = plt.figure(figsize=(20, 10))
+        gs = frame_fig.add_gridspec(2, 2, width_ratios=(4, 1), height_ratios=(3, 4), wspace=0.05, hspace=0.02)
 
-        vid_ax = frame_fig.add_subplot(1, 2, 1)
-        ax3d = frame_fig.add_subplot(1, 2, 2, projection='3d')
+        vid_ax = frame_fig.add_subplot(gs[:, 0])
+        ax3d = frame_fig.add_subplot(gs[0, 1], projection='3d')
+        legend_ax = frame_fig.add_subplot(gs[1, 1])
 
         cap.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
         ret, img = cap.read()
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
 
         img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+
+        for i_bpt, bpt2plot in enumerate(bpts2plot):
+            legend_ax.text(0, i_bpt/num_bpts, bpt2plot, color=cmap(i_bpt / num_bpts), transform=legend_ax.transAxes)
+        legend_ax.set_xticks([])
+        legend_ax.set_yticks([])
 
         vid_ax.imshow(img_ud)
         for i_view in range(3):
             for i_bpt, bpt2plot in enumerate(bpts2plot):
                 cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
 
-                col = cmap(i_bpt / num_bpts)
+                col = cmap(cur_bpt_idx / num_bpts)
 
                 p3d = r3d_data['points3d'][i_frame, cur_bpt_idx, :]
                 reproj = np.squeeze(r3d_data['calibration_data']['cgroup'].cameras[i_view].project(p3d).reshape([1, 2]))
-                vid_ax.scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0],
-                               dlc_coords[i_view, i_frame, cur_bpt_idx, 1], s=2, color=col)
-                vid_ax.scatter(reproj[0], reproj[1], s=2, color=col, marker='+')
+                if scores[i_view, i_frame, i_bpt] > min_valid_score:
+                    vid_ax.scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0],
+                                   dlc_coords[i_view, i_frame, cur_bpt_idx, 1], s=markersize, color=col)
+                    vid_ax.scatter(reproj[0], reproj[1], s=markersize, color=col, marker='+')
 
-        plt.show()
-        pass
+                else:
+                    vid_ax.scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0],
+                                   dlc_coords[i_view, i_frame, cur_bpt_idx, 1], s=markersize, color=col, marker='*')
 
+        for bpt2plot in bpts2plot:
+            cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
+            ax3d.scatter(r3d_data['points3d'][i_frame, cur_bpt_idx, 0],
+                         r3d_data['points3d'][i_frame, cur_bpt_idx, 2],
+                         r3d_data['points3d'][i_frame, cur_bpt_idx, 1],
+                         s=markersize,
+                         color=cmap(cur_bpt_idx / num_bpts))
 
+        connect_3d_bpts(r3d_data['points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2connect, ax3d)
+
+        ax3d.set_xlim((-50, 25))
+        ax3d.set_ylim((200, 350))  # this is actually z
+        ax3d.set_zlim((20, 120))  # this is actually y
+
+        ax3d.set_xlabel('x')
+        ax3d.set_ylabel('z')
+        ax3d.set_zlabel('y')
+        ax3d.invert_zaxis()
+
+        vid_ax.set_xticks([])
+        vid_ax.set_yticks([])
+
+        jpg_name = os.path.join(jpg_folder, 'frame{:04d}.jpg'.format(i_frame))
+        plt.savefig(jpg_name, format='jpeg')
+        plt.close('all')
 
     cap.release()
 
 
+    # turn the cropped jpegs into a new movie
+    jpg_names = os.path.join(jpg_folder, 'frame%04d.jpg')
+    command = (
+        f"ffmpeg -i {jpg_names} "
+        f"-c:v copy {animation_name}"
+    )
+    subprocess.call(command, shell=True)
 
-    pass
+    shutil.rmtree(jpg_folder)
+
+
+def connect_3d_bpts(points3d, bodyparts, bpts2connect, ax):
+
+    for bpts_pair in bpts2connect:
+        endpt_x = []
+        endpt_y = []
+        endpt_z = []
+        for bpt in bpts_pair:
+            bpt_idx = bodyparts.index(bpt)
+            endpt_x.append(points3d[bpt_idx, 0])
+            endpt_y.append(points3d[bpt_idx, 2])    # plotting y-coord on the z-axis
+            endpt_z.append(points3d[bpt_idx, 1])    # plotting z-coord on the y-axis
+
+        ax.plot(endpt_x, endpt_y, endpt_z, color='gray')
 
 
 def create_vids_plus_3danimation_figure(figsize=(18, 10), num_views=2, dpi=100.):
@@ -833,6 +901,11 @@ def rat_sr_bodyparts2connect():
     bpts2connect.append(['rightpip2', 'rightdig2'])
     bpts2connect.append(['rightpip3', 'rightdig3'])
     bpts2connect.append(['rightpip4', 'rightdig4'])
+
+    bpts2connect.append(['leftear', 'lefteye'])
+    bpts2connect.append(['rightear', 'righteye'])
+    bpts2connect.append(['nose', 'righteye'])
+    bpts2connect.append(['nose', 'lefteye'])
 
     return bpts2connect
 

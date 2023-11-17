@@ -642,7 +642,7 @@ def parse_croppedvid_dir_name(session_dir):
     session_date = fname_string_to_date(dir_name_parts[1])
 
     session_metadata = {'ratID': ratID,
-                        'session_date': session_date,
+                        'date': session_date,
                         'task': dir_name_parts[2],
                         'session_num': int(dir_name_parts[3][-2:])}
 
@@ -651,10 +651,15 @@ def parse_croppedvid_dir_name(session_dir):
 
 def test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=True):
 
+    if 'date' in session_metadata.keys():
+        session_date = session_metadata['date']
+    elif 'session_date' in session_metadata.keys():
+        session_date = session_metadata['session_date']
+
     if filtered:
         test_name = '_'.join((session_metadata['ratID'],
                               'b*',
-                              date_to_string_for_fname(session_metadata['session_date']),
+                              date_to_string_for_fname(session_date),
                               '*',
                               cam_name,
                               '*',
@@ -662,7 +667,7 @@ def test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=
     else:
         test_name = '_'.join((session_metadata['ratID'],
                               'b*',
-                              date_to_string_for_fname(session_metadata['session_date']),
+                              date_to_string_for_fname(session_date),
                               '*',
                               cam_name,
                               '*',
@@ -2001,7 +2006,11 @@ def find_session_folder(parent_directories, session_metadata):
     rat_folder = os.path.join(parent_directories['videos_root_folder'], ratID)
 
     formatstring = date_formatstring()
-    date_string = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
+    if 'date' in session_metadata.keys():
+        date_string = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
+    elif 'session_date' in session_metadata.keys():
+        date_string = fname_datestring_from_datetime(session_metadata['session_date'], formatstring=formatstring)
+
     date_foldername = ratID + '_' + date_string
     date_path = os.path.join(rat_folder, date_foldername)
 

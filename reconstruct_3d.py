@@ -96,7 +96,7 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt
 
         # first, figure out if we have calibration files for this session
         ratID = folder_to_reconstruct['ratID']
-        session_date = folder_to_reconstruct['session_date']
+        session_date = folder_to_reconstruct['date']
         box_num = folder_to_reconstruct['boxnum']
         session_num = folder_to_reconstruct['session_num']
         task = folder_to_reconstruct['task']

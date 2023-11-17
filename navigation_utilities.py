@@ -1967,7 +1967,7 @@ def find_marked_vids_for_3d_reconstruction(marked_vids_parent, dlc_mat_output_pa
 
 def processed_data_pickle_name(session_metadata, parent_directories):
 
-    session_folder = find_session_folder(parent_directories['data'], session_metadata)
+    session_folder = find_session_folder(parent_directories, session_metadata)
 
     formatstring = date_formatstring()
     datestring = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
@@ -1984,7 +1984,7 @@ def processed_data_pickle_name(session_metadata, parent_directories):
 def find_session_folder(parent_directories, session_metadata):
 
     ratID = session_metadata['ratID']
-    rat_folder = os.path.join(parent_directories['data'], ratID)
+    rat_folder = os.path.join(parent_directories['videos_root_folder'], ratID)
 
     formatstring = date_formatstring()
     date_string = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)

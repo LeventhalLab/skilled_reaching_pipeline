@@ -2961,7 +2961,7 @@ def get_pickled_ts_fname(session_metadata, parent_directories):
 
 def processed_data_pickle_name(session_metadata, parent_directories):
 
-    session_folder = find_session_folder(parent_directories['data'], session_metadata)
+    session_folder = find_session_folder(parent_directories, session_metadata)
 
     formatstring = date_formatstring()
     datestring = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)

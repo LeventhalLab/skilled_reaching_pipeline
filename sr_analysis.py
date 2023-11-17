@@ -1,6 +1,6 @@
 import numpy as np
-import photometry_rat_sr_navigation as prn
-import photometry_io_skilledreaching as io_utils
+import navigation_utilities
+import skilled_reaching_io
 from scipy import signal
 
 
@@ -16,7 +16,7 @@ def session_type_from_folders(session_folders, search_metadata):
     for session_type in session_types:
 
         for session_folder in session_folders[session_type]:
-            folder_metadata = prn.session_metadata_from_path(session_folder)
+            folder_metadata = navigation_utilities.session_metadata_from_path(session_folder)
             if search_metadata['date'] == folder_metadata['date'] and search_metadata['session_num'] == folder_metadata['session_num']:
                 return session_type
 
@@ -26,12 +26,12 @@ def session_type_from_folders(session_folders, search_metadata):
 def outcomes_by_session(sessions_per_rat, parent_directories):
 
     # load the sr_scores
-    sr_scores_xlsx = prn.find_scores_xlsx(parent_directories, xlname='rat_dlight_photometry_SR_sessions.xlsx')
+    sr_scores_xlsx = navigation_utilities.find_scores_xlsx(parent_directories, xlname='rat_dlight_photometry_SR_sessions.xlsx')
 
     ratIDs = list(sessions_per_rat.keys())
     sr_behavior_summary = {}
     for ratID in ratIDs:
-        sr_scores = io_utils.read_xlsx_scores(sr_scores_xlsx, ratID)
+        sr_scores = skilled_reaching_io.read_xlsx_scores(sr_scores_xlsx, ratID)
 
         if not sr_scores.empty:
             sr_behavior_summary[ratID] = single_rat_outcomes(sessions_per_rat[ratID], sr_scores)

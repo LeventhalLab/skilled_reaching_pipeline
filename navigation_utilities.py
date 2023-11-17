@@ -2914,3 +2914,115 @@ def find_manual_scoring_sheet(parent_directories, mouseID):
         scoring_file = None
 
     return scoring_file
+
+def get_pickled_metadata_fname(session_metadata, parent_directories):
+    session_folder = find_session_folder(parent_directories['data'], session_metadata)
+
+    formatstring = date_formatstring()
+    datestring = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
+    fname = '_'.join([session_metadata['ratID'],
+                      datestring,
+                      session_metadata['task'],
+                      'ses{:02d}_metadata.pickle'.format(session_metadata['session_num'])])
+
+    full_path_fname = os.path.join(session_folder, fname)
+
+    return full_path_fname
+
+
+def get_pickled_analog_processeddata_fname(session_metadata, parent_directories):
+    session_folder = find_session_folder(parent_directories['data'], session_metadata)
+
+    formatstring = date_formatstring()
+    datestring = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
+    fname = '_'.join([session_metadata['ratID'],
+                      datestring,
+                      session_metadata['task'],
+                      'ses{:02d}_analogprocessed.pickle'.format(session_metadata['session_num'])])
+
+    full_path_fname = os.path.join(session_folder, fname)
+
+    return full_path_fname
+
+
+def get_pickled_ts_fname(session_metadata, parent_directories):
+    session_folder = find_session_folder(parent_directories['data'], session_metadata)
+
+    formatstring = date_formatstring()
+    datestring = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
+    fname = '_'.join([session_metadata['ratID'],
+                      datestring,
+                      session_metadata['task'],
+                      'ses{:02d}_timestamps.pickle'.format(session_metadata['session_num'])])
+
+    full_path_fname = os.path.join(session_folder, fname)
+
+    return full_path_fname
+
+def processed_data_pickle_name(session_metadata, parent_directories):
+
+    session_folder = find_session_folder(parent_directories['data'], session_metadata)
+
+    formatstring = date_formatstring()
+    datestring = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
+    fname = '_'.join([session_metadata['ratID'],
+                      datestring,
+                      session_metadata['task'],
+                      'ses{:02d}_processed.pickle'.format(session_metadata['session_num'])])
+
+    full_path_fname = os.path.join(session_folder, fname)
+
+    return full_path_fname
+
+
+def find_baseline_recording(parent_directories, session_metadata):
+
+    session_folder = find_session_folder(parent_directories['data'], session_metadata)
+
+    session_name = session_name_from_metadata(session_metadata)
+    test_string = '_'.join([session_name,
+                            'baseline',
+                            '*.mat'])
+
+    test_path = os.path.join(session_folder, test_string)
+
+    baseline_recordings = glob.glob(test_path)
+
+    baseline_recordings = [br for br in baseline_recordings if '.mat' in br]
+
+    if len(baseline_recordings) == 1:
+        baseline_recording = baseline_recordings[0]
+    elif len(baseline_recordings) > 1:
+        print('more than one baseline file for {}'.format(session_name))
+        baseline_recording = None
+    else:
+        print('no baseline recordings for {}'.format(session_name))
+        baseline_recording = None
+
+    return baseline_recording
+
+
+def find_session_summary_folder(parent_directories, session_metadata):
+
+    summary_parent = parent_directories['summaries']
+    ratID = session_metadata['ratID']
+    rat_folder = os.path.join(summary_parent, ratID)
+
+    task_folder = os.path.join(rat_folder, session_metadata['task'])
+
+    if not os.path.isdir(task_folder):
+        os.makedirs(task_folder)
+
+    # date_string = fname_datestring_from_datetime(session_metadata['date'])
+    # date_foldername = ratID + '_' + date_string
+    # date_path = os.path.join(rat_folder, date_foldername)
+    #
+    # session_numstring = 'session{:02d}'.format(session_metadata['session_num'])
+    #
+    # session_foldername = '_'.join([date_foldername,
+    #                                session_metadata['task'],
+    #                                session_numstring])
+    #
+    # full_sessionpath = os.path.join(date_path, session_foldername)
+
+    return task_folder

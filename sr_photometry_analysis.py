@@ -1,7 +1,9 @@
 import photometry_analysis as pa
 import photometry_analysis_plots as pa_plots
-import photometry_io_skilledreaching as io_utils
-import photometry_rat_sr_navigation as prn
+# import photometry_io_skilledreaching as io_utils
+import skilled_reaching_io
+import sr_analysis
+import navigation_utilities
 import sr_analysis
 import numpy as np
 import math
@@ -1397,38 +1399,38 @@ def map_event_to_nidaq_channel(eventname, phot_data, session_metadata):
 
 
 def process_session_post_20230904(data_files, session_metadata, parent_directories, smooth_window=101, f0_pctile=10):
-    # full_processed_pickle_name = prn.processed_data_pickle_name(session_metadata, parent_directories)
-    pickled_metadata_fname = prn.get_pickled_metadata_fname(session_metadata, parent_directories)
-    pickled_analog_processeddata_fname = prn.get_pickled_analog_processeddata_fname(session_metadata, parent_directories)
-    pickled_ts_fname = prn.get_pickled_ts_fname(session_metadata, parent_directories)
+    # full_processed_pickle_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories)
+    pickled_metadata_fname = navigation_utilities.get_pickled_metadata_fname(session_metadata, parent_directories)
+    pickled_analog_processeddata_fname = navigation_utilities.get_pickled_analog_processeddata_fname(session_metadata, parent_directories)
+    pickled_ts_fname = navigation_utilities.get_pickled_ts_fname(session_metadata, parent_directories)
     # find the scores file and load it
     if os.path.exists(pickled_metadata_fname):
         _, pickle_name = os.path.split(pickled_metadata_fname)
         print('{} already processed'.format(pickle_name))
-        phot_metadata = io_utils.read_pickle(pickled_metadata_fname)
+        phot_metadata = skilled_reaching_io.read_pickle(pickled_metadata_fname)
         # pa_plots.identify_data_segments(get_photometry_signal(processed_phot_data))
         # intervals_to_analyze, intervals_to_ignore = pa_plots.select_data_segments_by_span(get_photometry_signal(processed_phot_data), session_metadata)
 
         if 'analysis_intervals' not in phot_metadata.keys():
             analysis_intervals = pa_plots.select_data_segments_by_span(demod_signals[0, :], session_metadata)
             phot_metadata['analysis_intervals'] = analysis_intervals
-            io_utils.write_pickle(full_processed_pickle_name, phot_metadata)
+            skilled_reaching_io.write_pickle(full_processed_pickle_name, phot_metadata)
         elif not phot_metadata['analysis_intervals']:
             # if 'analysis_intervals' is empty, recheck
             analysis_intervals = pa_plots.select_data_segments_by_span(demod_signals[0, :], session_metadata)
             phot_metadata['analysis_intervals'] = analysis_intervals
-            io_utils.write_pickle(full_processed_pickle_name, phot_metadata)
+            skilled_reaching_io.write_pickle(full_processed_pickle_name, phot_metadata)
 
-        processed_analog = io_utils.read_pickle(pickled_analog_processeddata_fname)
-        ts_dict = io_utils.read_pickle(pickled_ts_fname)
+        processed_analog = skilled_reaching_io.read_pickle(pickled_analog_processeddata_fname)
+        ts_dict = skilled_reaching_io.read_pickle(pickled_ts_fname)
     else:
         # find baseline photometry values for each session
-        baseline_file = prn.find_baseline_recording(parent_directories, session_metadata)
+        baseline_file = navigation_utilities.find_baseline_recording(parent_directories, session_metadata)
         baseline_data = determine_baseline(baseline_file, session_metadata, parent_directories)
 
-        phot_metadata = io_utils.read_photometry_metadata(data_files['metadata'])
-        t, analog_data = io_utils.read_analog_bin(data_files['analog_bin'], phot_metadata)
-        digital_data = io_utils.read_digital_bin(data_files['digital_bin'], phot_metadata)
+        phot_metadata = skilled_reaching_io.read_photometry_metadata(data_files['metadata'])
+        t, analog_data = skilled_reaching_io.read_analog_bin(data_files['analog_bin'], phot_metadata)
+        digital_data = skilled_reaching_io.read_digital_bin(data_files['digital_bin'], phot_metadata)
 
         ts_dict = sr_analysis.extract_digital_timestamps(phot_metadata, digital_data, analog_data)
 
@@ -1502,9 +1504,9 @@ def process_session_post_20230904(data_files, session_metadata, parent_directori
         # processed_phot_data['dff'] = dff
         # processed_phot_data['zscore'] = session_zscore
 
-        io_utils.write_pickle(pickled_metadata_fname, phot_metadata)
-        io_utils.write_pickle(pickled_analog_processeddata_fname, processed_analog)
-        io_utils.write_pickle(pickled_ts_fname, ts_dict)
+        skilled_reaching_io.write_pickle(pickled_metadata_fname, phot_metadata)
+        skilled_reaching_io.write_pickle(pickled_analog_processeddata_fname, processed_analog)
+        skilled_reaching_io.write_pickle(pickled_ts_fname, ts_dict)
 
     create_session_summary2(phot_metadata, processed_analog, ts_dict, parent_directories, smooth_window=smooth_window)
 
@@ -1512,32 +1514,32 @@ def process_session_post_20230904(data_files, session_metadata, parent_directori
 
 
 def process_session(data_files, session_metadata, parent_directories, smooth_window=101, f0_pctile=10):
-    full_processed_pickle_name = prn.processed_data_pickle_name(session_metadata, parent_directories)
+    full_processed_pickle_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories)
 
     # find the scores file and load it
     if os.path.exists(full_processed_pickle_name):
         _, pickle_name = os.path.split(full_processed_pickle_name)
         print('{} already processed'.format(pickle_name))
-        processed_phot_data = io_utils.read_pickle(full_processed_pickle_name)
+        processed_phot_data = skilled_reaching_io.read_pickle(full_processed_pickle_name)
         # pa_plots.identify_data_segments(get_photometry_signal(processed_phot_data))
         # intervals_to_analyze, intervals_to_ignore = pa_plots.select_data_segments_by_span(get_photometry_signal(processed_phot_data), session_metadata)
 
         if 'analysis_intervals' not in processed_phot_data.keys():
             analysis_intervals = pa_plots.select_data_segments_by_span(get_photometry_signal(processed_phot_data), session_metadata)
             processed_phot_data['analysis_intervals'] = analysis_intervals
-            io_utils.write_pickle(full_processed_pickle_name, processed_phot_data)
+            skilled_reaching_io.write_pickle(full_processed_pickle_name, processed_phot_data)
         elif not processed_phot_data['analysis_intervals']:
             # if 'analysis_intervals' is empty, recheck
             analysis_intervals = pa_plots.select_data_segments_by_span(get_photometry_signal(processed_phot_data), session_metadata)
             processed_phot_data['analysis_intervals'] = analysis_intervals
-            io_utils.write_pickle(full_processed_pickle_name, processed_phot_data)
+            skilled_reaching_io.write_pickle(full_processed_pickle_name, processed_phot_data)
 
     else:
         # find baseline photometry values for each session
-        baseline_file = prn.find_baseline_recording(parent_directories, session_metadata)
+        baseline_file = navigation_utilities.find_baseline_recording(parent_directories, session_metadata)
         baseline_data = determine_baseline(baseline_file, session_metadata, parent_directories)
 
-        phot_data = io_utils.read_photometry_data(data_files)
+        phot_data = skilled_reaching_io.read_photometry_data(data_files)
         # todo: add in the demodulation step here if needed
         use_isosbestic = False
         if 'LED1_modulation' in phot_data['AI_line_desc']:
@@ -1587,12 +1589,12 @@ def process_session(data_files, session_metadata, parent_directories, smooth_win
 
     create_session_summary(processed_phot_data, session_metadata, parent_directories, smooth_window=smooth_window)
 
-    io_utils.write_pickle(full_processed_pickle_name, processed_phot_data)
+    skilled_reaching_io.write_pickle(full_processed_pickle_name, processed_phot_data)
 
 
 def create_session_summary_legacy(phot_mat_name, session_metadata, parent_directories, smooth_window=201, perievent_window=(-5,5)):
 
-    # phot_data = io_utils.read_photometry_mat(phot_mat_name)
+    # phot_data = skilled_reaching_io.read_photometry_mat(phot_mat_name)
     #
     # photo_detrend2, popt, exp2_fit_successful = photodetrend(phot_data)
     # detrended_data, dc_offset, dff, popt, exp2_fit_successful = calc_dff(phot_data, smooth_window=smooth_window,
@@ -1710,7 +1712,7 @@ def create_chrimsontest_summary2(phot_metadata, processed_analog, ts_dict, paren
     t = np.linspace(1/Fs, num_samples/Fs, num_samples)
 
     session_metadata = phot_metadata['session_info']
-    session_name = prn.session_name_from_metadata(session_metadata)
+    session_name = navigation_utilities.session_name_from_metadata(session_metadata)
 
     save_fname = '_'.join([session_name,
                            session_metadata['task'],
@@ -1718,10 +1720,10 @@ def create_chrimsontest_summary2(phot_metadata, processed_analog, ts_dict, paren
                            'summarysheet_{:d}secwindows'.format(perievent_window[1]),
                            'smooth{:03d}.jpg'.format(smooth_window)]
                           )
-    save_folder = prn.find_session_summary_folder(parent_directories, session_metadata)
+    save_folder = navigation_utilities.find_session_summary_folder(parent_directories, session_metadata)
     save_name = os.path.join(save_folder, save_fname)
 
-    allperievent_folder = prn.find_perievent_signal_folder(session_metadata, parent_directories)
+    allperievent_folder = navigation_utilities.find_perievent_signal_folder(session_metadata, parent_directories)
 
     # if os.path.exists(save_name) and os.path.exists(allperievent_folder):
     #     print('{} already created'.format(save_fname))
@@ -1793,7 +1795,7 @@ def create_chrimsontest_summary2(phot_metadata, processed_analog, ts_dict, paren
 
 def create_chrimsontest_summary(processed_phot_data, session_metadata, parent_directories, perievent_window=(-5,15), smooth_window=501, f0_pctile=10):
 
-    session_name = prn.session_name_from_metadata(session_metadata)
+    session_name = navigation_utilities.session_name_from_metadata(session_metadata)
 
     save_fname = '_'.join([session_name,
                            session_metadata['task'],
@@ -1801,10 +1803,10 @@ def create_chrimsontest_summary(processed_phot_data, session_metadata, parent_di
                            'summarysheet_{:d}secwindows'.format(perievent_window[1]),
                            'smooth{:03d}.jpg'.format(smooth_window)]
                           )
-    save_folder = prn.find_session_summary_folder(parent_directories, session_metadata)
+    save_folder = navigation_utilities.find_session_summary_folder(parent_directories, session_metadata)
     save_name = os.path.join(save_folder, save_fname)
 
-    allperievent_folder = prn.find_perievent_signal_folder(session_metadata, parent_directories)
+    allperievent_folder = navigation_utilities.find_perievent_signal_folder(session_metadata, parent_directories)
 
     # if os.path.exists(save_name) and os.path.exists(allperievent_folder):
     #     print('{} already created'.format(save_fname))
@@ -1888,7 +1890,7 @@ def create_chrimsontest_summary(processed_phot_data, session_metadata, parent_di
 
 def create_pavlovian_summary(processed_phot_data, session_metadata, parent_directories, perievent_window=(-3, 3), smooth_window=501, f0_pctile=10):
 
-    session_name = prn.session_name_from_metadata(session_metadata)
+    session_name = navigation_utilities.session_name_from_metadata(session_metadata)
 
     save_fname = '_'.join([session_name,
                            session_metadata['task'],
@@ -1896,10 +1898,10 @@ def create_pavlovian_summary(processed_phot_data, session_metadata, parent_direc
                            'summarysheet_{:d}secwindows'.format(perievent_window[1]),
                            'smooth{:03d}.jpg'.format(smooth_window)]
                           )
-    save_folder = prn.find_session_summary_folder(parent_directories, session_metadata)
+    save_folder = navigation_utilities.find_session_summary_folder(parent_directories, session_metadata)
     save_name = os.path.join(save_folder, save_fname)
 
-    allperievent_folder = prn.find_perievent_signal_folder(session_metadata, parent_directories)
+    allperievent_folder = navigation_utilities.find_perievent_signal_folder(session_metadata, parent_directories)
 
     # if os.path.exists(save_name) and os.path.exists(allperievent_folder):
     #     print('{} already created'.format(save_fname))
@@ -1970,20 +1972,20 @@ def create_pavlovian_summary(processed_phot_data, session_metadata, parent_direc
 
 def create_pavlovian_summary_legacy(phot_mat_name, session_metadata, parent_directories, smooth_window=201, perievent_window=(-3, 3)):
 
-    session_name = prn.session_name_from_metadata(session_metadata)
+    session_name = navigation_utilities.session_name_from_metadata(session_metadata)
 
     save_fname = '_'.join([session_name,
                            session_metadata['task'],
                            'session{:02d}'.format(session_metadata['session_num']),
                            'summarysheet_{:d}secwindows.jpg'.format(perievent_window[1])]
                           )
-    save_folder = prn.find_session_summary_folder(parent_directories, session_metadata)
+    save_folder = navigation_utilities.find_session_summary_folder(parent_directories, session_metadata)
     save_name = os.path.join(save_folder, save_fname)
     if os.path.exists(save_name):
         print('{} already created'.format(save_fname))
         return
 
-    phot_data = io_utils.read_photometry_mat(phot_mat_name)
+    phot_data = skilled_reaching_io.read_photometry_mat(phot_mat_name)
     if len(phot_data['AI_line_desc']) > 0:
         FED_chan_num = phot_data['AI_line_desc'].index('FED3')
         try:
@@ -2083,7 +2085,7 @@ def sr_summary_by_outcome(processed_phot_data, session_metadata, parent_director
     num_event_rows = 2
     num_full_row_axes = 3
 
-    session_name = prn.session_name_from_metadata(session_metadata)
+    session_name = navigation_utilities.session_name_from_metadata(session_metadata)
 
     save_fname = '_'.join([session_name,
                            session_metadata['task'],
@@ -2091,14 +2093,14 @@ def sr_summary_by_outcome(processed_phot_data, session_metadata, parent_director
                            'trialoutcomes_{:d}secwindows'.format(perievent_window[1]),
                            'smooth{:03d}.jpg'.format(smooth_window)]
                           )
-    save_folder = prn.find_session_summary_folder(parent_directories, session_metadata)
+    save_folder = navigation_utilities.find_session_summary_folder(parent_directories, session_metadata)
     save_name = os.path.join(save_folder, save_fname)
     # if os.path.exists(save_name):
     #     print('{} already created'.format(save_fname))
     #     return
 
-    xls_score_file = prn.find_scores_xlsx(parent_directories)
-    sr_scores = io_utils.read_xlsx_scores(xls_score_file, session_metadata)
+    xls_score_file = navigation_utilities.find_scores_xlsx(parent_directories)
+    sr_scores = skilled_reaching_io.read_xlsx_scores(xls_score_file, session_metadata)
 
     outcome_groupings = sr_analysis.create_sr_outcome_groupings()
     trials_by_outcome, valid_trials = sr_analysis.extract_sr_trials_by_outcome(sr_scores, session_metadata, outcome_groupings)
@@ -2357,7 +2359,7 @@ def create_sr_summary2(phot_metadata, processed_analog, ts_dict, parent_director
     num_event_rows = 2
     num_full_row_axes = 3
 
-    session_name = prn.session_name_from_metadata(session_metadata)
+    session_name = navigation_utilities.session_name_from_metadata(session_metadata)
 
     save_fname = '_'.join([session_name,
                            session_metadata['task'],
@@ -2365,10 +2367,10 @@ def create_sr_summary2(phot_metadata, processed_analog, ts_dict, parent_director
                            'summarysheet_{:d}secwindows'.format(perievent_window[1]),
                            'smooth{:03d}.jpg'.format(smooth_window)]
                           )
-    save_folder = prn.find_session_summary_folder(parent_directories, session_metadata)
+    save_folder = navigation_utilities.find_session_summary_folder(parent_directories, session_metadata)
     save_name = os.path.join(save_folder, save_fname)
 
-    # allperievent_folder = prn.find_perievent_signal_folder(session_metadata, parent_directories)
+    # allperievent_folder = navigation_utilities.find_perievent_signal_folder(session_metadata, parent_directories)
 
     # if os.path.exists(save_name) and os.path.exists(allperievent_folder):
     #     print('{} already created'.format(save_fname))
@@ -2433,7 +2435,7 @@ def create_sr_summary(processed_phot_data, session_metadata, parent_directories,
     num_event_rows = 2
     num_full_row_axes = 3
 
-    session_name = prn.session_name_from_metadata(session_metadata)
+    session_name = navigation_utilities.session_name_from_metadata(session_metadata)
 
     save_fname = '_'.join([session_name,
                            session_metadata['task'],
@@ -2441,10 +2443,10 @@ def create_sr_summary(processed_phot_data, session_metadata, parent_directories,
                            'summarysheet_{:d}secwindows'.format(perievent_window[1]),
                            'smooth{:03d}.jpg'.format(smooth_window)]
                           )
-    save_folder = prn.find_session_summary_folder(parent_directories, session_metadata)
+    save_folder = navigation_utilities.find_session_summary_folder(parent_directories, session_metadata)
     save_name = os.path.join(save_folder, save_fname)
 
-    # allperievent_folder = prn.find_perievent_signal_folder(session_metadata, parent_directories)
+    # allperievent_folder = navigation_utilities.find_perievent_signal_folder(session_metadata, parent_directories)
 
     # if os.path.exists(save_name) and os.path.exists(allperievent_folder):
     #     print('{} already created'.format(save_fname))
@@ -2540,20 +2542,20 @@ def zscore_full_session(intervals, dff):
 def create_sr_summary_legacy(phot_mat_name, session_metadata, parent_directories, smooth_window=201, perievent_window=(-3, 3)):
 
 
-    session_name = prn.session_name_from_metadata(session_metadata)
+    session_name = navigation_utilities.session_name_from_metadata(session_metadata)
 
     save_fname = '_'.join([session_name,
                            session_metadata['task'],
                            'session{:02d}'.format(session_metadata['session_num']),
                            'summarysheet_{:d}secwindows.jpg'.format(perievent_window[1])]
                           )
-    save_folder = prn.find_session_summary_folder(parent_directories, session_metadata)
+    save_folder = navigation_utilities.find_session_summary_folder(parent_directories, session_metadata)
     save_name = os.path.join(save_folder, save_fname)
     if os.path.exists(save_name):
         print('{} already created'.format(save_fname))
         return
 
-    phot_data = io_utils.read_photometry_mat(phot_mat_name)
+    phot_data = skilled_reaching_io.read_photometry_mat(phot_mat_name)
     if len(phot_data['AI_line_desc']) > 0:
         # FED_chan_num = phot_data['AI_line_desc'].index('FED3')
         try:
@@ -2638,13 +2640,13 @@ def create_sr_summary_legacy(phot_mat_name, session_metadata, parent_directories
 
 def determine_baseline(baseline_file, session_metadata, parent_directories):
 
-    baseline_pickle_name = prn.create_baseline_pickle_name(baseline_file, session_metadata, parent_directories)
+    baseline_pickle_name = navigation_utilities.create_baseline_pickle_name(baseline_file, session_metadata, parent_directories)
     if os.path.exists(baseline_pickle_name):
         _, baseline_fname = os.path.split(baseline_pickle_name)
         print('baseline data loaded from {}'.format(baseline_fname))
-        baseline_data = io_utils.read_pickle(baseline_pickle_name)
+        baseline_data = skilled_reaching_io.read_pickle(baseline_pickle_name)
     elif baseline_file is not None:
-        baseline_data = io_utils.read_photometry_mat(baseline_file)
+        baseline_data = skilled_reaching_io.read_photometry_mat(baseline_file)
 
         t_min, t_max = pa_plots.select_data_window(baseline_data['t'], baseline_data['data'], session_metadata)
         indmin, indmax = np.searchsorted(baseline_data['t'], (t_min, t_max))
@@ -2660,6 +2662,6 @@ def determine_baseline(baseline_file, session_metadata, parent_directories):
                          'baseline_range': None
         }
 
-    io_utils.write_pickle(baseline_pickle_name, baseline_data)
+    skilled_reaching_io.write_pickle(baseline_pickle_name, baseline_data)
 
     return baseline_data

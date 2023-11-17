@@ -193,3 +193,219 @@ def get_calibration_data(session_date, box_num, cal_file_folder):
         cal_data = None
 
     return cal_data
+
+
+def read_xlsx_scores(sroutcome_fname, ratID):
+    if isinstance(ratID, dict):
+        # if ratID contains a session_metadata dictionary, extract the ratID. If it's a string, just use ratID
+        ratID = ratID['ratID']
+
+    try:
+        df = pd.read_excel(sroutcome_fname, sheet_name=ratID)
+    except:
+        # most likely, there isn't a sheet for this rat yet
+        df = pd.DataFrame()
+
+    return df
+
+
+def read_photometry_data(data_files):
+    if data_files['phot_mat'] is not None:
+        # this is an older file saved directly in .mat format
+        phot_data = read_photometry_mat(data_files['phot_mat'])
+    else:
+        md = sio.loadmat(data_files['metadata'])
+        if 'LEDwavelength' in md.keys():
+            phot_data = {
+                'Fs': float(md['Fs'][0][0]),
+                'current': md['current'][0][0],
+                'virus': md['virus'][0],
+                'AI_line_desc': [],
+                'DI_line_desc': [],
+                'carrier_freqs': md['carrier_freqs'][0],
+                'carrier_scale': md['carrier_scale'][0],
+                'LEDwavelength': md['LEDwavelength'][0],
+                'cam_trigger_delay': md['cam_trigger_delay'][0],
+                'cam_trigger_pw': md['cam_trigger_pw'][0],
+                'task': md['task']
+            }
+        else:
+            phot_data = {
+                'Fs': float(md['Fs'][0][0]),
+                'current': md['current'][0][0],
+                'virus': md['virus'][0],
+                'AI_line_desc': [],
+                'DI_line_desc': [],
+                'carrier_freqs': md['carrier_freqs'][0],
+                'carrier_scale': md['carrier_scale'][0],
+                'LEDwavelength': np.array([470, 405]),  # assume this was 470 nm excitation with 405 isosbestic
+                'cam_trigger_delay': md['cam_trigger_delay'][0],
+                'cam_trigger_pw': md['cam_trigger_pw'][0],
+                'task': md['task']
+            }
+
+        if 'AI_line_desc' in md.keys():
+            line_desc_array = md['AI_line_desc'][0]
+            line_desc_list = [ld[0] for ld in line_desc_array]
+            phot_data['AI_line_desc'] = line_desc_list
+
+            num_analog_lines = len(md['AI_line_desc'][0])
+
+            phot_data['t'], phot_data['data'] = read_analog_bin(data_files['analog_bin'], phot_data)
+
+        if 'DI_line_desc' in md.keys():
+            line_desc_array = md['DI_line_desc'][0]
+            line_desc_list = [ld[0] for ld in line_desc_array]
+            phot_data['DI_line_desc'] = line_desc_list
+
+            num_digital_lines = len(md['DI_line_desc'][0])
+
+            phot_data['digital_data'] = read_digital_bin(data_files['digital_bin'], phot_data)
+
+    return phot_data
+
+
+def read_photometry_metadata(metadata_fname):
+    md = sio.loadmat(metadata_fname)
+    if 'LEDwavelength' in md.keys():
+        phot_metadata = {
+            'Fs': float(md['Fs'][0][0]),
+            'current': md['current'][0][0],
+            'virus': md['virus'][0],
+            'AI_line_desc': [],
+            'DI_line_desc': [],
+            'carrier_freqs': md['carrier_freqs'][0],
+            'carrier_scale': md['carrier_scale'][0],
+            'LEDwavelength': md['LEDwavelength'][0],
+            'cam_trigger_delay': md['cam_trigger_delay'][0],
+            'cam_trigger_pw': md['cam_trigger_pw'][0],
+            'task': md['task']
+        }
+    else:
+        phot_metadata = {
+            'Fs': float(md['Fs'][0][0]),
+            'current': md['current'][0][0],
+            'virus': md['virus'][0],
+            'AI_line_desc': [],
+            'DI_line_desc': [],
+            'carrier_freqs': md['carrier_freqs'][0],
+            'carrier_scale': md['carrier_scale'][0],
+            'LEDwavelength': np.array([470, 405]),  # assume this was 470 nm excitation with 405 isosbestic
+            'cam_trigger_delay': md['cam_trigger_delay'][0],
+            'cam_trigger_pw': md['cam_trigger_pw'][0],
+            'task': md['task']
+        }
+
+    if 'AI_line_desc' in md.keys():
+        line_desc_array = md['AI_line_desc'][0]
+        line_desc_list = [ld[0] for ld in line_desc_array]
+        phot_metadata['AI_line_desc'] = line_desc_list
+
+    if 'DI_line_desc' in md.keys():
+        line_desc_array = md['DI_line_desc'][0]
+        try:
+            line_desc_list = [ld[0] for ld in line_desc_array]
+        except:
+            # ugly workaround for when line description for matlab acquisition code is an empty string
+            line_desc_list = []
+            for ld in line_desc_array:
+                if len(ld) == 0:
+                    line_desc_list.append('empty')
+                else:
+                    line_desc_list.append(ld[0])
+
+        phot_metadata['DI_line_desc'] = line_desc_list
+
+    return phot_metadata
+
+
+def read_analog_bin(fname, phot_metadata):
+    '''
+    read in analog raw data recorded from Matlab nidaq code. Data were stored as double precision floating point. First
+    number at each time point is a timestamp, then values are as described by the AI_line_desc array
+    :param fname:
+    :param num_channels:
+    :return:
+    '''
+
+    num_channels = len(phot_metadata['AI_line_desc'])
+
+    all_data = np.fromfile(fname, dtype=float, count=-1)
+
+    # reshape based on num_channels. Need to use num_channels+1 because the first column is timestamps
+    all_data = np.reshape(all_data, (-1, num_channels + 1))
+    t = all_data[:, 0]
+    analog_data = all_data[:, 1:]
+
+    return t, analog_data
+
+
+def read_digital_bin(fname, phot_metadata):
+    num_channels = len(phot_metadata['DI_line_desc'])
+
+    digital_data = np.fromfile(fname, dtype=np.bool_, count=-1)
+
+    # reshape based on num_channels. Need to use num_channels+1 because the first column is timestamps
+    digital_data = np.reshape(digital_data, (-1, num_channels))
+
+    return digital_data
+
+
+def read_photometry_mat(full_path):
+    '''
+    function to read a .mat file containing photometry data
+    assumed to be 8-channel data
+
+    return: dictionary with the following keys
+        Fs - float giving the sampling rate in Hz
+        current - current applied to the LED
+        data - n x 8 numpy array containing the raw data; channel 0 is typically the photometry signal
+    '''
+    # todo: need to update with new variables being saved in .mat file. Should also add a variable in the
+    # recording software to document what each analog line represents
+    try:
+        photometry_data = sio.loadmat(full_path)
+
+        # in some versions, 'current' and 'virus' aren't included in the file
+        try:
+            phot_data = {
+                'Fs': float(photometry_data['Fs'][0][0]),
+                'current': photometry_data['current'][0][0],
+                'data': photometry_data['data'],
+                't': photometry_data['timeStamps'],
+                'virus': photometry_data['virus'][0],
+                'AI_line_desc': []
+            }
+        except KeyError:
+            phot_data = {
+                'Fs': float(photometry_data['Fs'][0][0]),
+                'current': [],
+                'data': photometry_data['data'],
+                't': photometry_data['timeStamps'],
+                'virus': [],
+                'AI_line_desc': []
+            }
+
+        if 'AI_line_desc' in photometry_data.keys():
+            line_desc_array = photometry_data['AI_line_desc'][0]
+            line_desc_list = [ld[0] for ld in line_desc_array]
+            phot_data['AI_line_desc'] = line_desc_list
+
+    except NotImplementedError:
+        # likely a v7.3 .mat file, recorded from the matlab online visualization app
+        pfile_data = h5py.File(full_path, 'r')
+
+        phot_data = {
+            'data': pfile_data['data'][0],
+            'Fs': pfile_data['metadata']['Rate'][0][0],
+            'current': [],
+            't': pfile_data['timestamps'][0],
+            'virus': [],
+            'AI_line_desc': ['photometry_signal']
+        }
+    except ValueError:
+        # in case of corrupted mat file
+        return None
+
+    # reformat into a dictionary for easier use later
+    return phot_data

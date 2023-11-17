@@ -156,8 +156,10 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, rat_df, paren
         skilled_reaching_io.write_pickle(trials_db_name, trials_df)
 
     processed_phot_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories)
-    phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
+    proecessed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
 
+    if session_metadata['date'] < datetime(2023, 9, 4):
+        aggregate_data_pre_20230904(processed_phot_data, session_metadata)
     # now find matching files from each view
     for h5_file in h5_list[0]:
         h5_vid_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)

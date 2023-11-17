@@ -27,7 +27,7 @@ def find_rat_cropped_session_folder(session_metadata, parent_directories):
             session_date = session_metadata[test_key]
 
     session_folder_name = '_'.join((ratID,
-                                    fname_date2string(session_metadata['session_date']),
+                                    fname_date2string(session_date),
                                     session_metadata['task'],
                                     'ses{:02d}'.format(session_metadata['session_num'])))
     session_dir = os.path.join(rat_folder, session_folder_name)

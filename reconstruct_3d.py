@@ -120,15 +120,15 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt
 
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
         reconstruct_folder_anipose(folder_to_reconstruct, calibration_data, rat_df, parent_directories, filtered=filtered)
-        cgroup = calibration_data['cgroup']
-
-        calibration_folder = navigation_utilities.find_calibration_files_folder(session_date, box_num, calibration_files_parent)
-
-        if os.path.exists(calibration_folder):
-            # is there a calibration file for this session?
-
-            cal_data = skilled_reaching_io.get_calibration_data(session_date, box_num, calibration_folder)
-            reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
+        # cgroup = calibration_data['cgroup']
+        #
+        # calibration_folder = navigation_utilities.find_calibration_files_folder(session_date, box_num, calibration_files_parent)
+        #
+        # if os.path.exists(calibration_folder):
+        #     # is there a calibration file for this session?
+        #
+        #     cal_data = skilled_reaching_io.get_calibration_data(session_date, box_num, calibration_folder)
+        #     reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
 def reconstruct_folder_anipose(session_metadata, calibration_data, rat_df, parent_directories, filtered=True):

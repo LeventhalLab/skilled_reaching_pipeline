@@ -128,6 +128,15 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
 
 def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts2plot='all'):
 
+    traj_metadata = navigation_utilities.parse_trajectory_name(traj3d_fname)
+    traj_metadata['session_num'] = session_metadata['session_num']
+    traj_metadata['task'] = session_metadata['task']
+
+    animation_name = navigation_utilities.create_3dvid_name(traj_metadata, session_metadata, parent_directories)
+    if os.path.exists(animation_name):
+        return
+
+    print('creating video for {}'.format(animation_name))
     markersize = 4
     cmap = cm.get_cmap('rainbow')
 
@@ -139,11 +148,7 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts
         bpts2plot = r3d_data['dlc_output']['bodyparts']
     num_bpts = len(bpts2plot)
 
-    traj_metadata = navigation_utilities.parse_trajectory_name(traj3d_fname)
-    traj_metadata['session_num'] = session_metadata['session_num']
-    traj_metadata['task'] = session_metadata['task']
 
-    animation_name = navigation_utilities.create_3dvid_name(traj_metadata, session_metadata, parent_directories)
 
     orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
 

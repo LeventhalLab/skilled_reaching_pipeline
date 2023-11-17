@@ -1981,6 +1981,20 @@ def processed_data_pickle_name(session_metadata, parent_directories):
     return full_path_fname
 
 
+def date_formatstring():
+
+    formatstring = '%Y%m%d'
+
+    return formatstring
+
+
+def fname_datestring_from_datetime(dtime, formatstring='%Y%m%d'):
+
+    datestring = datetime.strftime(dtime, formatstring)
+
+    return datestring
+
+
 def find_session_folder(parent_directories, session_metadata):
 
     ratID = session_metadata['ratID']

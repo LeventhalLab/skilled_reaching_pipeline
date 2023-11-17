@@ -12,6 +12,7 @@ import computer_vision_basics as cvb
 import shapely.geometry as sg
 import sr_visualization
 import dlc_utilities
+import sr_photometry_analysis as srphot_anal
 import copy
 from anipose_utils import load_pose2d_fnames
 
@@ -146,20 +147,21 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, rat_df, paren
         new_h5_list = glob.glob(os.path.join(cam_folder_name, test_name))
         h5_list.append(glob.glob(os.path.join(cam_folder_name, test_name)))
 
-    trials_db_name = navigation_utilities.get_trialsdb_name(parent_directories, session_metadata['ratID'], 'sr')
-    if os.path.exists(trials_db_name):
-        trials_df = skilled_reaching_io.read_pickle(trials_db_name)
-    else:
-        rat_aggdata_fname = navigation_utilities.get_aggregated_singlerat_data_name(parent_directories, ratID, 'sr')
-        rat_phys_data = skilled_reaching_io.read_pickle(rat_aggdata_fname)
-        trials_df = rat_phys_data['rat_df']
-        skilled_reaching_io.write_pickle(trials_db_name, trials_df)
+    # trials_db_name = navigation_utilities.get_trialsdb_name(parent_directories, session_metadata['ratID'], 'sr')
+    # if os.path.exists(trials_db_name):
+    #     trials_df = skilled_reaching_io.read_pickle(trials_db_name)
+    # else:
+    #     rat_aggdata_fname = navigation_utilities.get_aggregated_singlerat_data_name(parent_directories, ratID, 'sr')
+    #     rat_phys_data = skilled_reaching_io.read_pickle(rat_aggdata_fname)
+    #     trials_df = rat_phys_data['rat_df']
+    #     skilled_reaching_io.write_pickle(trials_db_name, trials_df)
 
     processed_phot_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories)
-    proecessed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
+    processed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
 
     if session_metadata['date'] < datetime(2023, 9, 4):
-        aggregate_data_pre_20230904(processed_phot_data, session_metadata)
+        session_summary, trials_df = srphot_anal.aggregate_data_pre_20230904(processed_phot_data, session_metadata)
+
     # now find matching files from each view
     for h5_file in h5_list[0]:
         h5_vid_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)

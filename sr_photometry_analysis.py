@@ -14,6 +14,32 @@ import matplotlib
 matplotlib.use('Qt5Agg')
 
 
+def aggregate_data_pre_20230904(processed_phot_data, session_metadata, rat_srdf, smooth_window=101, f0_pctile=10, expected_baseline=0.2, perievent_window=(-5, 5)):
+
+    smoothed_data, detrended_data, session_dff, interval_popt, interval_exp2_fit_successful, baseline_used = srphot_anal.calc_segmented_dff(
+        processed_phot_data, processed_phot_data['mean_baseline'],
+        smooth_window=smooth_window,
+        f0_pctile=f0_pctile,
+        expected_baseline=expected_baseline)
+
+    session_zscore = srphot_anal.zscore_full_session(processed_phot_data['analysis_intervals'], session_dff)
+
+    rat_srdf, session_earlyreach_info = extract_sr_event_ts(processed_phot_data, session_metadata, rat_srdf,
+                                                            perievent_window=perievent_window,
+                                                            smooth_window=smooth_window, f0_pctile=f0_pctile,
+                                                            expected_baseline=expected_baseline)
+    session_summary = {'sr_dff1': session_dff,
+                       'sr_zscores1': session_zscore,
+                       'sr_dff2': [],
+                       'sr_zscores2': [],
+                       'sr_metadata_list': session_metadata,
+                       'sr_processed_phot': processed_phot_data,
+                       'sr_earlyreach_info': session_earlyreach_info
+                       }
+
+    return session_summary, rat_srdf
+
+
 def exp1_offset_func(t, a, b, c):
     return a * np.exp(b * t) + c
 

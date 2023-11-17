@@ -3,6 +3,7 @@ import matplotlib.cm as cm
 import cv2
 import numpy as np
 import os
+import stat
 import shutil
 import navigation_utilities
 import reconstruct_3d_optitrack
@@ -162,6 +163,8 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts
     session_folder, _ = os.path.split(traj3d_fname)
     jpg_folder = os.path.join(session_folder, 'temp')
     if not os.path.exists(jpg_folder):
+        # os.chmod(jpg_folder, stat.S_IWRITE)
+        # shutil.rmtree(jpg_folder)
         os.makedirs(jpg_folder)
 
     for i_frame in range(num_frames):
@@ -239,7 +242,7 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts
     )
     subprocess.call(command, shell=True)
 
-    shutil.rmtree(jpg_folder)
+    # shutil.rmtree(jpg_folder)
 
 
 def connect_3d_bpts(points3d, bodyparts, bpts2connect, ax):

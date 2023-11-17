@@ -431,6 +431,36 @@ def create_trajectory_name(h5_metadata, session_metadata, calibration_data, pare
     return traj_fname
 
 
+def get_trialsdb_name(parent_directories, ratID, task):
+    # rat_folder = os.path.join(parent_directories[source_volume]['data'], ratID)
+    task_folder = os.path.join(parent_directories['analysis'], task)
+    if not os.path.exists(task_folder):
+        os.makedirs(task_folder)
+
+    fname = '_'.join([ratID,
+                      task,
+                      'trialsdb.pickle'])
+
+    full_name = os.path.join(task_folder, fname)
+
+    return full_name
+
+
+def get_aggregated_singlerat_data_name(parent_directories, ratID, task):
+    # rat_folder = os.path.join(parent_directories[source_volume]['data'], ratID)
+    task_folder = os.path.join(parent_directories['analysis'], task)
+    if not os.path.exists(task_folder):
+        os.makedirs(task_folder)
+
+    fname = '_'.join([ratID,
+                      task,
+                      'aggregated.pickle'])
+
+    full_name = os.path.join(task_folder, fname)
+
+    return full_name
+
+
 def create_3dvid_name(traj_metadata, session_metadata, parent_directories):
 
     traj_summary_folder = get_3dsummaries_folder(session_metadata, parent_directories)
@@ -1933,6 +1963,43 @@ def find_marked_vids_for_3d_reconstruction(marked_vids_parent, dlc_mat_output_pa
                                         metadata_list.append(video_metadata)
 
     return metadata_list
+
+
+def processed_data_pickle_name(session_metadata, parent_directories):
+
+    session_folder = find_session_folder(parent_directories['data'], session_metadata)
+
+    formatstring = date_formatstring()
+    datestring = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
+    fname = '_'.join([session_metadata['ratID'],
+                      datestring,
+                      session_metadata['task'],
+                      'ses{:02d}_processed.pickle'.format(session_metadata['session_num'])])
+
+    full_path_fname = os.path.join(session_folder, fname)
+
+    return full_path_fname
+
+
+def find_session_folder(parent_directories, session_metadata):
+
+    ratID = session_metadata['ratID']
+    rat_folder = os.path.join(parent_directories['data'], ratID)
+
+    formatstring = date_formatstring()
+    date_string = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
+    date_foldername = ratID + '_' + date_string
+    date_path = os.path.join(rat_folder, date_foldername)
+
+    session_numstring = 'ses{:02d}'.format(session_metadata['session_num'])
+
+    session_foldername = '_'.join([date_foldername,
+                                   session_metadata['task'],
+                                   session_numstring])
+
+    full_sessionpath = os.path.join(date_path, session_foldername)
+
+    return full_sessionpath
 
 
 def find_Burgess_calibration_vid_folder(calibration_parent, session_datetime):

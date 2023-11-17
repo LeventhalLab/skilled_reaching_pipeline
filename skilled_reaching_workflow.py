@@ -420,6 +420,7 @@ if __name__ == '__main__':
     dlc_mat_output_parents = {expt: os.path.join(videos_parents[expt], 'matlab_readable_dlc') for expt in experiment_list}
     trajectories_parents = {expt: os.path.join(videos_parents[expt], 'traj_files') for expt in experiment_list}
     trajectory_summaries = {expt: os.path.join(videos_parents[expt], 'traj_summaries') for expt in experiment_list}
+    analysis_summaries = {expt: os.path.join(videos_parents[expt], 'analysis') for expt in experiment_list}
 
     view_keys = list(DLC_folder_names.keys())
 
@@ -435,7 +436,8 @@ if __name__ == '__main__':
                                 'calibration_files_parent': calibration_files_parents[expt],
                                 'dlc_mat_output_parent': dlc_mat_output_parents[expt],
                                 'trajectories_parent': trajectories_parents[expt],
-                                'trajectory_summaries': trajectory_summaries[expt]
+                                'trajectory_summaries': trajectory_summaries[expt],
+                                'analysis': analysis_summaries[expt]
                             }
                             for expt in experiment_list}
 

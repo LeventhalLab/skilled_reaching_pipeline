@@ -9,20 +9,12 @@ import navigation_utilities
 import reconstruct_3d_optitrack
 import computer_vision_basics as cvb
 import subprocess
-
+import sr_photometry_analysis as srphot_anal
 import skilled_reaching_io
+import integrate_phys_kinematics as ipk
 
 
-def plot_3d_skeleton(paw_trajectory, bodyparts, ax=None, trail_pts=3):
-
-    pass
-
-
-def overlay_pts_on_video(paw_trajectory, cal_data, bodyparts, orig_vid_name, crop_region, frame_num, ax=None, trail_pts=3):
-
-    pass
-
-def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_directories, test_frame=297, pawparts2plot=['pawdorsum', 'palm', 'dig1','dig2','dig3','dig4']):
+def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df, test_frame=297, pawparts2plot=['pawdorsum', 'palm', 'dig1','dig2','dig3','dig4']):
     prop_cycle = plt.rcParams['axes.prop_cycle']
     color_cycle = prop_cycle.by_key()['color']
 
@@ -35,99 +27,102 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
     pawtraces_fname = summary_3dbasename + '_pawtraces.pdf'
     imgsamp_fname = summary_3dbasename + '_imgsamp.tiff'
 
-    _, traj_name = os.path.split(traj3d_fname)
-    traj_name, _ = os.path.splitext(traj_name)
+    if not (os.path.exists(scores_fname) and os.path.exists(pawtraces_fname) and os.path.exists(imgsamp_fname)):
+        _, traj_name = os.path.split(traj3d_fname)
+        traj_name, _ = os.path.splitext(traj_name)
 
-    df_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
-    pawpref = df_row['pawpref'].values[0]
-    bpts2plot = [pawpref.lower() + pawpart for pawpart in pawparts2plot]#  'rightpawdorsum', 'rightdig1', 'rightdig2', 'rightdig3', 'rightdig4']
-    num_bpts = len(bpts2plot)
-    r3d_data = skilled_reaching_io.read_pickle(traj3d_fname)
+        df_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
+        pawpref = df_row['pawpref'].values[0]
+        bpts2plot = [pawpref.lower() + pawpart for pawpart in pawparts2plot]#  'rightpawdorsum', 'rightdig1', 'rightdig2', 'rightdig3', 'rightdig4']
+        num_bpts = len(bpts2plot)
+        r3d_data = skilled_reaching_io.read_pickle(traj3d_fname)
 
-    fig_2dproj = plt.figure(figsize=(8.5, 11))
-    axs_2dproj = [fig_2dproj.add_subplot(311)]
-    axs_2dproj.append(fig_2dproj.add_subplot(312))
-    axs_2dproj.append(fig_2dproj.add_subplot(313))
+        fig_2dproj = plt.figure(figsize=(8.5, 11))
+        axs_2dproj = [fig_2dproj.add_subplot(311)]
+        axs_2dproj.append(fig_2dproj.add_subplot(312))
+        axs_2dproj.append(fig_2dproj.add_subplot(313))
 
-    fig_scores = plt.figure(figsize=(8.5, 11))
-    axs_scores = [fig_scores.add_subplot(num_bpts, 1, 1)]
-    for i_bpt in range(1, num_bpts):
-        axs_scores.append(fig_scores.add_subplot(num_bpts, 1, i_bpt + 1))
+        fig_scores = plt.figure(figsize=(8.5, 11))
+        axs_scores = [fig_scores.add_subplot(num_bpts, 1, 1)]
+        for i_bpt in range(1, num_bpts):
+            axs_scores.append(fig_scores.add_subplot(num_bpts, 1, i_bpt + 1))
 
-    # fig_2dtrack = plt.figure(figsize=(9.4,12))
-    # axs_2dtrack = [fig_2dtrack.add_subplot(321)]
-    # axs_2dtrack.append([fig_2dtrack.add_subplot(322)])
-    # axs_2dtrack.append([fig_2dtrack.add_subplot(323)])
-    # axs_2dtrack.append([fig_2dtrack.add_subplot(324)])
-    # axs_2dtrack.append([fig_2dtrack.add_subplot(325)])
-    # axs_2dtrack.append([fig_2dtrack.add_subplot(326)])
+        # fig_2dtrack = plt.figure(figsize=(9.4,12))
+        # axs_2dtrack = [fig_2dtrack.add_subplot(321)]
+        # axs_2dtrack.append([fig_2dtrack.add_subplot(322)])
+        # axs_2dtrack.append([fig_2dtrack.add_subplot(323)])
+        # axs_2dtrack.append([fig_2dtrack.add_subplot(324)])
+        # axs_2dtrack.append([fig_2dtrack.add_subplot(325)])
+        # axs_2dtrack.append([fig_2dtrack.add_subplot(326)])
 
-    # fig_3d = plt.figure(figsize=(6, 6))
+        # fig_3d = plt.figure(figsize=(6, 6))
 
-    bpt_idx = []
-    for i_bpt, bpt2plot in enumerate(bpts2plot):
-        bpt_idx.append(r3d_data['dlc_output']['bodyparts'].index(bpt2plot))
-        cur_bpt_idx = bpt_idx[i_bpt]
-
-        for i_axis in range(3):
-            axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis])
-            axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis])
-            axs_2dproj[i_axis].set_xlim([200, 500])
-
-        for i_cam in range(3):
-            axs_scores[i_bpt].plot(np.squeeze(r3d_data['dlc_output']['scores'][i_cam, :, cur_bpt_idx]))
-        axs_scores[i_bpt].set_xlim([200, 500])
-        axs_scores[i_bpt].set_title(bpt2plot)
-        if i_bpt < num_bpts:
-            axs_scores[i_bpt].tick_params(labelbottom=False)
-    axs_scores[num_bpts-1].set_xlabel('frame number')
-
-    axs_2dproj[0].set_title('x')
-    axs_2dproj[1].set_title('y')
-    axs_2dproj[2].set_title('z')
-    axs_2dproj[2].set_xlabel('frame number')
-
-    fig_2dproj.suptitle(traj_name, fontsize=16)
-    fig_scores.suptitle(traj_name, fontsize=16)
-
-    plt.figure(fig_2dproj)
-    plt.savefig(pawtraces_fname, format='pdf')
-    plt.figure(fig_scores)
-    plt.savefig(scores_fname, format='pdf')
-
-    orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
-
-    cap = cv2.VideoCapture(orig_vid)
-
-    cap.set(cv2.CAP_PROP_POS_FRAMES, test_frame)
-    ret, img = cap.read()
-
-    cap.release()
-
-    cam_intrinsics = r3d_data['calibration_data']['cam_intrinsics']
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
-    img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
-
-    fig_img = plt.figure()
-    ax_img = fig_img.add_subplot()
-    ax_img.imshow(img_ud)
-
-    dlc_coords = r3d_data['dlc_output']['points']
-    for i_view in range(3):
+        bpt_idx = []
         for i_bpt, bpt2plot in enumerate(bpts2plot):
-            cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
+            bpt_idx.append(r3d_data['dlc_output']['bodyparts'].index(bpt2plot))
+            cur_bpt_idx = bpt_idx[i_bpt]
 
-            ax_img.scatter(dlc_coords[i_view, test_frame, cur_bpt_idx, 0], dlc_coords[i_view, test_frame, cur_bpt_idx, 1], s=2, color=color_cycle[i_bpt])
+            for i_axis in range(3):
+                axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis])
+                axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis])
+                axs_2dproj[i_axis].set_xlim([200, 500])
 
-    plt.savefig(imgsamp_fname, format='tiff', dpi=600)
+            for i_cam in range(3):
+                axs_scores[i_bpt].plot(np.squeeze(r3d_data['dlc_output']['scores'][i_cam, :, cur_bpt_idx]))
+            axs_scores[i_bpt].set_xlim([200, 500])
+            axs_scores[i_bpt].set_title(bpt2plot)
+            if i_bpt < num_bpts:
+                axs_scores[i_bpt].tick_params(labelbottom=False)
+        axs_scores[num_bpts-1].set_xlabel('frame number')
 
-    plt.close('all')
+        axs_2dproj[0].set_title('x')
+        axs_2dproj[1].set_title('y')
+        axs_2dproj[2].set_title('z')
+        axs_2dproj[2].set_xlabel('frame number')
 
-    create_anipose_vids(traj3d_fname, session_metadata, parent_directories)
+        fig_2dproj.suptitle(traj_name, fontsize=16)
+        fig_scores.suptitle(traj_name, fontsize=16)
+
+        plt.figure(fig_2dproj)
+        plt.savefig(pawtraces_fname, format='pdf')
+        plt.figure(fig_scores)
+        plt.savefig(scores_fname, format='pdf')
+
+        orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
+
+        cap = cv2.VideoCapture(orig_vid)
+
+        cap.set(cv2.CAP_PROP_POS_FRAMES, test_frame)
+        ret, img = cap.read()
+
+        cap.release()
+
+        cam_intrinsics = r3d_data['calibration_data']['cam_intrinsics']
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
+        img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+
+        fig_img = plt.figure()
+        ax_img = fig_img.add_subplot()
+        ax_img.imshow(img_ud)
+
+        dlc_coords = r3d_data['dlc_output']['points']
+        for i_view in range(3):
+            for i_bpt, bpt2plot in enumerate(bpts2plot):
+                cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
+
+                ax_img.scatter(dlc_coords[i_view, test_frame, cur_bpt_idx, 0], dlc_coords[i_view, test_frame, cur_bpt_idx, 1], s=2, color=color_cycle[i_bpt])
+
+        plt.savefig(imgsamp_fname, format='tiff', dpi=600)
+
+        plt.close('all')
+
+    create_anipose_vids(traj3d_fname, session_metadata, parent_directories, session_summary, trials_df)
 
 
 
-def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts2plot='all'):
+def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, session_summary, trials_df,
+                        bpts2plot='all', phot_ylim=[-1.5, 4]):
+
 
     traj_metadata = navigation_utilities.parse_trajectory_name(traj3d_fname)
     traj_metadata['session_num'] = session_metadata['session_num']
@@ -149,8 +144,6 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts
         bpts2plot = r3d_data['dlc_output']['bodyparts']
     num_bpts = len(bpts2plot)
 
-
-
     orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
 
     dlc_coords = r3d_data['dlc_output']['points']
@@ -159,6 +152,10 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts
     scores = r3d_data['dlc_output']['scores']
     min_valid_score = r3d_data['min_valid_score']
     cap = cv2.VideoCapture(orig_vid)
+
+    vidtrigger_ts = ipk.get_vidtrigger_ts(traj_metadata, trials_df)
+    vid_phot_signal = srphot_anal.resample_photometry_to_video(session_summary['sr_zscores1'], trigger_ts, Fs, trigger_frame=300, num_frames=num_frames, fps=300)
+    t = linspace(1/fps, num_frames/fps, num_frames)
 
     session_folder, _ = os.path.split(traj3d_fname)
     jpg_folder = os.path.join(session_folder, 'temp')
@@ -170,11 +167,17 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, bpts
     for i_frame in range(num_frames):
 
         frame_fig = plt.figure(figsize=(20, 10))
-        gs = frame_fig.add_gridspec(2, 2, width_ratios=(4, 1), height_ratios=(3, 4), wspace=0.05, hspace=0.02)
+        gs = frame_fig.add_gridspec(3, 2, width_ratios=(4, 1), height_ratios=(1, 4, 3), wspace=0.05, hspace=0.02)
 
-        vid_ax = frame_fig.add_subplot(gs[:, 0])
-        ax3d = frame_fig.add_subplot(gs[0, 1], projection='3d')
-        legend_ax = frame_fig.add_subplot(gs[1, 1])
+        vid_ax = frame_fig.add_subplot(gs[1:, 0])
+        ax3d = frame_fig.add_subplot(gs[:2, 1], projection='3d')
+        legend_ax = frame_fig.add_subplot(gs[2, 1])
+        phot_trace_ax = frame_fig.add_subplot(gs[0, 0])
+
+        phot_trace_ax.set_ylim(phot_ylim)
+        phot_trace_ax.set_xlim([0, max(t)])
+        phot_trace_ax.set_xticks([0, 300, max(t)])
+        phot_trace_ax.plot(t[:i_frame+1], vid_phot_signal[:i_frame+1], color='g')
 
         cap.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
         ret, img = cap.read()

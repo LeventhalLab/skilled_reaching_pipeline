@@ -133,7 +133,8 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt
         #     reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
-def reconstruct_folder_anipose(session_metadata, calibration_data, rat_df, parent_directories, filtered=True):
+def reconstruct_folder_anipose(session_metadata, calibration_data, rat_df, parent_directories, filtered=True,
+                               smooth_window=101, f0_pctile=10, expected_baseline=0.2, perievent_window=(-5, 5)):
 
     cams = calibration_data['cgroup'].get_names()
 
@@ -148,20 +149,28 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, rat_df, paren
         new_h5_list = glob.glob(os.path.join(cam_folder_name, test_name))
         h5_list.append(glob.glob(os.path.join(cam_folder_name, test_name)))
 
-    # trials_db_name = navigation_utilities.get_trialsdb_name(parent_directories, session_metadata['ratID'], 'sr')
-    # if os.path.exists(trials_db_name):
-    #     trials_df = skilled_reaching_io.read_pickle(trials_db_name)
-    # else:
-    #     rat_aggdata_fname = navigation_utilities.get_aggregated_singlerat_data_name(parent_directories, ratID, 'sr')
-    #     rat_phys_data = skilled_reaching_io.read_pickle(rat_aggdata_fname)
-    #     trials_df = rat_phys_data['rat_df']
-    #     skilled_reaching_io.write_pickle(trials_db_name, trials_df)
+    trials_db_name = navigation_utilities.get_trialsdb_name(parent_directories, session_metadata['ratID'], 'sr')
+    if os.path.exists(trials_db_name):
+        trials_df = skilled_reaching_io.read_pickle(trials_db_name)
+    else:
+        rat_aggdata_fname = navigation_utilities.get_aggregated_singlerat_data_name(parent_directories, ratID, 'sr')
+        rat_phys_data = skilled_reaching_io.read_pickle(rat_aggdata_fname)
+        trials_df = rat_phys_data['rat_df']
+        skilled_reaching_io.write_pickle(trials_db_name, trials_df)
 
     processed_phot_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories)
     processed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
 
     if session_metadata['date'] < datetime(2023, 9, 4):
-        session_summary, trials_df = srphot_anal.aggregate_data_pre_20230904(processed_phot_data, session_metadata)
+        session_summary, trials_df = srphot_anal.aggregate_data_pre_20230904(processed_phot_data, session_metadata, trials_df,
+                                                                             smooth_window=smooth_window,
+                                                                             f0_pctile=f0_pctile, expected_baseline=expected_baseline)
+    else:
+        session_summary, trials_df = srphot_anal.aggregate_data_post_20230904(processed_phot_data, session_metadata,
+                                                                             trials_df,
+                                                                             smooth_window=smooth_window,
+                                                                             f0_pctile=f0_pctile,
+                                                                             expected_baseline=expected_baseline)
 
     # now find matching files from each view
     for h5_file in h5_list[0]:
@@ -185,7 +194,7 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, rat_df, paren
         h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file_group[0])
         trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
                                                                        parent_directories)
-        sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories)
+        sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
 
 
 def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, parent_directories, min_valid_score=0.9):

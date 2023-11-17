@@ -1,6 +1,7 @@
 import photometry_analysis as pa
 import photometry_analysis_plots as pa_plots
 # import photometry_io_skilledreaching as io_utils
+import sr_photometry_analysis as srphot_anal
 import skilled_reaching_io
 import sr_analysis
 import navigation_utilities
@@ -14,6 +15,100 @@ import os
 
 import matplotlib
 matplotlib.use('Qt5Agg')
+
+
+def resample_photometry_to_video(photometry_signal, trigger_ts, Fs, trigger_frame=300, num_frames=1300, fps=300):
+
+    num_points = len(photometry_signal)
+    photometry_t = np.linspace(1/Fs, num_points/Fs, num_points)
+
+    phot_vidsignal = np.zeros(num_frames)
+    for i_frame in range(num_frames):
+
+        frame_time = trigger_ts + (i_frame - trigger_frame) / fps
+        time_diffs = abs(frame_time - photometry_t)
+
+        t_idx = np.where(time_diffs == min(time_diffs))
+        phot_vidsignal[i_frame] = photometry_signal[t_idx]
+
+    return phot_vidsignal
+
+
+def add_trialdata_to_srdf(rat_srdf, session_metadata, sr_ts, sr_intervals, session_duration):
+
+    vidtrigger_ts = sr_ts['vidtrigger']
+    act3_ts = sr_ts['act3']
+    vidtrigger_intervals = sr_intervals['vidtrigger']
+    act3_intervals = sr_intervals['act3']
+    # find rows
+    session_rows = (rat_srdf['session_date'] == session_metadata['date']) & (rat_srdf['date_session_num'] == session_metadata['session_num'])
+    session_row_idx = np.where(session_rows)[0]
+
+    # if there are more session rows than vidtrigger events, that's because the task kept running after the photometry recording stopped
+    # if n_vidtriggers is the number of vidtrigger events recorded in the photometry stream, assign the first n_vidtrigger rows to have a vidtrigger timestamp
+
+    # also, there are some where there are more vidtrigger events than there are videos. This sometimes happens when there is a "line pop"
+    # I think I fixed this, but if it continues to happen, can look at video names for times.
+    if len(session_row_idx) < len(vidtrigger_ts):
+        pass   # to catch instances when there are more vidtrigger events than there should be
+
+    for i_trial_in_session, row_idx in enumerate(session_row_idx):
+        if i_trial_in_session < len(vidtrigger_ts):
+            # find the last actuator 3 timestamp before the current reach
+            trial_act3_ts = act3_ts[act3_ts < vidtrigger_ts[i_trial_in_session]]
+            if len(trial_act3_ts) > 0:
+                trial_act3_ts = trial_act3_ts[-1]
+                trial_act3_idx = np.where(act3_ts == trial_act3_ts)[0][0]
+                rat_srdf.loc[row_idx, 'act3_interval'] = act3_intervals[trial_act3_idx]
+            else:
+                trial_act3_ts = 0
+                rat_srdf.loc[row_idx, 'act3_interval'] = -1
+                # something's weird with 453 on 2/23 - actuator3 and vidtriggers overlap, not sure why. Vids look OK, maybe cables were plugged in wrong?
+
+            rat_srdf.loc[row_idx, 'act3_ts'] = trial_act3_ts
+            rat_srdf.loc[row_idx, 'vidtrigger_ts'] = vidtrigger_ts[i_trial_in_session]
+            rat_srdf.loc[row_idx, 'vidtrigger_interval'] = vidtrigger_intervals[i_trial_in_session]
+            rat_srdf.loc[row_idx, 'session_type'] = session_metadata['task']
+            rat_srdf.loc[row_idx, 'session_duration'] = session_duration
+        else:
+            rat_srdf.loc[row_idx, 'session_type'] = session_metadata['task']
+            rat_srdf.loc[row_idx, 'session_duration'] = session_duration
+            break
+
+    return rat_srdf
+
+
+def extract_sr_event_ts(processed_phot_data, session_metadata, rat_srdf, perievent_window=(-3, 3), smooth_window=101, f0_pctile=10, expected_baseline=0.2):
+
+    eventlist, event_ts = srphot_anal.get_photometry_events(processed_phot_data, session_metadata)
+    Fs = processed_phot_data['Fs']
+    num_samples = len(processed_phot_data['t'])
+    session_duration = num_samples / Fs
+
+    # collect all actuator3 events
+    act3_idx = eventlist.index('Actuator3')
+    act3_ts = event_ts[act3_idx]
+
+    # collect all vidtrigger events
+    vidtrig_idx = eventlist.index('vid_trigger')
+    vidtrigger_ts = event_ts[vidtrig_idx]
+
+    # assign actuator3 and vidtrigger events to valid recording intervals
+    act3_intervals = srphot_anal.identify_ts_intervals(act3_ts, processed_phot_data['analysis_intervals'], perievent_window, processed_phot_data['Fs'])
+    vidtrigger_intervals = srphot_anal.identify_ts_intervals(vidtrigger_ts, processed_phot_data['analysis_intervals'], perievent_window, processed_phot_data['Fs'])
+
+    sr_ts = {'act3': act3_ts, 'vidtrigger': vidtrigger_ts}
+    sr_intervals = {'act3': act3_intervals, 'vidtrigger': vidtrigger_intervals}
+    rat_srdf = add_trialdata_to_srdf(rat_srdf, session_metadata, sr_ts, sr_intervals, session_duration)
+
+    # find all early reaches
+    earlyreach_ts = srphot_anal.find_early_reaches(eventlist, event_ts)
+    earlyreach_intervals = srphot_anal.identify_ts_intervals(earlyreach_ts, processed_phot_data['analysis_intervals'], perievent_window, processed_phot_data['Fs'])
+
+    earlyreach_info = {'earlyreach_ts': earlyreach_ts,
+                       'earlyreach_intervals': earlyreach_intervals}
+
+    return rat_srdf, earlyreach_info
 
 
 def aggregate_data_pre_20230904(processed_phot_data, session_metadata, rat_srdf, smooth_window=101, f0_pctile=10, expected_baseline=0.2, perievent_window=(-5, 5)):

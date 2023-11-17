@@ -3,7 +3,6 @@ import navigation_utilities
 import skilled_reaching_io
 from scipy import signal
 
-
 def session_type_from_folders(session_folders, search_metadata):
     '''
 

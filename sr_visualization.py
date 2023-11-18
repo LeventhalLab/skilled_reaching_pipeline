@@ -156,7 +156,7 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
     vidtrigger_ts, vidtrigger_interval = ipk.get_vidtrigger_ts(traj_metadata, trials_df)
     Fs = session_summary['sr_processed_phot']['Fs']
     vid_phot_signal = srphot_anal.resample_photometry_to_video(session_summary['sr_zscores1'], vidtrigger_ts, Fs, trigger_frame=300, num_frames=num_frames, fps=300)
-    t = linspace(1/fps, num_frames/fps, num_frames)
+    t = np.linspace(1/fps, num_frames/fps, num_frames)
 
     session_folder, _ = os.path.split(traj3d_fname)
     jpg_folder = os.path.join(session_folder, 'temp')

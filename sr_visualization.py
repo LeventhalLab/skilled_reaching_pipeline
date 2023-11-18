@@ -121,7 +121,7 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
 
 
 def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, session_summary, trials_df,
-                        bpts2plot='all', phot_ylim=[-1.5, 4]):
+                        bpts2plot='all', phot_ylim=[-2.5, 5]):
 
     vid_params = {'lm': 0.05,
                   'rm': 0.,
@@ -185,6 +185,7 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
         phot_trace_ax = frame_fig.add_subplot(gs[0, 0])
 
         phot_trace_ax.set_ylim(phot_ylim)
+        phot_trace_ax.set_ylabel('DF/F z-score')
         phot_trace_ax.set_xlim([0, max(t)])
         phot_trace_ax.set_xticks([0, 300/fps, max(t)])
         phot_trace_ax.plot(t[:i_frame+1], vid_phot_signal[:i_frame+1], color='g')

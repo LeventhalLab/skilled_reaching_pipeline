@@ -123,6 +123,14 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
 def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, session_summary, trials_df,
                         bpts2plot='all', phot_ylim=[-1.5, 4]):
 
+    vid_params = {'lm': 0.05,
+                  'rm': 0.,
+                  'tm': 0.,
+                  'bm': 0.05}
+    vid_params['rm'] = 1 - vid_params['lm']
+    vid_params['tm'] = 1 - vid_params['bm']
+
+    fps = 300    # need to record this somewhere in the data - maybe in the .log file?
 
     traj_metadata = navigation_utilities.parse_trajectory_name(traj3d_fname)
     traj_metadata['session_num'] = session_metadata['session_num']
@@ -155,7 +163,7 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
 
     vidtrigger_ts, vidtrigger_interval = ipk.get_vidtrigger_ts(traj_metadata, trials_df)
     Fs = session_summary['sr_processed_phot']['Fs']
-    vid_phot_signal = srphot_anal.resample_photometry_to_video(session_summary['sr_zscores1'], vidtrigger_ts, Fs, trigger_frame=300, num_frames=num_frames, fps=300)
+    vid_phot_signal = srphot_anal.resample_photometry_to_video(session_summary['sr_zscores1'], vidtrigger_ts, Fs, trigger_frame=300, num_frames=num_frames, fps=fps)
     t = np.linspace(1/fps, num_frames/fps, num_frames)
 
     session_folder, _ = os.path.split(traj3d_fname)
@@ -168,7 +176,8 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
     for i_frame in range(num_frames):
 
         frame_fig = plt.figure(figsize=(20, 10))
-        gs = frame_fig.add_gridspec(3, 2, width_ratios=(4, 1), height_ratios=(1, 4, 3), wspace=0.05, hspace=0.02)
+        gs = frame_fig.add_gridspec(3, 2, width_ratios=(4, 1), height_ratios=(1, 3, 4), wspace=0.05, hspace=0.02,
+                                    left=vid_params['lm'], right=vid_params['rm'], top=vid_params['tm'], bottom=vid_params['bm'])
 
         vid_ax = frame_fig.add_subplot(gs[1:, 0])
         ax3d = frame_fig.add_subplot(gs[:2, 1], projection='3d')
@@ -177,7 +186,7 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
 
         phot_trace_ax.set_ylim(phot_ylim)
         phot_trace_ax.set_xlim([0, max(t)])
-        phot_trace_ax.set_xticks([0, 300, max(t)])
+        phot_trace_ax.set_xticks([0, 300/fps, max(t)])
         phot_trace_ax.plot(t[:i_frame+1], vid_phot_signal[:i_frame+1], color='g')
 
         cap.set(cv2.CAP_PROP_POS_FRAMES, i_frame)

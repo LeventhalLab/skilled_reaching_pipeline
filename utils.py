@@ -4,6 +4,7 @@ from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.cluster.vq import whiten
 from collections import defaultdict, Counter
 import queue
+from datetime import datetime
 import pandas as pd
 
 def make_M(rvec, tvec):
@@ -240,3 +241,38 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
         'scores': scores,
         'bodyparts': joint_names
     }
+
+def datetime64_to_datetime_array(dt64_array):
+
+    dt_list = [datetime64_to_datetime(dt64) for dt64 in dt64_array]
+    dt_array = np.array(dt_list)
+
+    return dt_array
+
+def datetime64_to_datetime(dt64):
+
+    ts = pd.to_datetime(dt64)
+    year = ts.year
+    month = ts.month
+    day = ts.day
+    hour = ts.hour
+    minute = ts.minute
+    second = ts.second
+
+    return datetime(year, month, day, hour, minute, second)
+
+def datetime64_to_date_array(dt64_array):
+
+    dt_list = [datetime64_to_date(dt64).date() for dt64 in dt64_array]
+    dt_array = np.array(dt_list)
+
+    return dt_array
+
+def datetime64_to_date(dt64):
+
+    ts = pd.to_datetime(dt64)
+    year = ts.year
+    month = ts.month
+    day = ts.day
+
+    return datetime(year, month, day)

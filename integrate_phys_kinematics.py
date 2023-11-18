@@ -1,24 +1,24 @@
 import os
 import navigation_utilities
 import pandas as pd
+import utils
+import numpy as np
+from datetime import datetime
+
+
+def get_trialdf_row(vid_metadata, trials_df):
+
+    trial_dates = utils.datetime64_to_datetime_array(trials_df['session_date'].values)
+    trialdate_df = trials_df.loc[trial_dates == vid_metadata['triggertime'].date()]
+    session_df = trialdate_df[trial_date_df['date_session_num'] == vid_metadata['session_num']]
+    trial_df = session_df[session_df['vid_number_in_name'] == vid_metadata['video_number']]
+
 
 def get_vidtrigger_ts(vid_metadata, trials_df):
 
-    session_row = trials_df.loc[trials_df['session_date'] == vid_metadata['triggertime'].date()]
+    trial_df = get_trialdf_row(vid_metadata, trials_df)
 
-    session_df = trials_df[(trials_df['session_date'] == vid_metadata['triggertime'].date()) & \
-                            (trials_df['date_session_num'] == vid_metadata['session_num'])]
+    vidtrigger_ts = trial_df['vidtrigger_ts'].values[0]
+    vidtrigger_interval = trial_df['vidtrigger_interval'].values[0]
 
-    # find the session row from the rat_df dataframe
-    # session_row = rat_df[reaching_df['session_date'] == video_metadata['triggertime'].date()]
-    video_metadata = {
-        'ratID': '',
-        'rat_num': 0,
-        'session_name': '',
-        'boxnum': 99,
-        'triggertime': datetime(1,1,1),
-        'video_number': 0,
-        'video_type': '',
-        'video_name': '',
-        'im_size': (1024, 2040)
-    }
+    return vidtrigger_ts, vidtrigger_interval

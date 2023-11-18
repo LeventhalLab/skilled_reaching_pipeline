@@ -10,8 +10,10 @@ def get_trialdf_row(vid_metadata, trials_df):
 
     trial_dates = utils.datetime64_to_datetime_array(trials_df['session_date'].values)
     trialdate_df = trials_df.loc[trial_dates == vid_metadata['triggertime'].date()]
-    session_df = trialdate_df[trial_date_df['date_session_num'] == vid_metadata['session_num']]
+    session_df = trialdate_df[trialdate_df['date_session_num'] == vid_metadata['session_num']]
     trial_df = session_df[session_df['vid_number_in_name'] == vid_metadata['video_number']]
+
+    return trial_df
 
 
 def get_vidtrigger_ts(vid_metadata, trials_df):

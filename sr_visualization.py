@@ -153,8 +153,9 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
     min_valid_score = r3d_data['min_valid_score']
     cap = cv2.VideoCapture(orig_vid)
 
-    vidtrigger_ts = ipk.get_vidtrigger_ts(traj_metadata, trials_df)
-    vid_phot_signal = srphot_anal.resample_photometry_to_video(session_summary['sr_zscores1'], trigger_ts, Fs, trigger_frame=300, num_frames=num_frames, fps=300)
+    vidtrigger_ts, vidtrigger_interval = ipk.get_vidtrigger_ts(traj_metadata, trials_df)
+    Fs = session_summary['sr_processed_phot']['Fs']
+    vid_phot_signal = srphot_anal.resample_photometry_to_video(session_summary['sr_zscores1'], vidtrigger_ts, Fs, trigger_frame=300, num_frames=num_frames, fps=300)
     t = linspace(1/fps, num_frames/fps, num_frames)
 
     session_folder, _ = os.path.split(traj3d_fname)

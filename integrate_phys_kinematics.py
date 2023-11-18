@@ -8,7 +8,7 @@ from datetime import datetime
 
 def get_trialdf_row(vid_metadata, trials_df):
 
-    trial_dates = utils.datetime64_to_datetime_array(trials_df['session_date'].values)
+    trial_dates = utils.datetime64_to_date_array(trials_df['session_date'].values)
     trialdate_df = trials_df.loc[trial_dates == vid_metadata['triggertime'].date()]
     session_df = trialdate_df[trialdate_df['date_session_num'] == vid_metadata['session_num']]
     trial_df = session_df[session_df['vid_number_in_name'] == vid_metadata['video_number']]

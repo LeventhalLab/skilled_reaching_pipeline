@@ -21,7 +21,7 @@ def find_rat_cropped_session_folder(session_metadata, parent_directories):
     rat_folder = os.path.join(cropped_vids_parent, ratID)
 
     metadata_keys = session_metadata.keys()
-    test_datetime_keys = ['trialtime', 'date', 'time']
+    test_datetime_keys = ['trialtime', 'date', 'time', 'triggertime']
     for test_key in test_datetime_keys:
         if test_key in metadata_keys:
             session_date = session_metadata[test_key]
@@ -45,6 +45,7 @@ def find_cropped_session_folder(session_metadata, parent_directories):
     :param parent_directories:
     :return:
     '''
+
     cropped_vids_parent = parent_directories['cropped_vids_parent']
     mouseID = session_metadata['mouseID']
     mouse_folder = os.path.join(cropped_vids_parent, mouseID)
@@ -1087,7 +1088,7 @@ def parse_dlc_output_h5_name(dlc_output_h5_name):
         'scorername': '',
         'h5_name': ''
     }
-    _, h5_name = os.path.split(dlc_output_h5_name)
+    view_folder, h5_name = os.path.split(dlc_output_h5_name)
     h5_metadata['h5_name'] = h5_name
     h5_name, vid_type = os.path.splitext(h5_name)
 
@@ -1119,6 +1120,10 @@ def parse_dlc_output_h5_name(dlc_output_h5_name):
     bottom = int(crop_window_strings[-1][:dlc_location])
 
     h5_metadata['crop_window'].extend((left, right, top, bottom))
+
+    _, view_foldername = os.path.split(view_folder)
+    folder_nameparts = view_foldername.split('_')
+    h5_metadata['task'] = folder_nameparts[2]
 
     #todo: write the scorername into the pickle metadata dictionary. It's also in the metadata pickle file
     h5_metadata['scorername'] = '_'.join(('DLC',

@@ -261,7 +261,7 @@ def match_dlc_points(h5_list, cam_names, parent_directories):
     # find matching files from each view
     for h5_file in h5_list[0]:
         h5_vid_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)
-        cropped_session_folder = navigation_utilities.find_cropped_session_folder(h5_vid_metadata, parent_directories)
+        cropped_session_folder = navigation_utilities.find_rat_cropped_session_folder(h5_vid_metadata, parent_directories)
         h5_group = [h5_file]
         for cam_name in cam_names[1:]:
             cam_folder_name = os.path.join(cropped_session_folder, '_'.join((session_folder_name, cam_name)))

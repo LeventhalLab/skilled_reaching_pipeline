@@ -1,10 +1,12 @@
 import cv2
 import numpy as np
+import navigation_utilities
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.cluster.vq import whiten
 from collections import defaultdict, Counter
 import queue
 import pandas as pd
+import os
 
 def make_M(rvec, tvec):
     out = np.zeros((4,4))
@@ -190,65 +192,39 @@ def get_initial_extrinsics(rtvecs, cam_names=None):
     return rvecs, tvecs
 
 
-## convenience function to load a set of DeepLabCut pose-2d files
-def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
-    if cam_names is None:
-        cam_names = sorted(fname_dict.keys())
-    pose_names = [fname_dict[cname] for cname in cam_names]
+def crop_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
+    '''
 
-    if offsets_dict is None:
-        offsets_dict = dict([(cname, (0,0)) for cname in cam_names])
+    :param pose_data: dictionary containing: cam_names, points, scores, bodyparts
+        cam_names = name of each camera
+        points = num_cams x num_frames x num_joints x 2 array containing points as identified in the cropped views
+        scores = num_cams x num_frames x num_joints array containing the DLC score for each point
+        bodyparts = list of joints
+    :param h5_group:
+    :return:
+    '''
 
-    datas = []
-    for ix_cam, (cam_name, pose_name) in \
-            enumerate(zip(cam_names, pose_names)):
-        dlabs = pd.read_hdf(pose_name)
-        if len(dlabs.columns.levels) > 2:
-            scorer = dlabs.columns.levels[0][0]
-            dlabs = dlabs.loc[:, scorer]
+    num_frames = np.shape(pose_data['points'])[1]
+    for i_file, h5_file in enumerate(h5_group):
+        h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)
+        dx = h5_metadata['crop_window'][0]
+        dy = h5_metadata['crop_window'][2]
+        crop_w = h5_metadata['crop_window'][1] - h5_metadata['crop_window'][0] + 1
+        for i_frame in range(num_frames):
+            # translate points from the cropped video to the full frame
+            if 'fliplr' in h5_file:
+                # video was flipped left-right
+                pose_data['points'][i_file, i_frame, :, 0] = crop_w - pose_data['points'][i_file, i_frame, :, 0]
+            pose_data['points'][i_file, i_frame, :, 0] += dx
+            pose_data['points'][i_file, i_frame, :, 1] += dy
 
-        if 'm' in cam_name:
-            # rename "near" and "far" bodyparts to "left" and "right" depending on the mirror
-            dlabs = rename_mirror_columns(cam_name, dlabs)
+            # now undistort the full frame points
+            pts_ud_norm = cv2.undistortPoints(pose_data['points'][i_file, i_frame, :, :], cam_intrinsics['mtx'], cam_intrinsics['dist'])
+            pts_ud = cvb.unnormalize_points(pts_ud_norm, cam_intrinsics['mtx'])
 
-        bp_index = dlabs.columns.names.index('bodyparts')
-        ind_index = dlabs.columns.names.index('individuals')
-        joint_names = list(dlabs.columns.get_level_values(bp_index).unique())
-        ind_names = list(dlabs.columns.get_level_values(ind_index).unique())
-        dx = offsets_dict[cam_name][0]
-        dy = offsets_dict[cam_name][1]
+            pose_data['points'][i_file, i_frame, :, :] = pts_ud
 
-        for individual in ind_names:
-            for joint in joint_names:
-                if (individual, joint) in dlabs:
-                    dlabs.loc[:, (individual, joint, 'x')] += dx
-                    dlabs.loc[:, (individual, joint, 'y')] += dy
-
-        datas.append(dlabs)
-
-    n_cams = len(cam_names)
-    n_joints = len(joint_names)
-    n_frames = min([d.shape[0] for d in datas])
-
-    # frame, camera, bodypart, xy
-    points = np.full((n_cams, n_frames, n_joints, 2), np.nan, 'float')
-    scores = np.full((n_cams, n_frames, n_joints), np.zeros(1), 'float')
-
-    for cam_ix, dlabs in enumerate(datas):
-        for individual in ind_names:
-            for joint_ix, joint_name in enumerate(joint_names):
-                try:
-                    points[cam_ix, :, joint_ix] = np.array(dlabs.loc[:, (individual, joint_name, ('x', 'y'))])[:n_frames]
-                    scores[cam_ix, :, joint_ix] = np.array(dlabs.loc[:, (individual, joint_name, ('likelihood'))])[:n_frames].ravel()
-                except KeyError:
-                    pass
-
-    return {
-        'cam_names': cam_names,
-        'points': points,
-        'scores': scores,
-        'bodyparts': joint_names
-    }
+    return pose_data
 
 
 def rename_mirror_columns(cam_name, dlabs):
@@ -280,4 +256,40 @@ def rename_mirror_columns(cam_name, dlabs):
     return dlabs
 
 
+def match_dlc_points(h5_list, cam_names, parent_directories):
 
+    # find matching files from each view
+    for h5_file in h5_list[0]:
+        h5_vid_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)
+        cropped_session_folder = navigation_utilities.find_cropped_session_folder(h5_vid_metadata, parent_directories)
+        h5_group = [h5_file]
+        for cam_name in cam_names[1:]:
+            cam_folder_name = os.path.join(cropped_session_folder, '_'.join((session_folder_name, cam_name)))
+            test_name = navigation_utilities.test_dlc_h5_name_from_h5_metadata(h5_vid_metadata, cam_name,
+                                                                               filtered=filtered)
+            full_test_name = os.path.join(cam_folder_name, test_name)
+
+            view_h5_list = glob.glob(full_test_name)
+            if len(view_h5_list) == 1:
+                # found exactly one .h5 file to match the one from the direct view
+                h5_group.append(view_h5_list[0])
+
+        # now have a group of .h5 files for a single trial
+        if len(h5_group) != 3:
+            continue
+
+        for i_cam, cam_name in enumerate(cam_names):
+            fname_dict[cam_name] = h5_group[i_cam]
+
+        d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
+        d = crop_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
+
+        # test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)
+
+        n_cams, n_points, n_joints, _ = d['points'].shape
+
+        scores = d['scores']
+        bodyparts = d['bodyparts']
+
+        # remove points that are below threshold
+        points[scores < min_valid_score] = np.nan

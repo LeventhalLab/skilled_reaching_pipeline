@@ -22,11 +22,33 @@ import skilled_reaching_io
 from boards import CharucoBoard, Checkerboard, merge_rows, extract_points, extract_rtvecs
 from cameras import Camera, CameraGroup
 from utils import load_pose2d_fnames, get_initial_extrinsics, make_M, get_rtvec, get_connections
+from anipose_utils import match_dlc_points
 from random import randint
 from pprint import pprint
 import pandas as pd
 import matplotlib
 matplotlib.use('TKAgg')
+
+
+def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0.99):
+    '''
+
+    :param calibration_data:
+    :param h5_list: list of lists of dlc output (.h5) files containing dlc output
+    :return:
+    '''
+    cgroup = calibration_data['cgroup']
+    cam_names = cgroup.get_names()
+    cgroup_old = copy.deepcopy(cgroup)
+
+    imgp, extra = match_dlc_points(h5_list, cam_names, parent_directories)
+
+    if not calibration_data['bundle_adjust_completed']:
+        # if one of the views couldn't be calibrated, skip bundle adjustment for now
+        if not np.isnan(calibration_data['E']).any():
+            error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
+
+
 
 
 def calibration_metadata_from_df(session_metadata, calibration_metadata_df):

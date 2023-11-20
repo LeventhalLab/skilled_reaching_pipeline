@@ -4,6 +4,8 @@ from datetime import datetime
 import os
 import navigation_utilities
 import glob
+
+import skilled_reaching_calibration
 import skilled_reaching_io
 import pandas as pd
 import scipy.io as sio
@@ -15,10 +17,10 @@ import sr_visualization
 import dlc_utilities
 import sr_photometry_analysis as srphot_anal
 import copy
-from anipose_utils import load_pose2d_fnames
+from utils import load_pose2d_fnames
+from anipose_utils import crop_points_2_full_frame
 
 
-def refine_reconstruction()
 def test_reconstruction(parent_directories, rat_df):
     trajectories_parent = parent_directories['trajectories_parent']
 
@@ -123,6 +125,7 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt
             continue
 
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
+
         reconstruct_folder_anipose(folder_to_reconstruct, calibration_data, rat_df, parent_directories, filtered=filtered)
         # cgroup = calibration_data['cgroup']
         #
@@ -150,6 +153,8 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, rat_df, paren
         test_name = navigation_utilities.test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=filtered)
         new_h5_list = glob.glob(os.path.join(cam_folder_name, test_name))
         h5_list.append(glob.glob(os.path.join(cam_folder_name, test_name)))
+
+    calibration_data = skilled_reaching_calibration.refine_calibration(calibration_data, h5_list, parent_directories)
 
     trials_db_name = navigation_utilities.get_trialsdb_name(parent_directories, session_metadata['ratID'], 'sr')
     if os.path.exists(trials_db_name):
@@ -248,40 +253,6 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
                 'dlc_output': d}
     skilled_reaching_io.write_pickle(trajectory_fname, r3d_data)
 
-
-def crop_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
-    '''
-
-    :param pose_data: dictionary containing: cam_names, points, scores, bodyparts
-        cam_names = name of each camera
-        points = num_cams x num_frames x num_joints x 2 array containing points as identified in the cropped views
-        scores = num_cams x num_frames x num_joints array containing the DLC score for each point
-        bodyparts = list of joints
-    :param h5_group:
-    :return:
-    '''
-
-    num_frames = np.shape(pose_data['points'])[1]
-    for i_file, h5_file in enumerate(h5_group):
-        h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)
-        dx = h5_metadata['crop_window'][0]
-        dy = h5_metadata['crop_window'][2]
-        crop_w = h5_metadata['crop_window'][1] - h5_metadata['crop_window'][0] + 1
-        for i_frame in range(num_frames):
-            # translate points from the cropped video to the full frame
-            if 'fliplr' in h5_file:
-                # video was flipped left-right
-                pose_data['points'][i_file, i_frame, :, 0] = crop_w - pose_data['points'][i_file, i_frame, :, 0]
-            pose_data['points'][i_file, i_frame, :, 0] += dx
-            pose_data['points'][i_file, i_frame, :, 1] += dy
-
-            # now undistort the full frame points
-            pts_ud_norm = cv2.undistortPoints(pose_data['points'][i_file, i_frame, :, :], cam_intrinsics['mtx'], cam_intrinsics['dist'])
-            pts_ud = cvb.unnormalize_points(pts_ud_norm, cam_intrinsics['mtx'])
-
-            pose_data['points'][i_file, i_frame, :, :] = pts_ud
-
-    return pose_data
 
 
 def test_pose_data(h5_metadata, session_metadata, pose_data, cam_intrinsics, parent_directories, test_frame=300):

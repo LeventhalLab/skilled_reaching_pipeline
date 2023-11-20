@@ -17,6 +17,8 @@ import sr_photometry_analysis as srphot_anal
 import copy
 from anipose_utils import load_pose2d_fnames
 
+
+def refine_reconstruction()
 def test_reconstruction(parent_directories, rat_df):
     trajectories_parent = parent_directories['trajectories_parent']
 

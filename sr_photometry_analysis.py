@@ -19,6 +19,10 @@ matplotlib.use('Qt5Agg')
 
 def resample_photometry_to_video(photometry_signal, trigger_ts, Fs, trigger_frame=300, num_frames=1300, fps=300):
 
+    if np.isnan(trigger_ts):
+        # most likely, this video was recorded after the photometry recording completed but before the investigator could
+        # stop the skilled reaching task
+        return None
     num_points = len(photometry_signal)
     photometry_t = np.linspace(1/Fs, num_points/Fs, num_points)
 

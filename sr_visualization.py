@@ -188,7 +188,9 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
         phot_trace_ax.set_ylabel('DF/F z-score')
         phot_trace_ax.set_xlim([0, max(t)])
         phot_trace_ax.set_xticks([0, 300/fps, max(t)])
-        phot_trace_ax.plot(t[:i_frame+1], vid_phot_signal[:i_frame+1], color='g')
+        if not vid_phot_signal is None:
+            # only plot if a photometry signal was recorded during this trial
+            phot_trace_ax.plot(t[:i_frame+1], vid_phot_signal[:i_frame+1], color='g')
 
         cap.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
         ret, img = cap.read()

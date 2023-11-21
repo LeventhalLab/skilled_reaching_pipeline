@@ -1124,6 +1124,7 @@ def parse_dlc_output_h5_name(dlc_output_h5_name):
     _, view_foldername = os.path.split(view_folder)
     folder_nameparts = view_foldername.split('_')
     h5_metadata['task'] = folder_nameparts[2]
+    h5_metadata['session_num'] = int(folder_nameparts[3][-2:])
 
     #todo: write the scorername into the pickle metadata dictionary. It's also in the metadata pickle file
     h5_metadata['scorername'] = '_'.join(('DLC',

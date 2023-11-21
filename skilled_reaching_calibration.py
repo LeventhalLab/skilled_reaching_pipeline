@@ -41,7 +41,7 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     cam_names = cgroup.get_names()
     cgroup_old = copy.deepcopy(cgroup)
 
-    imgp, extra = match_dlc_points(h5_list, cam_names, parent_directories)
+    imgp, extra = match_dlc_points(h5_list, cam_names, calibration_data, parent_directories)
 
     if not calibration_data['bundle_adjust_completed']:
         # if one of the views couldn't be calibrated, skip bundle adjustment for now

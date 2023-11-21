@@ -8,6 +8,9 @@ import queue
 import pandas as pd
 import os
 import glob
+import copy
+from utils import load_pose2d_fnames
+import computer_vision_basics as cvb
 
 def make_M(rvec, tvec):
     out = np.zeros((4,4))
@@ -228,36 +231,9 @@ def crop_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
     return pose_data
 
 
-def rename_mirror_columns(cam_name, dlabs):
 
-    bp_index = dlabs.columns.names.index('bodyparts')
-    ind_index = dlabs.columns.names.index('individuals')
-    joint_names = list(dlabs.columns.get_level_values(bp_index).unique())
-    ind_names = list(dlabs.columns.get_level_values(ind_index).unique())
-
-    if cam_name == 'lm':
-        near_side = 'right'
-        far_side = 'left'
-    elif cam_name == 'rm':
-        near_side = 'left'
-        far_side = 'right'
-
-    for individual in ind_names:
-        if 'rat' not in individual:
-            continue
-
-        for joint in joint_names:
-            if 'near' in joint:
-                new_joint = joint.replace('near', near_side)
-                dlabs.rename(columns={joint: new_joint}, level=1, inplace=True)
-            if 'far' in joint:
-                new_joint = joint.replace('far', far_side)
-                dlabs.rename(columns={joint: new_joint}, level=1, inplace=True)
-
-    return dlabs
-
-
-def match_dlc_points(h5_list, cam_names, parent_directories, filtered=False):
+def match_dlc_points(h5_list, cam_names, calibration_data, parent_directories, min_valid_score=0.99, filtered=False):
+    # in general, use a very restrictive score cutoff since this is just to optimize the calibration (don't need full paw tracking)
 
     fname_dict = dict.fromkeys(cam_names)
     # find matching files from each view
@@ -291,8 +267,16 @@ def match_dlc_points(h5_list, cam_names, parent_directories, filtered=False):
 
         n_cams, n_points, n_joints, _ = d['points'].shape
 
+        # need to copy so full dlc_output gets written to r3d_data
+        points = copy.deepcopy(d['points'])
         scores = d['scores']
         bodyparts = d['bodyparts']
 
         # remove points that are below threshold
         points[scores < min_valid_score] = np.nan
+
+        # for calibration, we need an imgp array that is num_cams x num_points x 2
+        imgp = points[np.logical_not(np.isnan(points))]
+
+
+        pass

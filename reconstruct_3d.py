@@ -4,7 +4,6 @@ from datetime import datetime
 import os
 import navigation_utilities
 import glob
-
 import skilled_reaching_calibration
 import skilled_reaching_io
 import pandas as pd

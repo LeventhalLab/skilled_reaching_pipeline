@@ -198,13 +198,21 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
     pose_names = [fname_dict[cname] for cname in cam_names]
 
     if offsets_dict is None:
-        offsets_dict = dict([(cname, (0,0)) for cname in cam_names])
+        offsets_dict = dict([(cname, (0, 0)) for cname in cam_names])
 
     datas = []
     for ix_cam, (cam_name, pose_name) in \
             enumerate(zip(cam_names, pose_names)):
         dlabs = pd.read_hdf(pose_name)
+        if ix_cam == 0:
+            # this ensures that the joint order for the direct view is used uniformly
+            bp_index = dlabs.columns.names.index('bodyparts')
+            ind_index = dlabs.columns.names.index('individuals')
+
+            joint_names = list(dlabs.columns.get_level_values(bp_index).unique())
+            individuals = list(dlabs.columns.get_level_values(ind_index).unique())
         if not 'dir' in cam_name:
+            # rename from "near/far" to "left/right" for mirror views
             dlabs = rename_mirror_columns(cam_name, dlabs)
 
         if len(dlabs.columns.levels) > 2:
@@ -213,8 +221,7 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
 
         bp_index = dlabs.columns.names.index('bodyparts')
         ind_index = dlabs.columns.names.index('individuals')
-        joint_names = list(dlabs.columns.get_level_values(bp_index).unique())
-        individuals = list(dlabs.columns.get_level_values(ind_index).unique())
+
         dx = offsets_dict[cam_name][0]
         dy = offsets_dict[cam_name][1]
 
@@ -240,6 +247,7 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
         for joint_ix, joint_name in enumerate(joint_names):
             for ind in individuals:
                 try:
+                    # because points and score matrices are filled based on joint name, the joint order in the dataframe does not matter
                     points[cam_ix, :, joint_ix] = np.array(dlabs.loc[:, (ind, joint_name, ('x', 'y'))])[:n_frames]
                     scores[cam_ix, :, joint_ix] = np.array(dlabs.loc[:, (ind, joint_name, ('likelihood'))])[:n_frames].ravel()
                 except KeyError:

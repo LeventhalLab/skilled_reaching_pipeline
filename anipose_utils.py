@@ -294,7 +294,7 @@ def match_camera_view_pts(points):
     for i_frame in range(num_frames):
         valid_pts = np.ones((num_bodyparts, 2), dtype=bool)
         for i_cam in range(num_cams):
-            valid_pts = np.logical_and(valid_rows, points[i_cam, i_frame, :, :])
+            valid_pts = np.logical_and(valid_pts, np.isnan(points[i_cam, i_frame, :, :]))
         if i_frame == 0:
-            # imgp =
+            imgp = points[:, i_frame, ]
             pass

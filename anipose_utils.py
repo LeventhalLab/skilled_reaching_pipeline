@@ -274,6 +274,7 @@ def match_dlc_points(h5_list, cam_names, calibration_data, parent_directories, m
 
         # remove points that are below threshold
         points[scores < min_valid_score] = np.nan
+        match_camera_view_pts(points)
 
         # for calibration, we need an imgp array that is num_cams x num_points x 2
         # only keep points visible in all 3 cameras with high confidence
@@ -281,3 +282,19 @@ def match_dlc_points(h5_list, cam_names, calibration_data, parent_directories, m
 
 
         pass
+
+
+def match_camera_view_pts(points):
+
+    num_cams = np.shape(points)[0]
+    num_frames = np.shape(points)[1]
+    num_bodyparts = np.shape(points)[2]
+
+    # imgp = np.array((num_cams, num_frames, ))
+    for i_frame in range(num_frames):
+        valid_pts = np.ones((num_bodyparts, 2), dtype=bool)
+        for i_cam in range(num_cams):
+            valid_pts = np.logical_and(valid_rows, points[i_cam, i_frame, :, :])
+        if i_frame == 0:
+            # imgp =
+            pass

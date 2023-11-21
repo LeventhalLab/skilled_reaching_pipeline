@@ -276,6 +276,7 @@ def match_dlc_points(h5_list, cam_names, calibration_data, parent_directories, m
         points[scores < min_valid_score] = np.nan
 
         # for calibration, we need an imgp array that is num_cams x num_points x 2
+        # only keep points visible in all 3 cameras with high confidence
         imgp = points[np.logical_not(np.isnan(points))]
 
 

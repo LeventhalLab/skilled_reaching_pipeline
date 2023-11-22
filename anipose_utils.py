@@ -237,6 +237,7 @@ def match_dlc_points(h5_list, cam_names, calibration_data, parent_directories, m
 
     fname_dict = dict.fromkeys(cam_names)
     # find matching files from each view
+    num_matched_pts = 0
     for h5_file in h5_list[0]:
         h5_vid_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)
         cropped_session_folder = navigation_utilities.find_rat_cropped_session_folder(h5_vid_metadata, parent_directories)
@@ -274,14 +275,15 @@ def match_dlc_points(h5_list, cam_names, calibration_data, parent_directories, m
 
         # remove points that are below threshold
         points[scores < min_valid_score] = np.nan
-        match_camera_view_pts(points)
+        imgp = match_camera_view_pts(points)
 
-        # for calibration, we need an imgp array that is num_cams x num_points x 2
-        # only keep points visible in all 3 cameras with high confidence
-        imgp = points[np.logical_not(np.isnan(points))]
+        if num_matched_pts == 0:
+            all_imgp = imgp
+        else:
+            all_imgp = [np.vstack((prev_pts, vid_imgp)) for (prev_pts, vid_imgp) in zip(all_imgp, imgp)]
+        num_matched_pts += np.shape(imgp)[1]
 
-
-        pass
+    return all_imgp
 
 
 def match_camera_view_pts(points):
@@ -298,9 +300,8 @@ def match_camera_view_pts(points):
             valid_bool = np.logical_and(valid_bool, np.logical_not(np.isnan(points[i_cam, i_frame, :, 0])))
         if num_valid_pts == 0:
             imgp = [cam_pts[i_frame, valid_bool, :] for cam_pts in points]
-            num_valid_pts = np.shape(imgp)[1]
         else:
             imgp = [np.vstack((prev_cam_pts, frame_cam_pts[i_frame, valid_bool, :])) for (prev_cam_pts, frame_cam_pts) in zip(imgp, points)]
-            num_valid_pts += np.shape(imgp)[1]
+        num_valid_pts += np.shape(imgp)[1]
 
-    pass
+    return imgp

@@ -37,6 +37,9 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     :param h5_list: list of lists of dlc output (.h5) files containing dlc output
     :return:
     '''
+    h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_list[0][0])
+    print('refining calibration for {}, {}, session {:d}'.format(h5_metadata['ratID'], h5_metadata['triggertime'].strftime('%m/%d/%Y'), h5_metadata['session_num']))
+
     cgroup = calibration_data['cgroup']
     cam_names = cgroup.get_names()
     calibration_data['original_cgroup'] = copy.deepcopy(cgroup)
@@ -50,8 +53,16 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra=None, verbose=verbose)
 
     # cgroup was modified by the bundle_adjust_iter_fixed_dist function
-    calibration_data['cgroup'] = cgroup
-    calibration_data['refine_error'] = error
+    cgroup_name = '_'.join((h5_metadata['ratID'],
+                            h5_metadata['triggertime'].strftime('%Y%m%d'),
+                            'ses{:02d}'.format(h5_metadata['session_num']),
+                            'cgroup'))
+    calibration_data[cgroup_name] = cgroup
+    cgroup_error_name = '_'.join((h5_metadata['ratID'],
+                            h5_metadata['triggertime'].strftime('%Y%m%d'),
+                            'ses{:02d}'.format(h5_metadata['session_num']),
+                            'cgroup_error'))
+    calibration_data[cgroup_error_name] = error
 
     return calibration_data
 
@@ -1814,9 +1825,9 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
 
     view_keys = list(stereo_cal_points.keys())
     for view_key in view_keys:
-        if view_key in ['leftmirror', 'lm']:
+        if view_key in ['leftmirror', 'left_mirror', 'lm']:
             lm_key = view_key
-        elif view_key in ['right_mirror', 'rm']:
+        elif view_key in ['rightmirror', 'right_mirror', 'rm']:
             rm_key = view_key
         elif view_key in ['direct', 'dir']:
             dir_key = view_key

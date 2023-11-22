@@ -152,15 +152,14 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         new_h5_list = glob.glob(os.path.join(cam_folder_name, test_name))
         h5_list.append(glob.glob(os.path.join(cam_folder_name, test_name)))
 
+    h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_list[0][0])
+    cgroup_name = '_'.join((h5_metadata['ratID'],
+                            h5_metadata['triggertime'].strftime('%Y%m%d'),
+                            'ses{:02d}'.format(h5_metadata['session_num']),
+                            'cgroup'))
     # if calibration hasn't been refined by dlc points, refine it now, then write back to disk so we don't have to do it again
-    if 'dlc_refined' in calibration_data.keys():
-        if not calibration_data['dlc_refined']:
-            calibration_data = skilled_reaching_calibration.refine_calibration(calibration_data, h5_list, parent_directories)
-            calibration_data['dlc_refined'] = True
-            skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
-    else:
+    if not cgroup_name in calibration_data.keys():
         calibration_data = skilled_reaching_calibration.refine_calibration(calibration_data, h5_list, parent_directories)
-        calibration_data['dlc_refined'] = True
         skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
 
     trials_db_name = navigation_utilities.get_trialsdb_name(parent_directories, session_metadata['ratID'], 'sr')
@@ -219,7 +218,12 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     if os.path.exists(trajectory_fname):
         return
 
-    cgroup = calibration_data['cgroup']
+    cgroup_name = '_'.join((h5_metadata['ratID'],
+                            h5_metadata['triggertime'].strftime('%Y%m%d'),
+                            'ses{:02d}'.format(h5_metadata['session_num']),
+                            'cgroup'))
+
+    cgroup = calibration_data[cgroup_name]
     cam_names = cgroup.get_names()
     fname_dict = dict.fromkeys(cam_names)
     for i_cam, cam_name in enumerate(cam_names):

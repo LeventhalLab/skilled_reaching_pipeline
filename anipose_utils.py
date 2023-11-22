@@ -232,7 +232,7 @@ def crop_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
 
 
 
-def match_dlc_points(h5_list, cam_names, calibration_data, parent_directories, min_valid_score=0.99, filtered=False):
+def match_dlc_points_from_all_views(h5_list, cam_names, calibration_data, parent_directories, min_valid_score=0.99, filtered=False):
     # in general, use a very restrictive score cutoff since this is just to optimize the calibration (don't need full paw tracking)
 
     fname_dict = dict.fromkeys(cam_names)
@@ -271,7 +271,6 @@ def match_dlc_points(h5_list, cam_names, calibration_data, parent_directories, m
         # need to copy so full dlc_output gets written to r3d_data
         points = copy.deepcopy(d['points'])
         scores = d['scores']
-        bodyparts = d['bodyparts']
 
         # remove points that are below threshold
         points[scores < min_valid_score] = np.nan
@@ -283,7 +282,7 @@ def match_dlc_points(h5_list, cam_names, calibration_data, parent_directories, m
             all_imgp = [np.vstack((prev_pts, vid_imgp)) for (prev_pts, vid_imgp) in zip(all_imgp, imgp)]
         num_matched_pts += np.shape(imgp)[1]
 
-    return all_imgp
+    return np.array(all_imgp)
 
 
 def match_camera_view_pts(points):

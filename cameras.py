@@ -1514,7 +1514,7 @@ class CameraGroup:
         if extra is not None:
             ids = extra['ids_map']
             n_boards = int(np.max(ids[~np.isnan(ids)])) + 1
-            total_board_params = n_boards * (3 + 3) # rvecs + tvecs
+            total_board_params = n_boards * (3 + 3)  # rvecs + tvecs
 
             # initialize to 0
             rvecs = np.zeros((n_boards, 3), dtype='float64')

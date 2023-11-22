@@ -22,7 +22,7 @@ import skilled_reaching_io
 from boards import CharucoBoard, Checkerboard, merge_rows, extract_points, extract_rtvecs
 from cameras import Camera, CameraGroup
 from utils import load_pose2d_fnames, get_initial_extrinsics, make_M, get_rtvec, get_connections
-from anipose_utils import match_dlc_points
+from anipose_utils import match_dlc_points_from_all_views
 from random import randint
 from pprint import pprint
 import pandas as pd
@@ -30,7 +30,7 @@ import matplotlib
 matplotlib.use('TKAgg')
 
 
-def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0.99):
+def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0.99, verbose=False):
     '''
 
     :param calibration_data:
@@ -39,16 +39,21 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     '''
     cgroup = calibration_data['cgroup']
     cam_names = cgroup.get_names()
-    cgroup_old = copy.deepcopy(cgroup)
+    calibration_data['original_cgroup'] = copy.deepcopy(cgroup)
 
-    imgp, extra = match_dlc_points(h5_list, cam_names, calibration_data, parent_directories)
+    imgp = match_dlc_points_from_all_views(h5_list, cam_names, calibration_data, parent_directories)
 
-    if not calibration_data['bundle_adjust_completed']:
-        # if one of the views couldn't be calibrated, skip bundle adjustment for now
-        if not np.isnan(calibration_data['E']).any():
-            error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
+    # do the fundamental and essential matrices need to be recalculated?
+    # imgp_dict ={cam_name: imgp[i_cam] for i_cam, cam_name in enumerate(cam_names)}
+    # cam_intrinsics = calibration_data['cam_intrinsics']
+    # E, F, rot, t = mirror_stereo_cal(imgp_dict, cam_intrinsics, view_names=cam_names)
+    error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra=None, verbose=verbose)
 
+    # cgroup was modified by the bundle_adjust_iter_fixed_dist function
+    calibration_data['cgroup'] = cgroup
+    calibration_data['refine_error'] = error
 
+    return calibration_data
 
 
 def calibration_metadata_from_df(session_metadata, calibration_metadata_df):
@@ -1807,14 +1812,23 @@ def select_correct_E_mirror(R1, R2, T, pts1, pts2, mtx):
 
 def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']]):
 
+    view_keys = list(stereo_cal_points.keys())
+    for view_key in view_keys:
+        if view_key in ['leftmirror', 'lm']:
+            lm_key = view_key
+        elif view_key in ['right_mirror', 'rm']:
+            rm_key = view_key
+        elif view_key in ['direct', 'dir']:
+            dir_key = view_key
+
     # calculate fundamental matrices for each view
     F = np.empty((3, 3, 2))
-    if stereo_cal_points['leftmirror'] is None:
+    if stereo_cal_points[lm_key] is None:
         F[:, :, 0].fill(np.nan)
     else:
         F[:, :, 0] = cvb.fund_matrix_mirror(stereo_cal_points['directleft'], stereo_cal_points['leftmirror'])
 
-    if stereo_cal_points['rightmirror'] is None:
+    if stereo_cal_points[rm_key] is None:
         F[:, :, 1].fill(np.nan)
     else:
         F[:, :, 1] = cvb.fund_matrix_mirror(stereo_cal_points['directright'], stereo_cal_points['rightmirror'])

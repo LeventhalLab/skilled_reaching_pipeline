@@ -123,9 +123,7 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt
         if not os.path.exists(calibration_pickle_name):
             continue
 
-        calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
-
-        reconstruct_folder_anipose(folder_to_reconstruct, calibration_data, rat_df, parent_directories, filtered=filtered)
+        reconstruct_folder_anipose(folder_to_reconstruct, calibration_pickle_name, rat_df, parent_directories, filtered=filtered)
         # cgroup = calibration_data['cgroup']
         #
         # calibration_folder = navigation_utilities.find_calibration_files_folder(session_date, box_num, calibration_files_parent)
@@ -137,8 +135,9 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt
         #     reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
-def reconstruct_folder_anipose(session_metadata, calibration_data, rat_df, parent_directories, filtered=True,
+def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df, parent_directories, filtered=True,
                                smooth_window=101, f0_pctile=10, expected_baseline=0.2, perievent_window=(-5, 5)):
+    calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
 
     cams = calibration_data['cgroup'].get_names()
 
@@ -153,7 +152,16 @@ def reconstruct_folder_anipose(session_metadata, calibration_data, rat_df, paren
         new_h5_list = glob.glob(os.path.join(cam_folder_name, test_name))
         h5_list.append(glob.glob(os.path.join(cam_folder_name, test_name)))
 
-    calibration_data = skilled_reaching_calibration.refine_calibration(calibration_data, h5_list, parent_directories)
+    # if calibration hasn't been refined by dlc points, refine it now, then write back to disk so we don't have to do it again
+    if 'dlc_refined' in calibration_data.keys():
+        if not calibration_data['dlc_refined']:
+            calibration_data = skilled_reaching_calibration.refine_calibration(calibration_data, h5_list, parent_directories)
+            calibration_data['dlc_refined'] = True
+            skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+    else:
+        calibration_data = skilled_reaching_calibration.refine_calibration(calibration_data, h5_list, parent_directories)
+        calibration_data['dlc_refined'] = True
+        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
 
     trials_db_name = navigation_utilities.get_trialsdb_name(parent_directories, session_metadata['ratID'], 'sr')
     if os.path.exists(trials_db_name):

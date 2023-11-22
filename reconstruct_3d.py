@@ -215,8 +215,8 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
                                                                    parent_directories)
 
-    if os.path.exists(trajectory_fname):
-        return
+    # if os.path.exists(trajectory_fname):
+    #     return
 
     cgroup_name = '_'.join((h5_metadata['ratID'],
                             h5_metadata['triggertime'].strftime('%Y%m%d'),
@@ -239,11 +239,12 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     # need to copy so full dlc_output gets written to r3d_data
     points = copy.deepcopy(d['points'])
     scores = d['scores']
-
     bodyparts = d['bodyparts']
 
     # remove points that are below threshold
     points[scores < min_valid_score] = np.nan
+
+    match_palm_dorsum(points, bodyparts)
 
     points_flat = points.reshape(n_cams, -1, 2)
     scores_flat = scores.reshape(n_cams, -1)
@@ -265,6 +266,34 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     skilled_reaching_io.write_pickle(trajectory_fname, r3d_data)
 
 
+def match_palm_dorsum(points, bodyparts):
+    '''
+    if the palm was identified instead of the paw dorsum, move the palm coordinates into the spot for the paw dorsum
+    coordinates, so it can be triangulated
+    :param points:
+    :param bodyparts:
+    :return:
+    '''
+    num_cams = np.shape(points)[0]
+    num_frames = np.shape(points)[1]
+    paws = ['left', 'right']
+    pd_idx = []
+    palm_idx = []
+    for paw in paws:
+        pd_idx.append(bodyparts.index(paw + 'pawdorsum'))
+        palm_idx.append(bodyparts.index(paw + 'palm'))
+
+    for i_frame in range(num_frames):
+        for i_paw in range(2):
+            for i_cam in range(num_cams):
+                ispdvalid = not np.isnan(points[i_cam, i_frame, pd_idx[i_paw], 0])
+                ispalmvalid = not np.isnan(points[i_cam, i_frame, palm_idx[i_paw], 0])
+
+                if ispalmvalid and not ispdvalid:
+                    points[i_cam, i_frame, pd_idx[i_paw], :] = points[i_cam, i_frame, palm_idx, :]
+
+
+    return points
 
 def test_pose_data(h5_metadata, session_metadata, pose_data, cam_intrinsics, parent_directories, test_frame=300):
 

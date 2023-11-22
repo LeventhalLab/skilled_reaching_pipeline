@@ -16,6 +16,7 @@ import sr_visualization
 import dlc_utilities
 import sr_photometry_analysis as srphot_anal
 import copy
+import toml
 from utils import load_pose2d_fnames
 from anipose_utils import crop_points_2_full_frame
 
@@ -85,7 +86,7 @@ def reconstruct_folders(folders_to_reconstruct, parent_directories,  rat_df):
             reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
-def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt, rat_df, filtered=True):
+def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt, rat_df, anipose_config, filtered=True):
 
     cropped_videos_parent = parent_directories['cropped_videos_parent']
     calibration_files_parent = parent_directories['calibration_files_parent']
@@ -123,7 +124,7 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt
         if not os.path.exists(calibration_pickle_name):
             continue
 
-        reconstruct_folder_anipose(folder_to_reconstruct, calibration_pickle_name, rat_df, parent_directories, filtered=filtered)
+        reconstruct_folder_anipose(folder_to_reconstruct, calibration_pickle_name, rat_df, parent_directories, anipose_config, filtered=filtered)
         # cgroup = calibration_data['cgroup']
         #
         # calibration_folder = navigation_utilities.find_calibration_files_folder(session_date, box_num, calibration_files_parent)
@@ -135,7 +136,7 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt
         #     reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
-def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df, parent_directories, filtered=True,
+def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df, parent_directories, anipose_config, filtered=True,
                                smooth_window=101, f0_pctile=10, expected_baseline=0.2, perievent_window=(-5, 5)):
     calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
 
@@ -202,7 +203,7 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         if len(h5_file_group) != 3:
             continue
 
-        reconstruct_single_vid_anipose(h5_file_group, session_metadata, calibration_data, parent_directories)
+        reconstruct_single_vid_anipose(h5_file_group, session_metadata, calibration_data, anipose_config, parent_directories)
 
         h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file_group[0])
         trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
@@ -210,7 +211,8 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
 
 
-def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, parent_directories, min_valid_score=0.9):
+def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, anipose_config, parent_directories, min_valid_score=0.9):
+
     h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_group[0])
     trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
                                                                    parent_directories)
@@ -255,8 +257,9 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     p3ds = p3ds_flat.reshape(n_points, n_joints, 3)
     reprojerr = reprojerr_flat.reshape(n_points, n_joints)
 
-    # todo: write code to save a pickled file with the reconstruction so we can create an animation
-
+    # now compare to the optimized version that includes constraints and filtering
+    # hard-code the constraints for now
+    constraints = load_constraints(anipose_config, bodyparts)
 
     r3d_data = {'points3d': p3ds,
                 'calibration_data': calibration_data,
@@ -274,8 +277,7 @@ def match_palm_dorsum(points, bodyparts):
     :param bodyparts:
     :return:
     '''
-    num_cams = np.shape(points)[0]
-    num_frames = np.shape(points)[1]
+    n_cams, n_frames, _, _ = np.shape(points)
     paws = ['left', 'right']
     pd_idx = []
     palm_idx = []
@@ -283,9 +285,9 @@ def match_palm_dorsum(points, bodyparts):
         pd_idx.append(bodyparts.index(paw + 'pawdorsum'))
         palm_idx.append(bodyparts.index(paw + 'palm'))
 
-    for i_frame in range(num_frames):
+    for i_frame in range(n_frames):
         for i_paw in range(2):
-            for i_cam in range(num_cams):
+            for i_cam in range(n_cams):
                 ispdvalid = not np.isnan(points[i_cam, i_frame, pd_idx[i_paw], 0])
                 ispalmvalid = not np.isnan(points[i_cam, i_frame, palm_idx[i_paw], 0])
 

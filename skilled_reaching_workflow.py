@@ -8,6 +8,7 @@ import glob
 import os
 import shutil
 import pandas as pd
+import toml
 import cv2
 import sys
 import deeplabcut
@@ -389,12 +390,12 @@ if __name__ == '__main__':
 
     filtertype = 'h264'
 
-    # for lambda computer
-    view_config_paths = {
-        'direct': '/home/levlab/deeplabcut_projects/ratdirsr-DL-2023-06-07/config.yaml',
-        'nearpaw': '/home/levlab/deeplabcut_projects/ratnearpawmirrsr-DL-2023-06-19/config.yaml',
-        'farpaw': '/home/levlab/deeplabcut_projects/ratfarpawmirrsr-DL-2023-07-03/config.yaml'
-    }
+    # # for lambda computer
+    # view_config_paths = {
+    #     'direct': '/home/levlab/deeplabcut_projects/ratdirsr-DL-2023-06-07/config.yaml',
+    #     'nearpaw': '/home/levlab/deeplabcut_projects/ratnearpawmirrsr-DL-2023-06-19/config.yaml',
+    #     'farpaw': '/home/levlab/deeplabcut_projects/ratfarpawmirrsr-DL-2023-07-03/config.yaml'
+    # }
 
     DLC_folder_names = {'direct': 'ratdirsr-DL-2023-06-07',
                         'nearpaw': 'ratnearpawmirrsr-DL-2023-06-19',
@@ -426,6 +427,7 @@ if __name__ == '__main__':
 
     # to find the config files for each DLC network for each view
     view_config_paths = {view_key: os.path.join(DLC_top_folder, DLC_folder_names[view_key], 'config.yaml') for view_key in view_keys}
+    anipose_config_path = os.path.join(DLC_top_folder, 'sr_anipose', 'config.toml')
 
     parent_directories = {expt: {
                                 'videos_parent': videos_parents[expt],
@@ -536,7 +538,9 @@ if __name__ == '__main__':
     for expt in experiment_list:
         rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
         folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(parent_directories[expt]['cropped_videos_parent'], cam_names)
-        reconstruct_3d.reconstruct_folders_anipose(folders_to_reconstruct, parent_directories[expt], expt, rat_df, filtered=False)
+
+        anipose_config = toml.load(anipose_config_path)
+        reconstruct_3d.reconstruct_folders_anipose(folders_to_reconstruct, parent_directories[expt], expt, rat_df, anipose_config, filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)
 

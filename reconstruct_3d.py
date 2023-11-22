@@ -290,7 +290,7 @@ def match_palm_dorsum(points, bodyparts):
                 ispalmvalid = not np.isnan(points[i_cam, i_frame, palm_idx[i_paw], 0])
 
                 if ispalmvalid and not ispdvalid:
-                    points[i_cam, i_frame, pd_idx[i_paw], :] = points[i_cam, i_frame, palm_idx, :]
+                    points[i_cam, i_frame, pd_idx[i_paw], :] = points[i_cam, i_frame, palm_idx[i_paw], :]
 
 
     return points

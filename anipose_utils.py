@@ -291,10 +291,16 @@ def match_camera_view_pts(points):
     num_bodyparts = np.shape(points)[2]
 
     # imgp = np.array((num_cams, num_frames, ))
+    num_valid_pts = 0
     for i_frame in range(num_frames):
-        valid_pts = np.ones((num_bodyparts, 2), dtype=bool)
+        valid_bool = np.ones((num_bodyparts), dtype=bool)
         for i_cam in range(num_cams):
-            valid_pts = np.logical_and(valid_pts, np.isnan(points[i_cam, i_frame, :, :]))
-        if i_frame == 0:
-            imgp = points[:, i_frame, ]
-            pass
+            valid_bool = np.logical_and(valid_bool, np.logical_not(np.isnan(points[i_cam, i_frame, :, 0])))
+        if num_valid_pts == 0:
+            imgp = [cam_pts[i_frame, valid_bool, :] for cam_pts in points]
+            num_valid_pts = np.shape(imgp)[1]
+        else:
+            imgp = [np.vstack((prev_cam_pts, frame_cam_pts[i_frame, valid_bool, :])) for (prev_cam_pts, frame_cam_pts) in zip(imgp, points)]
+            num_valid_pts += np.shape(imgp)[1]
+
+    pass

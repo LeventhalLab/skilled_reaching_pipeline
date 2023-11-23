@@ -258,8 +258,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     reprojerr = reprojerr_flat.reshape(n_points, n_joints)
 
     # now compare to the optimized version that includes constraints and filtering
-    # hard-code the constraints for now
-    constraints = load_constraints(anipose_config, bodyparts)
+    triangulate_optim(d, cgroup, anipose_config, p3ds)
 
     r3d_data = {'points3d': p3ds,
                 'calibration_data': calibration_data,
@@ -267,6 +266,53 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
                 'min_valid_score': min_valid_score,
                 'dlc_output': d}
     skilled_reaching_io.write_pickle(trajectory_fname, r3d_data)
+
+
+def triangulate_optim(d, cgroup, anipose_config, points_3d_init):
+
+    points_2d = copy.deepcopy(d['points'])
+    scores_2d = d['scores']
+    bodyparts = d['bodyparts']
+
+    n_cams, n_frames, n_joints, _ = points_2d.shape
+
+    constraints = load_constraints(anipose_config, bodyparts)
+    constraints_weak = load_constraints(anipose_config, bodyparts, 'constraints_weak')
+
+    points_shaped = points_2d.reshape(n_cams, n_frames * n_joints, 2)
+
+    c = np.isfinite(points_3d_init[:, :, 0])
+    if np.sum(c) < 20:
+        print("warning: not enough 3D points to run optimization")
+        points_3d = points_3d_init
+        # todo: working here...
+    else:
+        points_3d = cgroup.optim_points(
+            points_2d, points_3d_init,
+            constraints=constraints,
+            constraints_weak=constraints_weak,
+            # scores=scores_2d,
+            scale_smooth=config['triangulation']['scale_smooth'],
+            scale_length=config['triangulation']['scale_length'],
+            scale_length_weak=config['triangulation']['scale_length_weak'],
+            n_deriv_smooth=config['triangulation']['n_deriv_smooth'],
+            reproj_error_threshold=config['triangulation']['reproj_error_threshold'],
+            verbose=True)
+
+    return points_3d
+
+
+def load_constraints(config, bodyparts, key='constraints'):
+    # taken directly from anipose
+    constraints_names = config['triangulation'].get(key, [])
+    bp_index = dict(zip(bodyparts, range(len(bodyparts))))
+    constraints = []
+    for a, b in constraints_names:
+        assert a in bp_index, 'Bodypart {} from constraints not found in list of bodyparts'.format(a)
+        assert b in bp_index, 'Bodypart {} from constraints not found in list of bodyparts'.format(b)
+        con = [bp_index[a], bp_index[b]]
+        constraints.append(con)
+    return constraints
 
 
 def match_palm_dorsum(points, bodyparts):

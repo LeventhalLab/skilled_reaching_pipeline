@@ -292,11 +292,11 @@ def triangulate_optim(d, cgroup, anipose_config, points_3d_init):
             constraints=constraints,
             constraints_weak=constraints_weak,
             # scores=scores_2d,
-            scale_smooth=config['triangulation']['scale_smooth'],
-            scale_length=config['triangulation']['scale_length'],
-            scale_length_weak=config['triangulation']['scale_length_weak'],
-            n_deriv_smooth=config['triangulation']['n_deriv_smooth'],
-            reproj_error_threshold=config['triangulation']['reproj_error_threshold'],
+            scale_smooth=anipose_config['triangulation']['scale_smooth'],
+            scale_length=anipose_config['triangulation']['scale_length'],
+            scale_length_weak=anipose_config['triangulation']['scale_length_weak'],
+            n_deriv_smooth=anipose_config['triangulation']['n_deriv_smooth'],
+            reproj_error_threshold=anipose_config['triangulation']['reproj_error_threshold'],
             verbose=True)
 
     return points_3d

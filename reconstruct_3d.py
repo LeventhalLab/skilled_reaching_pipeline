@@ -211,7 +211,10 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
 
 
-def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, anipose_config, parent_directories, min_valid_score=0.9):
+def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, anipose_config, parent_directories):
+
+    min_valid_2dfilter_score = anipose_config['filter']['score_threshold']
+    min_valid_triangulation_score = anipose_config['triangulation']['score_threshold']
 
     h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_group[0])
     trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
@@ -234,6 +237,8 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
     d = crop_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
 
+    # todo: perform 2d-filtering here
+
     # test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)
 
     n_cams, n_points, n_joints, _ = d['points'].shape
@@ -244,7 +249,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     bodyparts = d['bodyparts']
 
     # remove points that are below threshold
-    points[scores < min_valid_score] = np.nan
+    points[scores < min_valid_2dfilter_score] = np.nan
 
     match_palm_dorsum(points, bodyparts)
 
@@ -258,9 +263,10 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     reprojerr = reprojerr_flat.reshape(n_points, n_joints)
 
     # now compare to the optimized version that includes constraints and filtering
-    triangulate_optim(d, cgroup, anipose_config, p3ds)
+    optim_p3ds = triangulate_optim(d, cgroup, anipose_config, p3ds)
 
     r3d_data = {'points3d': p3ds,
+                'optim_points3d': optim_p3ds,
                 'calibration_data': calibration_data,
                 'h5_group': h5_group,
                 'min_valid_score': min_valid_score,

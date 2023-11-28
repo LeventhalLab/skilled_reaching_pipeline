@@ -376,7 +376,7 @@ if __name__ == '__main__':
 
     label_videos = True
 
-    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514]
+    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514]
 
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
@@ -465,12 +465,12 @@ if __name__ == '__main__':
         # calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
         calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
     #
-    #     crop_videos.crop_all_calibration_videos(parent_directories[expt],
-    #                                 calibration_metadata_df,
-    #                                 vidtype='.avi',
-    #                                 view_list=cam_names,
-    #                                 filtertype=filtertype,
-    #                                 rat_nums=rats_to_analyze)
+        crop_videos.crop_all_calibration_videos(parent_directories[expt],
+                                    calibration_metadata_df,
+                                    vidtype='.avi',
+                                    view_list=cam_names,
+                                    filtertype=filtertype,
+                                    rat_nums=rats_to_analyze)
     #
     #
         # calibrate_all_sessions(parent_directories[expt],

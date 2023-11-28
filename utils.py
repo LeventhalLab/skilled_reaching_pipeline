@@ -5,6 +5,7 @@ from scipy.cluster.vq import whiten
 from collections import defaultdict, Counter
 import queue
 from datetime import datetime
+import navigation_utilities
 import pandas as pd
 
 def make_M(rvec, tvec):
@@ -189,6 +190,29 @@ def get_initial_extrinsics(rtvecs, cam_names=None):
     rvecs = np.array(rvecs)
     tvecs = np.array(tvecs)
     return rvecs, tvecs
+
+
+def fullpickle2h5(fpickle_name, num_outputs):
+
+    pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name(fpickle_name)
+    pickled_data = skilled_reaching_io.read_pickle(fpickle_name)
+
+    all_joints_names = pickled_data['metadata']['all_joints_names']
+
+    xyz_labs_orig = ["x", "y", "likelihood"]
+    suffix = [str(s + 1) for s in range(num_outputs)]
+    suffix[0] = ""  # first one has empty suffix for backwards compatibility
+    xyz_labs = [x + s for s in suffix for x in xyz_labs_orig]
+
+    pdindex = pd.MultiIndex.from_product(
+        [[pickle_metadata['scorername']], all_joints_names, xyz_labs],
+        names=["scorer", "bodyparts", "coords"],
+    )
+
+    # todo: figure out what imagenames is and incorporate it
+    DataMachine = pd.DataFrame(pickled_data, columns=pdindex, index=imagenames)
+
+    pass
 
 
 ## convenience function to load a set of DeepLabCut pose-2d files

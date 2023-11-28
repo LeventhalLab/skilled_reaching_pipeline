@@ -1126,7 +1126,6 @@ def parse_dlc_output_h5_name(dlc_output_h5_name):
     h5_metadata['task'] = folder_nameparts[2]
     h5_metadata['session_num'] = int(folder_nameparts[3][-2:])
 
-    #todo: write the scorername into the pickle metadata dictionary. It's also in the metadata pickle file
     h5_metadata['scorername'] = '_'.join(('DLC',
                                           metadata_list[next_metadata_idx + 5],
                                           metadata_list[next_metadata_idx + 6],
@@ -1163,7 +1162,7 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
         'scorername': '',
         'pickle_name': ''
     }
-    _, pickle_name = os.path.split(dlc_output_pickle_name)
+    view_folder, pickle_name = os.path.split(dlc_output_pickle_name)
     pickle_metadata['pickle_name'] = pickle_name
     pickle_name, vid_type = os.path.splitext(pickle_name)
 
@@ -1196,8 +1195,16 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
 
     pickle_metadata['crop_window'].extend((left, right, top, bottom))
 
+    _, view_foldername = os.path.split(view_folder)
+    folder_nameparts = view_foldername.split('_')
+    pickle_metadata['task'] = folder_nameparts[2]
+    pickle_metadata['session_num'] = int(folder_nameparts[3][-2:])
+
     #todo: write the scorername into the pickle metadata dictionary. It's also in the metadata pickle file
-    pickle_metadata['scorername']
+    pickle_metadata['scorername'] = '_'.join(('DLC',
+                                              metadata_list[next_metadata_idx + 5],
+                                              metadata_list[next_metadata_idx + 6],
+                                              metadata_list[next_metadata_idx + 7]))
 
     return pickle_metadata
 

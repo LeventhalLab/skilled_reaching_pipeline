@@ -240,6 +240,11 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     # todo: perform 2d-filtering here
 
     # test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)
+    for i_cam, cam_name in enumerate(cam_names):
+        # for input to the anipose 2d filtering code, the "points" should be given as an n_frames x n_joints x n_possible x 3 array
+        # what the heck is n_possible? need to figure that out
+        cam_points = d['points'][i_cam, :, :, :]
+        filter_pose_medfilt(anipose_config, all_points, bodyparts)
 
     n_cams, n_points, n_joints, _ = d['points'].shape
 
@@ -251,7 +256,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     # remove points that are below threshold
     points[scores < min_valid_2dfilter_score] = np.nan
 
-    match_palm_dorsum(points, bodyparts)
+    points = match_palm_dorsum(points, bodyparts)
 
     points_flat = points.reshape(n_cams, -1, 2)
     scores_flat = scores.reshape(n_cams, -1)
@@ -272,6 +277,58 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
                 'min_valid_score': min_valid_score,
                 'dlc_output': d}
     skilled_reaching_io.write_pickle(trajectory_fname, r3d_data)
+
+
+def filter_pose_medfilt(config, all_points, bodyparts):
+    # this code adapted from anipose
+    n_frames, n_joints, n_possible, _ = all_points.shape
+
+    points_full = all_points[:, :, :, :2]
+    scores_full = all_points[:, :, :, 2]
+
+    points = np.full((n_frames, n_joints, 2), np.nan, dtype='float64')
+    scores = np.empty((n_frames, n_joints), dtype='float64')
+
+    for bp_ix, bp in enumerate(bodyparts):
+        x = points_full[:, bp_ix, 0, 0]
+        y = points_full[:, bp_ix, 0, 1]
+        score = scores_full[:, bp_ix, 0]
+
+        xmed = signal.medfilt(x, kernel_size=config['filter']['medfilt'])
+        ymed = signal.medfilt(y, kernel_size=config['filter']['medfilt'])
+
+        errx = np.abs(x - xmed)
+        erry = np.abs(y - ymed)
+        err = errx + erry
+
+        bad = np.zeros(len(x), dtype='bool')
+        bad[err >= config['filter']['offset_threshold']] = True
+        bad[score < config['filter']['score_threshold']] = True
+
+        Xf = arr([x,y]).T
+        Xf[bad] = np.nan
+
+        Xfi = np.copy(Xf)
+
+        for i in range(Xf.shape[1]):
+            vals = Xfi[:, i]
+            nans, ix = nan_helper(vals)
+            # some data missing, but not too much
+            if np.sum(nans) > 0 and np.mean(~nans) > 0.5 and np.sum(~nans) > 5:
+                if config['filter']['spline']:
+                    spline = splrep(ix(~nans), vals[~nans], k=3, s=0)
+                    vals[nans]= splev(ix(nans), spline)
+                else:
+                    vals[nans] = np.interp(ix(nans), ix(~nans), vals[~nans])
+            Xfi[:,i] = vals
+
+        points[:, bp_ix, 0] = Xfi[:, 0]
+        points[:, bp_ix, 1] = Xfi[:, 1]
+        # dout[scorer, bp, 'interpolated'] = np.isnan(Xf[:, 0])
+
+    scores = scores_full[:, :, 0]
+
+    return points, scores
 
 
 def triangulate_optim(d, cgroup, anipose_config, points_3d_init):

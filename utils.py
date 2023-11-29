@@ -243,7 +243,7 @@ def flatten_pickled_data(pickled_data, num_outputs):
             for i_out in range(num_outputs):
                 start_col_idx = (i_bp * 3 * num_outputs) + (i_out * 3)
                 try:
-                    flattened_data[i_frame, start_col_idx:start_col_idx+1] = bp_coords[i_out]
+                    flattened_data[i_frame, start_col_idx:start_col_idx+2] = bp_coords[i_out]
                     flattened_data[i_frame, start_col_idx + 2] = bp_conf[i_out]
                 except:
                     # if there aren't num_outputs possible values for this bodypart in this frame, just skip

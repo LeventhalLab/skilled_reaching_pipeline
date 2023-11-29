@@ -657,22 +657,29 @@ def test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=
     elif 'session_date' in session_metadata.keys():
         session_date = session_metadata['session_date']
 
-    if filtered:
-        test_name = '_'.join((session_metadata['ratID'],
-                              'b*',
-                              date_to_string_for_fname(session_date),
-                              '*',
-                              cam_name,
-                              '*',
-                              'el_filtered.h5'))
-    else:
-        test_name = '_'.join((session_metadata['ratID'],
-                              'b*',
-                              date_to_string_for_fname(session_date),
-                              '*',
-                              cam_name,
-                              '*',
-                              'el.h5'))
+    test_name = '_'.join((session_metadata['ratID'],
+                          'b*',
+                          date_to_string_for_fname(session_date),
+                          '*',
+                          cam_name,
+                          '*.h5'))
+
+    # if filtered:
+    #     test_name = '_'.join((session_metadata['ratID'],
+    #                           'b*',
+    #                           date_to_string_for_fname(session_date),
+    #                           '*',
+    #                           cam_name,
+    #                           '*',
+    #                           'el_filtered.h5'))
+    # else:
+    #     test_name = '_'.join((session_metadata['ratID'],
+    #                           'b*',
+    #                           date_to_string_for_fname(session_date),
+    #                           '*',
+    #                           cam_name,
+    #                           '*',
+    #                           'el.h5'))
 
     return test_name
 

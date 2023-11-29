@@ -6,6 +6,7 @@ from collections import defaultdict, Counter
 import queue
 from datetime import datetime
 import navigation_utilities
+import skilled_reaching_io
 import pandas as pd
 
 def make_M(rvec, tvec):
@@ -198,7 +199,7 @@ def fullpickle2h5(fpickle_name, num_outputs):
     pickled_data = skilled_reaching_io.read_pickle(fpickle_name)
 
     all_joints_names = pickled_data['metadata']['all_joints_names']
-    nframes = pickle_metadata['metadata']['nframes']
+    nframes = pickled_data['metadata']['nframes']
 
     xyz_labs_orig = ["x", "y", "likelihood"]
     suffix = [str(s + 1) for s in range(num_outputs)]
@@ -210,13 +211,45 @@ def fullpickle2h5(fpickle_name, num_outputs):
         names=["scorer", "bodyparts", "coords"],
     )
 
-    DataMachine = pd.DataFrame(pickled_data, columns=pdindex, index=range(nframes))
+    # now need to take data from full.pickle and rearrange into a numpy array that can be converted to a dataframe
+    flattened_data = flatten_pickled_data(pickled_data, num_outputs)
+    DataMachine = pd.DataFrame(flattened_data, columns=pdindex, index=range(nframes))
 
     h5_name = fpickle_name.split(".pickle")[0] + ".h5"
 
     DataMachine.to_hdf(h5_name, "df_with_missing", format="table", mode="w")
 
     return DataMachine
+
+
+def flatten_pickled_data(pickled_data, num_outputs):
+
+    nframes = pickled_data['metadata']['nframes']
+    nbodyparts = len(pickled_data['metadata']['all_joints_names'])
+    ncolumns = nbodyparts * 3 * num_outputs
+    flattened_data = np.empty((nframes, ncolumns))
+    flattened_data[:] = np.nan
+
+    frame_names = list(pickled_data)
+    frames = [name for name in frame_names if name[:5] == 'frame']
+
+    for i_frame, frame in enumerate(frames):
+        frame_data = pickled_data[frame]
+        frame_coords = frame_data['coordinates'][0]
+        frame_conf = frame_data['confidence']
+        for i_bp in range(nbodyparts):
+            bp_coords = frame_coords[i_bp]
+            bp_conf = frame_conf[i_bp]
+            for i_out in range(num_outputs):
+                start_col_idx = (i_bp * 3 * num_outputs) + (i_out * 3)
+                try:
+                    flattened_data[i_frame, start_col_idx:start_col_idx+1] = bp_coords[i_out]
+                    flattened_data[i_frame, start_col_idx + 2] = bp_conf[i_out]
+                except:
+                    # if there aren't num_outputs possible values for this bodypart in this frame, just skip
+                    pass
+
+    return flattened_data
 
 
 ## convenience function to load a set of DeepLabCut pose-2d files

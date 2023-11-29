@@ -17,6 +17,8 @@ import dlc_utilities
 import sr_photometry_analysis as srphot_anal
 import copy
 import toml
+
+import utils
 from utils import load_pose2d_fnames
 from anipose_utils import crop_points_2_full_frame
 
@@ -137,7 +139,26 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt
 
 
 def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df, parent_directories, anipose_config, filtered=True,
-                               smooth_window=101, f0_pctile=10, expected_baseline=0.2, perievent_window=(-5, 5)):
+                               smooth_window=101, f0_pctile=10, expected_baseline=0.2, perievent_window=(-5, 5), num_outputs=3):
+    '''
+
+    :param session_metadata:
+    :param calibration_pickle_name:
+    :param rat_df:
+    :param parent_directories:
+    :param anipose_config:
+    :param filtered:
+    :param smooth_window:
+    :param f0_pctile:
+    :param expected_baseline:
+    :param perievent_window:
+    :param num_outputs: number of possible outputs to consider from dlc output for each keypoint (i.e., there could be more
+        than one reasonable estimate for each keypoint, and the second best one could be the correct one based on continuity
+        across frames, proximity to nearby points, etc)
+    :return:
+    '''
+    # note, I misunderstood what "filtered" meant for anipose. Not the dlc-filtered version of tracklets ("el_filtered.h5")
+    # it's actually whether or not to apply the anipose filters to the data
     calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
 
     cams = calibration_data['cgroup'].get_names()
@@ -147,9 +168,13 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
     _, session_folder_name = os.path.split(cropped_session_folder)
     # find matching .h5 files from each folder
     h5_list = []
+    pickle_list = []
     for cam_name in cams:
         cam_folder_name = os.path.join(cropped_session_folder, '_'.join((session_folder_name, cam_name)))
         test_name = navigation_utilities.test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=filtered)
+        test_pickle_name = navigation_utilities.test_dlc_pickle_name_from_session_metadata(session_metadata, cam_name)
+        if os.path.exists(test_pickle_name):
+            utils.fullpickle2h5(test_pickle_name, num_outputs)
         new_h5_list = glob.glob(os.path.join(cam_folder_name, test_name))
         h5_list.append(glob.glob(os.path.join(cam_folder_name, test_name)))
 

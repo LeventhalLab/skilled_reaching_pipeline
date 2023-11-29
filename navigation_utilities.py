@@ -677,6 +677,24 @@ def test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=
     return test_name
 
 
+def test_dlc_pickle_name_from_session_metadata(session_metadata, cam_name, suffix='full'):
+
+    if 'date' in session_metadata.keys():
+        session_date = session_metadata['date']
+    elif 'session_date' in session_metadata.keys():
+        session_date = session_metadata['session_date']
+
+    test_name = '_'.join((session_metadata['ratID'],
+                          'b*',
+                          date_to_string_for_fname(session_date),
+                          '*',
+                          cam_name,
+                          '*',
+                          suffix + '.pickle'))
+
+    return test_name
+
+
 def test_dlc_h5_name_from_h5_metadata(h5_metadata, cam_name, filtered=True):
 
     # crop_string = '-'.join([str(cb) for cb in h5_metadata['crop_window']])

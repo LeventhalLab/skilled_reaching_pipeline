@@ -198,6 +198,7 @@ def fullpickle2h5(fpickle_name, num_outputs):
     pickled_data = skilled_reaching_io.read_pickle(fpickle_name)
 
     all_joints_names = pickled_data['metadata']['all_joints_names']
+    nframes = pickle_metadata['metadata']['nframes']
 
     xyz_labs_orig = ["x", "y", "likelihood"]
     suffix = [str(s + 1) for s in range(num_outputs)]
@@ -209,10 +210,13 @@ def fullpickle2h5(fpickle_name, num_outputs):
         names=["scorer", "bodyparts", "coords"],
     )
 
-    # todo: figure out what imagenames is and incorporate it
-    DataMachine = pd.DataFrame(pickled_data, columns=pdindex, index=imagenames)
+    DataMachine = pd.DataFrame(pickled_data, columns=pdindex, index=range(nframes))
 
-    pass
+    h5_name = fpickle_name.split(".pickle")[0] + ".h5"
+
+    DataMachine.to_hdf(h5_name, "df_with_missing", format="table", mode="w")
+
+    return DataMachine
 
 
 ## convenience function to load a set of DeepLabCut pose-2d files

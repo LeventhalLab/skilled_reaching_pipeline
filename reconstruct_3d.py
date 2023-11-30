@@ -184,7 +184,7 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
                 if not os.path.exists(test_h5_name):
                     utils.fullpickle2h5(fpickle, num_outputs)
         new_h5_list = glob.glob(os.path.join(cam_folder_name, test_h5_name))
-        h5_list.append(glob.glob(os.path.join(cam_folder_name, test_h5_name)))
+        h5_list.append(glob.glob(os.path.join(cam_folder_name, new_h5_list)))
 
     h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_list[0][0])
     cgroup_name = '_'.join((h5_metadata['ratID'],

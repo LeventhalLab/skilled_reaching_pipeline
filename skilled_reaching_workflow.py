@@ -473,11 +473,11 @@ if __name__ == '__main__':
                                     rat_nums=rats_to_analyze)
     # #
     # #
-    #     calibrate_all_sessions(parent_directories[expt],
-    #                            calibration_metadata_df,
-    #                            cam_names,
-    #                            filtertype=filtertype,
-    #                            rat_nums=rats_to_analyze)
+        calibrate_all_sessions(parent_directories[expt],
+                               calibration_metadata_df,
+                               cam_names,
+                               filtertype=filtertype,
+                               rat_nums=rats_to_analyze)
 
     # for expt in experiment_list:
     #     rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])

@@ -16,6 +16,7 @@ import pickle
 
 def filter_pose_medfilt(config, all_points, bodyparts):
     # adapted directly from anipose github file "filter_pose.py"
+    # where in here does it make use of alternative possible points? does it at all?
     n_frames, n_joints, n_possible, _ = all_points.shape
 
     points_full = all_points[:, :, :, :2]
@@ -49,6 +50,7 @@ def filter_pose_medfilt(config, all_points, bodyparts):
             vals = Xfi[:, i]
             nans, ix = nan_helper(vals)
             # some data missing, but not too much
+            # this may need to be adjusted since often many points are missing at the beginning and end of a reaching video
             if np.sum(nans) > 0 and np.mean(~nans) > 0.5 and np.sum(~nans) > 5:
                 if config['filter']['spline']:
                     spline = splrep(ix(~nans), vals[~nans], k=3, s=0)

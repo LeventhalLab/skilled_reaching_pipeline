@@ -242,13 +242,15 @@ def crop_all_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
     :return:
     '''
 
-    num_frames = np.shape(pose_data['all_points'])[1]
+    n_bodyparts = np.shape(pose_data['all_points'])[2]
+    n_frames = np.shape(pose_data['all_points'])[1]
+    n_possible = np.shape(pose_data['all_points'])[3]
     for i_file, h5_file in enumerate(h5_group):
         h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)
         dx = h5_metadata['crop_window'][0]
         dy = h5_metadata['crop_window'][2]
         crop_w = h5_metadata['crop_window'][1] - h5_metadata['crop_window'][0] + 1
-        for i_frame in range(num_frames):
+        for i_frame in range(n_frames):
             # translate points from the cropped video to the full frame
             if 'fliplr' in h5_file:
                 # video was flipped left-right
@@ -256,11 +258,14 @@ def crop_all_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
             pose_data['all_points'][i_file, i_frame, :, :, 0] += dx
             pose_data['all_points'][i_file, i_frame, :, :, 1] += dy
 
-            # now undistort the full frame points
-            pts_ud_norm = cv2.undistortPoints(pose_data['points'][i_file, i_frame, :, :], cam_intrinsics['mtx'], cam_intrinsics['dist'])
-            pts_ud = cvb.unnormalize_points(pts_ud_norm, cam_intrinsics['mtx'])
+            for i_bp in range(n_bodyparts):
+                # now undistort the full frame points
+                pts_ud = np.full((n_possible, 2), fill_value=np.nan)
+                for i_out in range(n_possible):
+                    pts_ud_norm = cv2.undistortPoints(pose_data['all_points'][i_file, i_frame, i_bp, i_out, :2], cam_intrinsics['mtx'], cam_intrinsics['dist'])
+                    pts_ud[i_out, :] = cvb.unnormalize_points(pts_ud_norm, cam_intrinsics['mtx'])
 
-            pose_data['points'][i_file, i_frame, :, :] = pts_ud
+                pose_data['all_points'][i_file, i_frame, i_bp, :, :2] = pts_ud
 
     return pose_data
 

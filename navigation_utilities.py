@@ -705,22 +705,29 @@ def test_dlc_pickle_name_from_session_metadata(session_metadata, cam_name, suffi
 def test_dlc_h5_name_from_h5_metadata(h5_metadata, cam_name, filtered=True):
 
     # crop_string = '-'.join([str(cb) for cb in h5_metadata['crop_window']])
-    if filtered:
-        test_name = '_'.join((h5_metadata['ratID'],
-                              'b{:02d}'.format(h5_metadata['boxnum']),
-                              datetime_to_string_for_fname(h5_metadata['triggertime']),
-                              '{:03d}'.format(h5_metadata['video_number']),
-                              cam_name,
-                              '*',
-                              'el_filtered.h5'))
-    else:
-        test_name = '_'.join((h5_metadata['ratID'],
-                              'b{:02d}'.format(h5_metadata['boxnum']),
-                              datetime_to_string_for_fname(h5_metadata['triggertime']),
-                              '{:03d}'.format(h5_metadata['video_number']),
-                              cam_name,
-                              '*',
-                              'el.h5'))
+
+    test_name = '_'.join((h5_metadata['ratID'],
+                          'b{:02d}'.format(h5_metadata['boxnum']),
+                          datetime_to_string_for_fname(h5_metadata['triggertime']),
+                          '{:03d}'.format(h5_metadata['video_number']),
+                          cam_name,
+                          '*' + h5_metadata['scorername'] + '.h5'))
+    # if filtered:
+    #     test_name = '_'.join((h5_metadata['ratID'],
+    #                           'b{:02d}'.format(h5_metadata['boxnum']),
+    #                           datetime_to_string_for_fname(h5_metadata['triggertime']),
+    #                           '{:03d}'.format(h5_metadata['video_number']),
+    #                           cam_name,
+    #                           '*',
+    #                           'el_filtered.h5'))
+    # else:
+    #     test_name = '_'.join((h5_metadata['ratID'],
+    #                           'b{:02d}'.format(h5_metadata['boxnum']),
+    #                           datetime_to_string_for_fname(h5_metadata['triggertime']),
+    #                           '{:03d}'.format(h5_metadata['video_number']),
+    #                           cam_name,
+    #                           '*',
+    #                           'el.h5'))
 
     return test_name
 

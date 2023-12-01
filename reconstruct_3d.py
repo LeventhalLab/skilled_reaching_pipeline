@@ -178,13 +178,15 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
 
         if new_pickle_list:
             # if _full.pickle files were found in this folder
+            cam_h5s = []
             for fpickle in new_pickle_list:
                 # is there already a corresponding .h5 file?
-                test_h5_name = fpickle.split('_full.pickle')[0] + '.h5'
-                if not os.path.exists(test_h5_name):
-                    utils.fullpickle2h5(fpickle, num_outputs)
-        new_h5_list = glob.glob(os.path.join(cam_folder_name, test_h5_name))
-        h5_list.append(glob.glob(os.path.join(cam_folder_name, new_h5_list)))
+                h5_out_name = fpickle.split('_full.pickle')[0] + '.h5'
+                if not os.path.exists(h5_out_name):
+                    utils.fullpickle2h5(fpickle, h5_out_name, num_outputs)
+                cam_h5s.append(h5_out_name)
+        # new_h5_list = glob.glob(os.path.join(cam_folder_name, h5_out_name))
+        h5_list.append(cam_h5s)
 
     h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_list[0][0])
     cgroup_name = '_'.join((h5_metadata['ratID'],
@@ -225,8 +227,10 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         h5_file_group = [h5_file]
         for cam_name in cams[1:]:
             cam_folder_name = os.path.join(cropped_session_folder, '_'.join((session_folder_name, cam_name)))
-            test_h5_name = navigation_utilities.test_dlc_h5_name_from_h5_metadata(h5_vid_metadata, cam_name, filtered=filtered)
-            full_test_name = os.path.join(cam_folder_name, test_h5_name)
+            h5_cam_metadata = copy.deepcopy(h5_vid_metadata)
+            h5_cam_metadata['scorername'] = h5_vid_metadata['scorername'].replace(cams[0], cam_name)
+            h5_test_name = navigation_utilities.test_dlc_h5_name_from_h5_metadata(h5_cam_metadata, cam_name, filtered=filtered)
+            full_test_name = os.path.join(cam_folder_name, h5_test_name)
 
             view_h5_list = glob.glob(full_test_name)
             if len(view_h5_list) == 1:

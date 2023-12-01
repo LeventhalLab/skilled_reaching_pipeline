@@ -193,7 +193,7 @@ def get_initial_extrinsics(rtvecs, cam_names=None):
     return rvecs, tvecs
 
 
-def fullpickle2h5(fpickle_name, num_outputs):
+def fullpickle2h5(fpickle_name, h5_out_name, num_outputs):
 
     pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name(fpickle_name)
     pickled_data = skilled_reaching_io.read_pickle(fpickle_name)
@@ -215,9 +215,9 @@ def fullpickle2h5(fpickle_name, num_outputs):
     flattened_data = flatten_pickled_data(pickled_data, num_outputs)
     DataMachine = pd.DataFrame(flattened_data, columns=pdindex, index=range(nframes))
 
-    h5_name = fpickle_name.split(".pickle")[0] + ".h5"
+    # h5_name = fpickle_name.split("_full.pickle")[0] + ".h5"
 
-    DataMachine.to_hdf(h5_name, "df_with_missing", format="table", mode="w")
+    DataMachine.to_hdf(h5_out_name, "df_with_missing", format="table", mode="w")
 
     return DataMachine
 

@@ -272,6 +272,8 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     for i_cam, cam_name in enumerate(cam_names):
         fname_dict[cam_name] = h5_group[i_cam]
 
+    # load data from pickle files, write into a .h5 file with all possible detections, perform anipose 2d-filtering,
+    # and return the data structure
     d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
     d = crop_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
 

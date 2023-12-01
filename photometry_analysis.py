@@ -1,6 +1,7 @@
 import skilled_reaching_io
 import photometry_analysis_plots
 import matplotlib.pyplot as plt
+import aniposefilter_pose
 import numpy as np
 import os
 import glob

@@ -265,10 +265,15 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
     for ix_cam, (cam_name, pose_name) in \
             enumerate(zip(cam_names, pose_names)):
         dlabs = pd.read_hdf(pose_name)
+        if len(dlabs.columns.levels) > 2:
+            scorer = dlabs.columns.levels[0][0]
+            dlabs = dlabs.loc[:, scorer]
         if ix_cam == 0:
             # this ensures that the joint order for the direct view is used uniformly
             bp_index = dlabs.columns.names.index('bodyparts')
             joint_names = list(dlabs.columns.get_level_values(bp_index).unique())
+            coord_index = dlabs.columns.names.index('coords')
+            n_possible = len(dlabs.columns.levels[coord_index]) // 3
             try:
                 ind_index = dlabs.columns.names.index('individuals')
                 individuals = list(dlabs.columns.get_level_values(ind_index).unique())
@@ -281,18 +286,23 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
             # rename from "near/far" to "left/right" for mirror views
             dlabs = rename_mirror_columns(cam_name, dlabs)
 
-        if len(dlabs.columns.levels) > 2:
-            scorer = dlabs.columns.levels[0][0]
-            dlabs = dlabs.loc[:, scorer]
-
         dx = offsets_dict[cam_name][0]
         dy = offsets_dict[cam_name][1]
 
-        for ind in individuals:
+        if individuals is not None:
+            for ind in individuals:
+                for joint in joint_names:
+                    try:
+                        dlabs.loc[:, (ind, joint, 'x')] += dx
+                        dlabs.loc[:, (ind, joint, 'y')] += dy
+                    except KeyError:
+                        # for when this joint doesn't exist for a specific individual
+                        pass
+        else:
             for joint in joint_names:
                 try:
-                    dlabs.loc[:, (ind, joint, 'x')] += dx
-                    dlabs.loc[:, (ind, joint, 'y')] += dy
+                    dlabs.loc[:, (joint, 'x')] += dx
+                    dlabs.loc[:, (joint, 'y')] += dy
                 except KeyError:
                     # for when this joint doesn't exist for a specific individual
                     pass
@@ -302,27 +312,64 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
     n_joints = len(joint_names)
     n_frames = min([d.shape[0] for d in datas])
 
-    # frame, camera, bodypart, xy
-    points = np.full((n_cams, n_frames, n_joints, 2), np.nan, 'float')
-    scores = np.full((n_cams, n_frames, n_joints), np.zeros(1), 'float')
+    # camera, frame, bodypart, poss_point, x-y-conf
+    all_points = np.full((n_cams, n_frames, n_joints, n_possible, 3), np.nan, 'float')
+    # scores = np.full((n_cams, n_frames, n_joints), np.zeros(1), 'float')
 
     for cam_ix, dlabs in enumerate(datas):
         for joint_ix, joint_name in enumerate(joint_names):
-            for ind in individuals:
-                try:
-                    # because points and score matrices are filled based on joint name, the joint order in the dataframe does not matter
-                    points[cam_ix, :, joint_ix] = np.array(dlabs.loc[:, (ind, joint_name, ('x', 'y'))])[:n_frames]
-                    scores[cam_ix, :, joint_ix] = np.array(dlabs.loc[:, (ind, joint_name, ('likelihood'))])[:n_frames].ravel()
-                except KeyError:
-                    # for when this joint doesn't exist for a specific individual
-                    pass
+            if individuals is not None:
+                for ind in individuals:
+                    for i_out in range(n_possible):
+                        if i_out == 0:
+                            xlabel = 'x'
+                            ylabel = 'y'
+                            like_label = 'likelihood'
+                        else:
+                            xlabel = 'x{:d}'.format(i_out)
+                            ylabel = 'y{:d}'.format(i_out)
+                            like_label = 'likelihood{:d}'.format(i_out)
+                        try:
+                            # because points and score matrices are filled based on joint name, the joint order in the dataframe does not matter
+                            all_points[cam_ix, :, joint_ix, i_out, :2] = np.array(dlabs.loc[:, (ind, joint_name, (xlabel, ylabel))])[:n_frames]
+                            all_points[cam_ix, :, joint_ix, i_out, 2] = np.array(dlabs.loc[:, (ind, joint_name, (like_label))])[:n_frames].ravel()
+                        except KeyError:
+                            # for when this joint doesn't exist for a specific individual
+                            pass
+            else:
+                for i_out in range(n_possible):
+                    if i_out == 0:
+                        xlabel = 'x'
+                        ylabel = 'y'
+                        like_label = 'likelihood'
+                    else:
+                        xlabel = 'x{:d}'.format(i_out + 1)
+                        ylabel = 'y{:d}'.format(i_out + 1)
+                        like_label = 'likelihood{:d}'.format(i_out + 1)
+                    try:
+                        # because points and score matrices are filled based on joint name, the joint order in the dataframe does not matter
+                        try:
+                            all_points[cam_ix, :, joint_ix, i_out, :2] = np.array(dlabs.loc[:, (joint_name, (xlabel, ylabel))])[:n_frames]
+                            all_points[cam_ix, :, joint_ix, i_out, 2] = np.array(dlabs.loc[:, (joint_name, (like_label))])[
+                                                          :n_frames].ravel()
+                        except:
+                            pass
+                    except KeyError:
+                        # for when this joint doesn't exist for a specific individual
+                        pass
 
     return {
         'cam_names': cam_names,
-        'points': points,
-        'scores': scores,
+        'all_points': all_points,
         'bodyparts': joint_names
     }
+
+    # return {
+    #     'cam_names': cam_names,
+    #     'points': points,
+    #     'scores': scores,
+    #     'bodyparts': joint_names
+    # }
 
 
 def datetime64_to_datetime_array(dt64_array):
@@ -367,9 +414,13 @@ def rename_mirror_columns(cam_name, dlabs):
         return dlabs
 
     bp_index = dlabs.columns.names.index('bodyparts')
-    ind_index = dlabs.columns.names.index('individuals')
     joint_names = list(dlabs.columns.get_level_values(bp_index).unique())
-    ind_names = list(dlabs.columns.get_level_values(ind_index).unique())
+    try:
+        ind_index = dlabs.columns.names.index('individuals')
+        ind_names = list(dlabs.columns.get_level_values(ind_index).unique())
+    except:
+        ind_index = None
+        ind_names = None
 
     if cam_name == 'lm':
         near_side = 'right'
@@ -378,10 +429,7 @@ def rename_mirror_columns(cam_name, dlabs):
         near_side = 'left'
         far_side = 'right'
 
-    for individual in ind_names:
-        if 'rat' not in individual:
-            continue
-
+    if ind_index is None:
         for joint in joint_names:
             if 'near' in joint:
                 new_joint = joint.replace('near', near_side)
@@ -389,5 +437,17 @@ def rename_mirror_columns(cam_name, dlabs):
             if 'far' in joint:
                 new_joint = joint.replace('far', far_side)
                 dlabs.rename(columns={joint: new_joint}, level=bp_index, inplace=True)
+    else:
+        for individual in ind_names:
+            if 'rat' not in individual:
+                continue
+
+            for joint in joint_names:
+                if 'near' in joint:
+                    new_joint = joint.replace('near', near_side)
+                    dlabs.rename(columns={joint: new_joint}, level=bp_index, inplace=True)
+                if 'far' in joint:
+                    new_joint = joint.replace('far', far_side)
+                    dlabs.rename(columns={joint: new_joint}, level=bp_index, inplace=True)
 
     return dlabs

@@ -231,6 +231,40 @@ def crop_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
     return pose_data
 
 
+def crop_all_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
+    '''
+
+    :param pose_data: dictionary containing: cam_names, points, scores, bodyparts
+        cam_names = name of each camera
+        all_points = num_cams x num_frames x num_joints x num_outputs x 3 array containing points as identified in the cropped views
+        bodyparts = list of joints
+    :param h5_group:
+    :return:
+    '''
+
+    num_frames = np.shape(pose_data['all_points'])[1]
+    for i_file, h5_file in enumerate(h5_group):
+        h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)
+        dx = h5_metadata['crop_window'][0]
+        dy = h5_metadata['crop_window'][2]
+        crop_w = h5_metadata['crop_window'][1] - h5_metadata['crop_window'][0] + 1
+        for i_frame in range(num_frames):
+            # translate points from the cropped video to the full frame
+            if 'fliplr' in h5_file:
+                # video was flipped left-right
+                pose_data['all_points'][i_file, i_frame, :, :, 0] = crop_w - pose_data['all_points'][i_file, i_frame, :, 0]
+            pose_data['all_points'][i_file, i_frame, :, :, 0] += dx
+            pose_data['all_points'][i_file, i_frame, :, :, 1] += dy
+
+            # now undistort the full frame points
+            pts_ud_norm = cv2.undistortPoints(pose_data['points'][i_file, i_frame, :, :], cam_intrinsics['mtx'], cam_intrinsics['dist'])
+            pts_ud = cvb.unnormalize_points(pts_ud_norm, cam_intrinsics['mtx'])
+
+            pose_data['points'][i_file, i_frame, :, :] = pts_ud
+
+    return pose_data
+
+
 
 def match_dlc_points_from_all_views(h5_list, cam_names, calibration_data, parent_directories, min_valid_score=0.99, filtered=False):
     # in general, use a very restrictive score cutoff since this is just to optimize the calibration (don't need full paw tracking)

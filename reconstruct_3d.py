@@ -20,7 +20,7 @@ import toml
 
 import utils
 from utils import load_pose2d_fnames
-from anipose_utils import crop_points_2_full_frame
+from anipose_utils import crop_all_points_2_full_frame
 
 
 def test_reconstruction(parent_directories, rat_df):
@@ -275,7 +275,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     # load data from pickle files, write into a .h5 file with all possible detections, perform anipose 2d-filtering,
     # and return the data structure
     d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
-    d = crop_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
+    d = crop_all_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
 
     # todo: perform 2d-filtering here
 

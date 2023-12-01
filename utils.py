@@ -348,12 +348,9 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
                         like_label = 'likelihood{:d}'.format(i_out + 1)
                     try:
                         # because points and score matrices are filled based on joint name, the joint order in the dataframe does not matter
-                        try:
-                            all_points[cam_ix, :, joint_ix, i_out, :2] = np.array(dlabs.loc[:, (joint_name, (xlabel, ylabel))])[:n_frames]
-                            all_points[cam_ix, :, joint_ix, i_out, 2] = np.array(dlabs.loc[:, (joint_name, (like_label))])[
-                                                          :n_frames].ravel()
-                        except:
-                            pass
+                        all_points[cam_ix, :, joint_ix, i_out, :2] = np.array(dlabs.loc[:, (joint_name, (xlabel, ylabel))])[:n_frames]
+                        all_points[cam_ix, :, joint_ix, i_out, 2] = np.array(dlabs.loc[:, (joint_name, (like_label))])[
+                                                      :n_frames].ravel()
                     except KeyError:
                         # for when this joint doesn't exist for a specific individual
                         pass

@@ -229,10 +229,11 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
             cam_folder_name = os.path.join(cropped_session_folder, '_'.join((session_folder_name, cam_name)))
             h5_cam_metadata = copy.deepcopy(h5_vid_metadata)
             h5_cam_metadata['scorername'] = h5_vid_metadata['scorername'].replace(cams[0], cam_name)
-            h5_test_name = navigation_utilities.test_dlc_h5_name_from_h5_metadata(h5_cam_metadata, cam_name, filtered=filtered)
+            h5_test_name = navigation_utilities.test_dlc_h5_name_from_h5_metadata(h5_cam_metadata, suffix='')
             full_test_name = os.path.join(cam_folder_name, h5_test_name)
 
             view_h5_list = glob.glob(full_test_name)
+            view_h5_list = [h5_name for h5_name in view_h5_list if not 'el' in h5_name]
             if len(view_h5_list) == 1:
                 # found exactly one .h5 file to match the one from the direct view
                 h5_file_group.append(view_h5_list[0])

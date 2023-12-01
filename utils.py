@@ -268,10 +268,15 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
         if ix_cam == 0:
             # this ensures that the joint order for the direct view is used uniformly
             bp_index = dlabs.columns.names.index('bodyparts')
-            ind_index = dlabs.columns.names.index('individuals')
-
             joint_names = list(dlabs.columns.get_level_values(bp_index).unique())
-            individuals = list(dlabs.columns.get_level_values(ind_index).unique())
+            try:
+                ind_index = dlabs.columns.names.index('individuals')
+                individuals = list(dlabs.columns.get_level_values(ind_index).unique())
+            except:
+                # if there is no 'individuals' column header
+                ind_index = None
+                individuals = None
+
         if not 'dir' in cam_name:
             # rename from "near/far" to "left/right" for mirror views
             dlabs = rename_mirror_columns(cam_name, dlabs)
@@ -279,9 +284,6 @@ def load_pose2d_fnames(fname_dict, offsets_dict=None, cam_names=None):
         if len(dlabs.columns.levels) > 2:
             scorer = dlabs.columns.levels[0][0]
             dlabs = dlabs.loc[:, scorer]
-
-        bp_index = dlabs.columns.names.index('bodyparts')
-        ind_index = dlabs.columns.names.index('individuals')
 
         dx = offsets_dict[cam_name][0]
         dy = offsets_dict[cam_name][1]

@@ -278,20 +278,19 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
     d = crop_all_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
 
-    # todo: perform 2d-filtering here
+    n_cams, n_frames, n_joints, _, _ = d['all_points'].shape
 
     # test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)
+    points = np.zeros((n_cams, n_frames, n_joints, 2))
+    scores = np.zeros((n_cams, n_frames, n_joints))
     for i_cam, cam_name in enumerate(cam_names):
         # for input to the anipose 2d filtering code, the "points" should be given as an n_frames x n_joints x n_possible x 3 array
-        # what the heck is n_possible? need to figure that out
         cam_points = d['all_points'][i_cam, :, :, :, :]
-        aniposefilter_pose.filter_pose_medfilt(anipose_config, cam_points, d['bodyparts'])
-
-    n_cams, n_points, n_joints, _ = d['points'].shape
+        points[i_cam, :, :, :], scores[i_cam, :] = aniposefilter_pose.filter_pose_medfilt(anipose_config, cam_points, d['bodyparts'])
 
     # need to copy so full dlc_output gets written to r3d_data
-    points = copy.deepcopy(d['points'])
-    scores = d['scores']
+    # points = copy.deepcopy(d['points'])
+    # scores = d['scores']
     bodyparts = d['bodyparts']
 
     # remove points that are below threshold
@@ -305,6 +304,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     p3ds_flat = cgroup.triangulate(points_flat, progress=True)
     reprojerr_flat = cgroup.reprojection_error(p3ds_flat, points_flat, mean=True)
 
+    n_points = np.shape(points_flat)[0]
     p3ds = p3ds_flat.reshape(n_points, n_joints, 3)
     reprojerr = reprojerr_flat.reshape(n_points, n_joints)
 

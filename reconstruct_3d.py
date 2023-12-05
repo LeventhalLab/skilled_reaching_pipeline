@@ -267,6 +267,8 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
                             'ses{:02d}'.format(h5_metadata['session_num']),
                             'cgroup'))
 
+    h5_el_group = [h5_name.strip('.h5') + '_el.h5' for h5_name in h5_group]
+
     cgroup = calibration_data[cgroup_name]
     cam_names = cgroup.get_names()
     fname_dict = dict.fromkeys(cam_names)
@@ -277,12 +279,17 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     # and return the data structure
     d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
     d = crop_all_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
+    fname_el_dict = {cam_name: h5_el_name for cam_name, h5_el_name in zip(cam_names, h5_el_group)}
+
+    d_el = load_pose2d_fnames(fname_el_dict, cam_names=cam_names)
+    d_el = crop_all_points_2_full_frame(d_el, h5_el_group, calibration_data['cam_intrinsics'])
 
     n_cams, n_frames, n_joints, _, _ = d['all_points'].shape
 
     # test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)
     points = np.zeros((n_cams, n_frames, n_joints, 2))
     scores = np.zeros((n_cams, n_frames, n_joints))
+    # todo: how different is "points" from "all_points" and points in the "el.h5" file?
     for i_cam, cam_name in enumerate(cam_names):
         # for input to the anipose 2d filtering code, the "points" should be given as an n_frames x n_joints x n_possible x 3 array
         cam_points = d['all_points'][i_cam, :, :, :, :]
@@ -304,10 +311,11 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     p3ds_flat = cgroup.triangulate(points_flat, progress=True)
     reprojerr_flat = cgroup.reprojection_error(p3ds_flat, points_flat, mean=True)
 
-    n_points = np.shape(points_flat)[0]
-    p3ds = p3ds_flat.reshape(n_points, n_joints, 3)
-    reprojerr = reprojerr_flat.reshape(n_points, n_joints)
+    p3ds = p3ds_flat.reshape(n_frames, n_joints, 3)
+    reprojerr = reprojerr_flat.reshape(n_frames, n_joints)
 
+    d['points'] = points
+    d['scores'] = scores
     # now compare to the optimized version that includes constraints and filtering
     optim_p3ds = triangulate_optim(d, cgroup, anipose_config, p3ds)
 
@@ -315,7 +323,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
                 'optim_points3d': optim_p3ds,
                 'calibration_data': calibration_data,
                 'h5_group': h5_group,
-                'min_valid_score': min_valid_score,
+                'anipose_config': anipose_config,
                 'dlc_output': d}
     skilled_reaching_io.write_pickle(trajectory_fname, r3d_data)
 
@@ -375,7 +383,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
 def triangulate_optim(d, cgroup, anipose_config, points_3d_init):
 
     points_2d = copy.deepcopy(d['points'])
-    scores_2d = d['scores']
+    # scores_2d = d['scores']
     bodyparts = d['bodyparts']
 
     n_cams, n_frames, n_joints, _ = points_2d.shape
@@ -383,7 +391,7 @@ def triangulate_optim(d, cgroup, anipose_config, points_3d_init):
     constraints = load_constraints(anipose_config, bodyparts)
     constraints_weak = load_constraints(anipose_config, bodyparts, 'constraints_weak')
 
-    points_shaped = points_2d.reshape(n_cams, n_frames * n_joints, 2)
+    # points_shaped = points_2d.reshape(n_cams, n_frames * n_joints, 2)
 
     c = np.isfinite(points_3d_init[:, :, 0])
     if np.sum(c) < 20:

@@ -254,7 +254,10 @@ def crop_all_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
             # translate points from the cropped video to the full frame
             if 'fliplr' in h5_file:
                 # video was flipped left-right
-                pose_data['all_points'][i_file, i_frame, :, :, 0] = crop_w - pose_data['all_points'][i_file, i_frame, :, 0]
+                try:
+                    pose_data['all_points'][i_file, i_frame, :, :, 0] = crop_w - pose_data['all_points'][i_file, i_frame, :, :, 0]
+                except:
+                    pass
             pose_data['all_points'][i_file, i_frame, :, :, 0] += dx
             pose_data['all_points'][i_file, i_frame, :, :, 1] += dy
 

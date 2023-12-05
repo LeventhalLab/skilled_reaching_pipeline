@@ -27,7 +27,7 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
     pawtraces_fname = summary_3dbasename + '_pawtraces.pdf'
     imgsamp_fname = summary_3dbasename + '_imgsamp.tiff'
 
-    if not (os.path.exists(scores_fname) and os.path.exists(pawtraces_fname) and os.path.exists(imgsamp_fname)):
+    if True:# not (os.path.exists(scores_fname) and os.path.exists(pawtraces_fname) and os.path.exists(imgsamp_fname)):
         _, traj_name = os.path.split(traj3d_fname)
         traj_name, _ = os.path.splitext(traj_name)
 
@@ -63,8 +63,12 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
             cur_bpt_idx = bpt_idx[i_bpt]
 
             for i_axis in range(3):
-                axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis])
-                axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis])
+                axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis], linestyle='--')
+                axs_2dproj[i_axis].plot(r3d_data['points3d'][:, bpt_idx, i_axis], linestyle='--')
+
+                axs_2dproj[i_axis].plot(r3d_data['optim_points3d'][:, bpt_idx, i_axis])
+                axs_2dproj[i_axis].plot(r3d_data['optim_points3d'][:, bpt_idx, i_axis])
+
                 axs_2dproj[i_axis].set_xlim([200, 500])
 
             for i_cam in range(3):
@@ -84,9 +88,9 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
         fig_scores.suptitle(traj_name, fontsize=16)
 
         plt.figure(fig_2dproj)
-        plt.savefig(pawtraces_fname, format='pdf')
+        # plt.savefig(pawtraces_fname, format='pdf')
         plt.figure(fig_scores)
-        plt.savefig(scores_fname, format='pdf')
+        # plt.savefig(scores_fname, format='pdf')
 
         orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
 
@@ -158,7 +162,7 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
     num_frames = np.shape(r3d_data['points3d'])[0]
     cam_intrinsics = r3d_data['calibration_data']['cam_intrinsics']
     scores = r3d_data['dlc_output']['scores']
-    min_valid_score = r3d_data['min_valid_score']
+    min_valid_score = r3d_data['anipose_config']['triangulation']['score_threshold']
     cap = cv2.VideoCapture(orig_vid)
 
     vidtrigger_ts, vidtrigger_interval = ipk.get_vidtrigger_ts(traj_metadata, trials_df)

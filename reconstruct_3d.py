@@ -293,7 +293,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     for i_cam, cam_name in enumerate(cam_names):
         # for input to the anipose 2d filtering code, the "points" should be given as an n_frames x n_joints x n_possible x 3 array
         cam_points = d['all_points'][i_cam, :, :, :, :]
-        points[i_cam, :, :, :], scores[i_cam, :] = aniposefilter_pose.filter_pose_medfilt(anipose_config, cam_points, d['bodyparts'])
+        points[i_cam, :, :, :], scores[i_cam, :, :] = aniposefilter_pose.filter_pose_medfilt(anipose_config, cam_points, d['bodyparts'])
 
     # need to copy so full dlc_output gets written to r3d_data
     # points = copy.deepcopy(d['points'])
@@ -302,13 +302,14 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
 
     # remove points that are below threshold
     points[scores < min_valid_2dfilter_score] = np.nan
+    points[np.isnan(scores)] = np.nan
 
     points = match_palm_dorsum(points, bodyparts)
 
     points_flat = points.reshape(n_cams, -1, 2)
     scores_flat = scores.reshape(n_cams, -1)
 
-    p3ds_flat = cgroup.triangulate(points_flat, progress=True)
+    p3ds_flat = cgroup.triangulate(points_flat, progress=True, undistort=False)
     reprojerr_flat = cgroup.reprojection_error(p3ds_flat, points_flat, mean=True)
 
     p3ds = p3ds_flat.reshape(n_frames, n_joints, 3)

@@ -14,9 +14,10 @@ import skilled_reaching_io
 import integrate_phys_kinematics as ipk
 
 
-def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df, test_frame=297, pawparts2plot=['pawdorsum', 'palm', 'dig1','dig2','dig3','dig4']):
+def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df, test_frame=297, pawparts2plot=['pawdorsum', 'palm', 'dig1', 'dig2','dig3','dig4']):
     prop_cycle = plt.rcParams['axes.prop_cycle']
     color_cycle = prop_cycle.by_key()['color']
+    col_list = ['k','b','r','g','m','c']
 
     traj_metadata = navigation_utilities.parse_trajectory_name(traj3d_fname)
     traj_metadata['session_num'] = session_metadata['session_num']
@@ -72,7 +73,7 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
                 axs_2dproj[i_axis].set_xlim([200, 500])
 
             for i_cam in range(3):
-                axs_scores[i_bpt].plot(np.squeeze(r3d_data['dlc_output']['scores'][i_cam, :, cur_bpt_idx]))
+                axs_scores[i_bpt].plot(np.squeeze(r3d_data['dlc_output']['scores'][i_cam, :, cur_bpt_idx]), color=color_cycle[i_bpt])
             axs_scores[i_bpt].set_xlim([200, 500])
             axs_scores[i_bpt].set_title(bpt2plot)
             if i_bpt < num_bpts:
@@ -114,7 +115,7 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
             for i_bpt, bpt2plot in enumerate(bpts2plot):
                 cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
 
-                ax_img.scatter(dlc_coords[i_view, test_frame, cur_bpt_idx, 0], dlc_coords[i_view, test_frame, cur_bpt_idx, 1], s=2, color=color_cycle[i_bpt])
+                ax_img.scatter(dlc_coords[i_view, test_frame, cur_bpt_idx, 0], dlc_coords[i_view, test_frame, cur_bpt_idx, 1], s=3, color=color_cycle[i_bpt])
 
         plt.savefig(imgsamp_fname, format='tiff', dpi=600)
 

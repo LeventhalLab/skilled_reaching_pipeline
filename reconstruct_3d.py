@@ -287,13 +287,19 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     n_cams, n_frames, n_joints, _, _ = d['all_points'].shape
 
     # test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)
+    mf_points = np.zeros((n_cams, n_frames, n_joints, 2))
+    mf_scores = np.zeros((n_cams, n_frames, n_joints))
+
     points = np.zeros((n_cams, n_frames, n_joints, 2))
     scores = np.zeros((n_cams, n_frames, n_joints))
     # todo: how different is "points" from "all_points" and points in the "el.h5" file?
     for i_cam, cam_name in enumerate(cam_names):
         # for input to the anipose 2d filtering code, the "points" should be given as an n_frames x n_joints x n_possible x 3 array
         cam_points = d['all_points'][i_cam, :, :, :, :]
-        points[i_cam, :, :, :], scores[i_cam, :, :] = aniposefilter_pose.filter_pose_medfilt(anipose_config, cam_points, d['bodyparts'])
+        points[i_cam, :, :, :], scores[i_cam, :, :] = aniposefilter_pose.filter_pose_viterbi(anipose_config,
+                                                                                                cam_points,
+                                                                                                d['bodyparts'])
+        mf_points[i_cam, :, :, :], mf_scores[i_cam, :, :] = aniposefilter_pose.filter_pose_medfilt(anipose_config, cam_points, d['bodyparts'])
 
     # need to copy so full dlc_output gets written to r3d_data
     # points = copy.deepcopy(d['points'])

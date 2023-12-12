@@ -207,5 +207,63 @@ def remove_dups(pts, thres=7):
     return pts_out
 
 
+def filter_pose_autoencoder_scores(config, all_points, bodyparts):
+    n_frames, n_joints, n_possible, _ = all_points.shape
+
+    points_full = all_points[:, :, :, :2]
+    scores_full = all_points[:, :, :, 2]
+
+    scores_test = all_points[:, :, 0, 2]
+
+    fname_model = config['filter']['autoencoder_path']
+    with open(fname_model, 'rb') as f:
+        mlp = pickle.load(f)
+
+    scores_pred = mlp.predict_proba(scores_test)
+    scores_pred_rep = np.repeat(scores_pred, n_possible, axis=1).reshape(scores_full.shape)
+
+    scores_fixed = np.min([scores_pred_rep, scores_full], axis=0)
+
+    return points_full, scores_fixed
+
+
+def filter_pose_autoencoder_scores_DL(config, all_points, bodyparts, dlc_proj_name):
+    n_frames, n_joints, n_possible, _ = all_points.shape
+
+    ae_fname = '_'.join((dlc_proj_name, 'autoencoder.pickle'))
+    ae_fname = os.path.join(config['model_folder'], ae_fname)
+
+    points_full = all_points[:, :, :, :2]
+    scores_full = all_points[:, :, :, 2]
+
+    scores_test = all_points[:, :, 0, 2]
+    scores_test = np.nan_to_num(scores_test, copy=False, nan=0.0)
+
+    # fname_model = config['filter']['autoencoder_path']
+    with open(ae_fname, 'rb') as f:
+        mlp = pickle.load(f)
+
+    scores_pred = mlp.predict_proba(scores_test)
+    scores_pred_rep = np.repeat(scores_pred, n_possible, axis=1).reshape(scores_full.shape)
+
+    scores_fixed = np.min([scores_pred_rep, scores_full], axis=0)
+
+    return points_full, scores_fixed
+
+
 def nan_helper(y):
     return np.isnan(y), lambda z: z.nonzero()[0]
+
+
+def wrap_points(points, scores):
+    if len(points.shape) == 3: # n_possible = 1
+        points = points[:, :, None]
+        scores = scores[:, :, None]
+
+    n_frames, n_joints, n_possible, _ = points.shape
+
+    all_points = np.full((n_frames, n_joints, n_possible, 3), np.nan, dtype='float64')
+    all_points[:, :, :, :2] = points
+    all_points[:, :, :, 2] = scores
+
+    return all_points

@@ -252,6 +252,8 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
 
 def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, anipose_config, parent_directories):
 
+    proj_names = [DLC_folder.split('-')[0] for DLC_folder in anipose_config['DLC_folders']]
+
     min_valid_2dfilter_score = anipose_config['filter']['score_threshold']
     min_valid_triangulation_score = anipose_config['triangulation']['score_threshold']
 
@@ -259,8 +261,8 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
                                                                    parent_directories)
 
-    # if os.path.exists(trajectory_fname):
-    #     return
+    if os.path.exists(trajectory_fname):
+        return
 
     cgroup_name = '_'.join((h5_metadata['ratID'],
                             h5_metadata['triggertime'].strftime('%Y%m%d'),
@@ -292,14 +294,34 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
 
     points = np.zeros((n_cams, n_frames, n_joints, 2))
     scores = np.zeros((n_cams, n_frames, n_joints))
+    cam_vit_pts = []
+    cam_vit_scores = []
     # todo: how different is "points" from "all_points" and points in the "el.h5" file?
     for i_cam, cam_name in enumerate(cam_names):
         # for input to the anipose 2d filtering code, the "points" should be given as an n_frames x n_joints x n_possible x 3 array
         cam_points = d['all_points'][i_cam, :, :, :, :]
-        points[i_cam, :, :, :], scores[i_cam, :, :] = aniposefilter_pose.filter_pose_viterbi(anipose_config,
-                                                                                                cam_points,
-                                                                                                d['bodyparts'])
-        mf_points[i_cam, :, :, :], mf_scores[i_cam, :, :] = aniposefilter_pose.filter_pose_medfilt(anipose_config, cam_points, d['bodyparts'])
+        # points[i_cam, :, :, :], scores[i_cam, :, :] = aniposefilter_pose.filter_pose_viterbi(anipose_config,
+        #                                                                                         cam_points,
+        #                                                                                         d['bodyparts'])
+
+        vit_pts, vit_scores = aniposefilter_pose.filter_pose_viterbi(anipose_config, cam_points, d['bodyparts'])
+        all_vit_pts = aniposefilter_pose.wrap_points(vit_pts, vit_scores)
+        cam_vit_pts.append(vit_pts)
+        cam_vit_scores.append(vit_scores)
+
+        # dlc_proj_name = dlc_proj_name_from_h5(h5_group[i_cam], proj_names)
+
+        # ae_pts, ae_scores = aniposefilter_pose.filter_pose_autoencoder_scores_DL(anipose_config, all_vit_pts, d['bodyparts'], dlc_proj_name)
+
+        points[i_cam, :, :, :] = np.squeeze(vit_pts)
+        scores[i_cam, :, :] = np.squeeze(vit_scores)
+
+        # points[i_cam, :, :, :], scores[i_cam, :, :] = aniposefilter_pose.filter_pose_autoencoder_scores_DL(anipose_config,
+        #                                                                                         all_vit_pts,
+        #                                                                                         d['bodyparts'],
+        #                                                                                         dlc_proj_name)
+
+        # mf_points[i_cam, :, :, :], mf_scores[i_cam, :, :] = aniposefilter_pose.filter_pose_medfilt(anipose_config, cam_points, d['bodyparts'])
 
     # need to copy so full dlc_output gets written to r3d_data
     # points = copy.deepcopy(d['points'])
@@ -385,6 +407,16 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
 #     scores = scores_full[:, :, 0]
 #
 #     return points, scores
+
+
+def dlc_proj_name_from_h5(h5_name, proj_names):
+
+    dlc_proj_name = [proj_name for proj_name in proj_names if proj_name in h5_name]
+
+    if len(dlc_proj_name) == 1:
+        return dlc_proj_name[0]
+    else:
+        return None
 
 
 def triangulate_optim(d, cgroup, anipose_config, points_3d_init):

@@ -14,6 +14,7 @@ import sys
 import deeplabcut
 from boards import CharucoBoard, Checkerboard
 from cameras import Camera, CameraGroup
+import train_autoencoder
 
 
 def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_dirs, rat_df, cropped_vid_type='.avi', gputouse=0, save_as_csv=True, create_marked_vids=True):
@@ -397,10 +398,6 @@ if __name__ == '__main__':
     #     'farpaw': '/home/levlab/deeplabcut_projects/ratfarpawmirrsr-DL-2023-07-03/config.yaml'
     # }
 
-    DLC_folder_names = {'direct': 'ratdirsr-DL-2023-06-07',
-                        'nearpaw': 'ratnearpawmirrsr-DL-2023-06-19',
-                        'farpaw': 'ratfarpawmirrsr-DL-2023-07-03'}
-
     if sys.platform in ['win32']:
         # assume DKL computer
         DLC_top_folder = r'C:\Users\dleventh\Documents\deeplabcut_projects'
@@ -410,6 +407,17 @@ if __name__ == '__main__':
         # lambda computer
         DLC_top_folder = '/home/dleventh/Documents/DLC_projects'
         data_root_folder = '/home/dleventh/SharedX/Neuro-Leventhal/data/sr'
+
+    # to find the config files for each DLC network for each view
+    view_keys = ('direct', 'nearpaw', 'farpaw')   #list(DLC_folder_names.keys())
+    anipose_config_path = os.path.join(DLC_top_folder, 'sr_anipose', 'config.toml')
+    anipose_config = toml.load(anipose_config_path)
+    DLC_folder_names = {view_key: anipose_config['DLC_folders'][i_view] for i_view, view_key in enumerate(view_keys)}
+
+        # 'direct': DLC_proj_names['direct'] + '-DL-2023-06-07',
+        #                 'nearpaw': DLC_proj_names['nearpaw'] + '-DL-2023-06-19',
+        #                 'farpaw': DLC_proj_names['farpaw'] + '-DL-2023-07-03'}
+    view_config_paths = {view_key: os.path.join(DLC_top_folder, anipose_config['DLC_folders'][i_view], 'config.yaml') for i_view, view_key in enumerate(view_keys)}
 
     # store directory tree for each experiment
     videos_parents = {expt: os.path.join(data_root_folder, expt) for expt in experiment_list}
@@ -422,12 +430,6 @@ if __name__ == '__main__':
     trajectories_parents = {expt: os.path.join(videos_parents[expt], 'traj_files') for expt in experiment_list}
     trajectory_summaries = {expt: os.path.join(videos_parents[expt], 'traj_summaries') for expt in experiment_list}
     analysis_summaries = {expt: os.path.join(videos_parents[expt], 'analysis') for expt in experiment_list}
-
-    view_keys = list(DLC_folder_names.keys())
-
-    # to find the config files for each DLC network for each view
-    view_config_paths = {view_key: os.path.join(DLC_top_folder, DLC_folder_names[view_key], 'config.yaml') for view_key in view_keys}
-    anipose_config_path = os.path.join(DLC_top_folder, 'sr_anipose', 'config.toml')
 
     parent_directories = {expt: {
                                 'videos_parent': videos_parents[expt],
@@ -540,6 +542,10 @@ if __name__ == '__main__':
         folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(parent_directories[expt]['cropped_videos_parent'], cam_names)
 
         anipose_config = toml.load(anipose_config_path)
+
+        DLC_folder_keys = DLC_folder_names.keys()
+        # for DLC_key in DLC_folder_keys:
+        #     train_autoencoder.train_autoencoder(anipose_config, DLC_folder_names[DLC_key])
         reconstruct_3d.reconstruct_folders_anipose(folders_to_reconstruct, parent_directories[expt], expt, rat_df, anipose_config, filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)

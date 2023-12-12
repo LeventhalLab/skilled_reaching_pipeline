@@ -181,12 +181,13 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
     for i_frame in range(num_frames):
 
         frame_fig = plt.figure(figsize=(20, 10))
-        gs = frame_fig.add_gridspec(3, 2, width_ratios=(4, 1), height_ratios=(1, 3, 4), wspace=0.05, hspace=0.02,
+        gs = frame_fig.add_gridspec(3, 3, width_ratios=(8, 2, 1), height_ratios=(1, 3, 4), wspace=0.05, hspace=0.02,
                                     left=vid_params['lm'], right=vid_params['rm'], top=vid_params['tm'], bottom=vid_params['bm'])
 
         vid_ax = frame_fig.add_subplot(gs[1:, 0])
         ax3d = frame_fig.add_subplot(gs[:2, 1], projection='3d')
-        legend_ax = frame_fig.add_subplot(gs[2, 1])
+        ax3d_optim = frame_fig.add_subplot(gs[2, 1], projection='3d')
+        legend_ax = frame_fig.add_subplot(gs[:, 2])
         phot_trace_ax = frame_fig.add_subplot(gs[0, 0])
 
         phot_trace_ax.set_ylim(phot_ylim)
@@ -234,16 +235,28 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
                          s=markersize,
                          color=cmap(cur_bpt_idx / num_bpts))
 
-        connect_3d_bpts(r3d_data['points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2connect, ax3d)
+            ax3d_optim.scatter(r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 0],
+                         r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 2],
+                         r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 1],
+                         s=markersize,
+                         color=cmap(cur_bpt_idx / num_bpts))
 
-        ax3d.set_xlim((-50, 25))
-        ax3d.set_ylim((200, 350))  # this is actually z
-        ax3d.set_zlim((20, 120))  # this is actually y
+        connect_3d_bpts(r3d_data['points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2connect, ax3d)
+        connect_3d_bpts(r3d_data['optim_points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2connect, ax3d_optim)
+
+        # ax3d.set_xlim((-50, 25))
+        # ax3d.set_ylim((200, 350))  # this is actually z
+        # ax3d.set_zlim((20, 120))  # this is actually y
 
         ax3d.set_xlabel('x')
         ax3d.set_ylabel('z')
         ax3d.set_zlabel('y')
         ax3d.invert_zaxis()
+
+        ax3d_optim.set_xlabel('x')
+        ax3d_optim.set_ylabel('z')
+        ax3d_optim.set_zlabel('y')
+        ax3d_optim.invert_zaxis()
 
         vid_ax.set_xticks([])
         vid_ax.set_yticks([])

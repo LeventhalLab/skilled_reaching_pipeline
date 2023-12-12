@@ -223,7 +223,8 @@ def crop_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
             pose_data['points'][i_file, i_frame, :, 1] += dy
 
             # now undistort the full frame points
-            pts_ud_norm = cv2.undistortPoints(pose_data['points'][i_file, i_frame, :, :], cam_intrinsics['mtx'], cam_intrinsics['dist'])
+            pts = pose_data['points'][i_file, i_frame, :, :].astype(np.float64)
+            pts_ud_norm = cv2.undistortPoints(pts, cam_intrinsics['mtx'], cam_intrinsics['dist'])
             pts_ud = cvb.unnormalize_points(pts_ud_norm, cam_intrinsics['mtx'])
 
             pose_data['points'][i_file, i_frame, :, :] = pts_ud
@@ -287,11 +288,13 @@ def match_dlc_points_from_all_views(h5_list, cam_names, calibration_data, parent
         h5_group = [h5_file]
         for cam_name in cam_names[1:]:
             cam_folder_name = os.path.join(cropped_session_folder, '_'.join((cropped_session_folder_name, cam_name)))
-            test_name = navigation_utilities.test_dlc_h5_name_from_h5_metadata(h5_vid_metadata, cam_name,
-                                                                               filtered=filtered)
+            test_name = navigation_utilities.test_dlc_h5_name_from_h5_metadata(h5_vid_metadata)
             full_test_name = os.path.join(cam_folder_name, test_name)
 
             view_h5_list = glob.glob(full_test_name)
+
+            # eliminate the processed versions of the .h5 files from dlc
+            view_h5_list = [h5_file for h5_file in view_h5_list if '_el' not in h5_file]
             if len(view_h5_list) == 1:
                 # found exactly one .h5 file to match the one from the direct view
                 h5_group.append(view_h5_list[0])
@@ -304,6 +307,12 @@ def match_dlc_points_from_all_views(h5_list, cam_names, calibration_data, parent
             fname_dict[cam_name] = h5_group[i_cam]
 
         d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
+
+        # this version of d has an "all_points" array which is a num_cams x num_frames x num_bodyparts x num_possibilities x 3 array
+        # the last 3 values are the x value, y value, and score. Need to rearrange into points and scores arrays
+        ind_points_scores = np.squeeze(d['all_points'][:, :, :, 0, :])   # eliminates other "possible" points, which shouldn't matter for purposes of recalibrating
+        d['points'] = ind_points_scores[:, :, :, :2]
+        d['scores'] = ind_points_scores[:, :, :, 2]
         d = crop_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
 
         # test_pose_data(h5_metadata, session_metadata, d, calibration_data['cam_intrinsics'], parent_directories)

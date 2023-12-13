@@ -265,7 +265,9 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
 
     # select out the row from the rat info table and the trials table to store with the kinematic data
     ratdf_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
-    trialdf_row = trials_df[pd.to_datetime(trials_df['session_date']) == h5_metadata['triggertime'].date &
+    test_date = h5_metadata['triggertime']
+    test_date = test_date.replace(hour=0, minute=0, second=0)
+    trialdf_row = trials_df[(pd.to_datetime(trials_df['session_date']) == test_date) &
                             (trials_df['date_session_num'] == h5_metadata['session_num']) &
                             (trials_df['vid_number_in_name'] == h5_metadata['video_number'])
     ]
@@ -273,8 +275,8 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     analyze_3d_recons.analyze_trajectory(trajectory_fname)
     # todo: get trial info and store that with the 3d reconstruction as well
 
-    if os.path.exists(trajectory_fname):
-        return
+    # if os.path.exists(trajectory_fname):
+    #     return
 
     cgroup_name = '_'.join((h5_metadata['ratID'],
                             h5_metadata['triggertime'].strftime('%Y%m%d'),
@@ -366,7 +368,8 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
                 'h5_group': h5_group,
                 'anipose_config': anipose_config,
                 'dlc_output': d,
-                'rat_info': ratdf_row}
+                'rat_info': ratdf_row,
+                'trial_info': trialdf_row}
     skilled_reaching_io.write_pickle(trajectory_fname, r3d_data)
 
 

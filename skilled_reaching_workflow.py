@@ -547,7 +547,7 @@ if __name__ == '__main__':
         # for DLC_key in DLC_folder_keys:
         #     train_autoencoder.train_autoencoder(anipose_config, DLC_folder_names[DLC_key])
         ftr = [folder for folder in folders_to_reconstruct if folder['ratID'] == 'R0468']
-        reconstruct_3d.reconstruct_folders_anipose(folders_to_reconstruct, parent_directories[expt], expt, rat_df, anipose_config, filtered=False)
+        reconstruct_3d.reconstruct_folders_anipose(ftr, parent_directories[expt], expt, rat_df, anipose_config, filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)
 

@@ -203,7 +203,7 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
     if os.path.exists(trials_db_name):
         trials_df = skilled_reaching_io.read_pickle(trials_db_name)
     else:
-        rat_aggdata_fname = navigation_utilities.get_aggregated_singlerat_data_name(parent_directories, ratID, 'sr')
+        rat_aggdata_fname = navigation_utilities.get_aggregated_singlerat_data_name(parent_directories, session_metadata['ratID'], 'sr')
         rat_phys_data = skilled_reaching_io.read_pickle(rat_aggdata_fname)
         trials_df = rat_phys_data['rat_df']
         skilled_reaching_io.write_pickle(trials_db_name, trials_df)

@@ -2,6 +2,8 @@ import numpy as np
 import cv2
 from datetime import datetime
 import os
+
+import analyze_3d_recons
 import navigation_utilities
 import glob
 import skilled_reaching_calibration
@@ -242,7 +244,7 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         if len(h5_file_group) != 3:
             continue
 
-        reconstruct_single_vid_anipose(h5_file_group, session_metadata, calibration_data, anipose_config, parent_directories)
+        reconstruct_single_vid_anipose(h5_file_group, session_metadata, calibration_data, anipose_config, rat_df, trials_df, parent_directories)
 
         h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file_group[0])
         trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
@@ -250,7 +252,7 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
 
 
-def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, anipose_config, parent_directories):
+def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, anipose_config, rat_df, trials_df, parent_directories):
 
     proj_names = [DLC_folder.split('-')[0] for DLC_folder in anipose_config['DLC_folders']]
 
@@ -260,6 +262,16 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_group[0])
     trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
                                                                    parent_directories)
+
+    # select out the row from the rat info table and the trials table to store with the kinematic data
+    ratdf_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
+    trialdf_row = trials_df[pd.to_datetime(trials_df['session_date']) == h5_metadata['triggertime'].date &
+                            (trials_df['date_session_num'] == h5_metadata['session_num']) &
+                            (trials_df['vid_number_in_name'] == h5_metadata['video_number'])
+    ]
+
+    analyze_3d_recons.analyze_trajectory(trajectory_fname)
+    # todo: get trial info and store that with the 3d reconstruction as well
 
     if os.path.exists(trajectory_fname):
         return
@@ -353,7 +365,8 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
                 'calibration_data': calibration_data,
                 'h5_group': h5_group,
                 'anipose_config': anipose_config,
-                'dlc_output': d}
+                'dlc_output': d,
+                'rat_info': ratdf_row}
     skilled_reaching_io.write_pickle(trajectory_fname, r3d_data)
 
 

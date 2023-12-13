@@ -15,6 +15,7 @@ import deeplabcut
 from boards import CharucoBoard, Checkerboard
 from cameras import Camera, CameraGroup
 import train_autoencoder
+import analyze_3d_recons
 
 
 def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_dirs, rat_df, cropped_vid_type='.avi', gputouse=0, save_as_csv=True, create_marked_vids=True):

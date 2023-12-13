@@ -57,7 +57,7 @@ def identify_pellet_contact(r3d_data, paw_pref, score_threshold=0.95, pelletname
     if did_pellet_move:
         # now need to figure out which bodypart made it move, and which frame that was
 
-    pass
+        pass
 
 
 def get_reaching_traj(pts3d, dlc_output, reaching_pawparts):
@@ -106,11 +106,6 @@ def test_if_pellet_moved(dlc_output, pts3d, initial_pellet_loc, pelletscore_thre
         return True
     else:
         return False
-
-    if (pellet_scores < pelletscore_threshold).any():
-        # at some point, the pellet disappeared in at least one view
-
-
 
 
 def find_reaching_pawparts(bodyparts, paw_pref):

@@ -272,7 +272,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
                             (trials_df['vid_number_in_name'] == h5_metadata['video_number'])
     ]
 
-    analyze_3d_recons.analyze_trajectory(trajectory_fname)
+    # analyze_3d_recons.analyze_trajectory(trajectory_fname)
     # todo: get trial info and store that with the 3d reconstruction as well
 
     # if os.path.exists(trajectory_fname):

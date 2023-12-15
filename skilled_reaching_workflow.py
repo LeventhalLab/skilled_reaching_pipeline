@@ -459,7 +459,8 @@ if __name__ == '__main__':
     # crop calibration videos and perform the calibrations
     # perform_calibrations(parent_directories, vidtype='.avi', cam_names=cam_names, filtertype=filtertype, rat_nums=rats_to_analyze)
 
-
+    test_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0452\R0452_20230406_sr_ses01'
+    analyze_3d_recons.analyze_trajectories(test_folder)
 
     for expt in experiment_list:
 
@@ -538,6 +539,7 @@ if __name__ == '__main__':
     # find list of all analyzed videos; extract dates and boxes for each session
 
     # step 4: reconstruct the 3d trajectories
+
     for expt in experiment_list:
         rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
         folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(parent_directories[expt]['cropped_videos_parent'], cam_names)

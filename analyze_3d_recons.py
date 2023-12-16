@@ -19,11 +19,30 @@ def analyze_trajectories(traj_folder):
         paw_pref = r3d_data['rat_info']['pawpref'].values[0]
         trials_slot_z[i_traj_file] = find_slot_z(r3d_data, paw_pref)
 
-    session_slot_z = np.nanmean(trials_slot_z)
+    # need to do something to eliminate outliers
+    slot_z_inliers = exclude_outliers_by_zscore(trials_slot_z, max_zscore=3.)
+    session_slot_z = np.mean(slot_z_inliers)
     pass
 
     for traj_file in traj_files:
         analyze_trajectory(traj_file, slot_z=session_slot_z)
+
+
+def exclude_outliers_by_zscore(data, max_zscore=3.):
+    '''
+    find outliers in an array by eliminating nan's, then calculating z-scores and removing any
+    points whose absolute z-score is > max_zscore
+    :param data:
+    :param max_zscore:
+    :return:
+    '''
+    data = data[np.logical_not(np.isnan(data))]
+
+    data_zscores = scipy.stats.zscore(data)
+
+    inliers = data[abs(data_zscores) < max_zscore]
+
+    return inliers
 
 
 def analyze_trajectory(trajectory_fname, slot_z=None):
@@ -112,7 +131,6 @@ def find_slot_z(r3d_data, paw_pref):
     z_testvals = np.linspace(min(all_paw_z), max(all_paw_z), num_testpts)
     smoothed_dist = smooth(zhist_dist.pdf(z_testvals), smooth_win)
 
-    # todo: implement Otsu's method here
     z_mins_idx, min_props = scipy.signal.find_peaks(-smoothed_dist, prominence=max(smoothed_dist) / 3)
 
     poss_mins = smoothed_dist[z_mins_idx]
@@ -128,12 +146,33 @@ def identify_reaches(pts3d, bodyparts, paw_pref, slot_z, pp2follow='dig2', min_r
     pp2follow = paw_pref.lower() + pp2follow
     pp_idx = bodyparts.index(pp2follow)
 
+    all_dig = [paw_pref.lower() + 'dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    all_dig_idx = [bodyparts.index(dig_name) for dig_name in all_dig]
     pp2follow_z = pts3d[:, pp_idx, 2]
 
     # may have to adust/add parameters to find more peaks
-    z_mins, min_props = scipy.signal.find_peaks(-pp2follow_z, prominence=min_reach_prominence)
-    pass
+    z_mins_idx, min_props = scipy.signal.find_peaks(-pp2follow_z, prominence=min_reach_prominence)
+    z_mins = pp2follow_z[z_mins_idx]
 
+    # only take reaches where z_min is less than the slot_z
+    reach_z_mins = z_mins[z_mins < slot_z]
+    reach_z_mins_idx = z_mins_idx[z_mins < slot_z]
+
+    # from matlab code, need to decide if we need this
+    # reaches_to_keep = islocalmin(-pp2follow_z, prominence=1, 'prominencewindow',[0,1000], distance=minGraspSeparation)
+    # reachMins = reachMins & reaches_to_keep;
+
+    # matlab code now looks for pawparts being too far apart to be a legit reach; I think
+    # that is already taken care of in the optim_3dpts routine from anipose
+
+    # make sure all digits were through the slot at the end of the reach
+    all_dig_z = pts3d[:, all_dig_idx, 2]
+    valid_reach_ends = []
+    for min_idx in reach_z_mins_idx:
+        if all(all_dig_z[min_idx, :] < slot_z):
+            valid_reach_ends.append(min_idx)
+
+    pass
 
 def get_reaching_traj(pts3d, dlc_output, reaching_pawparts):
     # working here...

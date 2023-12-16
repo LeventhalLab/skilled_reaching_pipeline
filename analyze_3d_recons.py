@@ -150,6 +150,10 @@ def identify_reaches(pts3d, bodyparts, paw_pref, slot_z, pp2follow='dig2', min_r
     all_dig_idx = [bodyparts.index(dig_name) for dig_name in all_dig]
     pp2follow_z = pts3d[:, pp_idx, 2]
 
+    pd_name = paw_pref.lower() + 'pawdorsum'
+    pd_idx = bodyparts.index(pd_name)
+    pd_z = pts3d[:, pd_idx, 2]
+
     # may have to adust/add parameters to find more peaks
     z_mins_idx, min_props = scipy.signal.find_peaks(-pp2follow_z, prominence=min_reach_prominence)
     z_mins = pp2follow_z[z_mins_idx]
@@ -172,6 +176,46 @@ def identify_reaches(pts3d, bodyparts, paw_pref, slot_z, pp2follow='dig2', min_r
         if all(all_dig_z[min_idx, :] < slot_z):
             valid_reach_ends.append(min_idx)
 
+    # find the paw dorsum maxima in between each reach termination
+    for i_reach, reach_end in enumerate(valid_reach_ends):
+        if i_reach == 0:
+            start_frame = 0
+        else:
+            start_frame = valid_reach_ends[i_reach - 1]
+        last_frame = valid_reach_ends[i_reach]
+        interval_dig2_z_max = max(pp2follow_z[start_frame : last_frame])
+
+    # working here...
+    # reachStarts = false(numFrames, 1);
+#     num_reaches = length(reachData.reachEnds);
+#     removeReachEndFlag = false(num_reaches, 1);
+#     for i_reach = 1: num_reaches
+#     % look in the interval from the previous reach( or trial start) to the
+#     % current reach.find where paw dorsum started moving forward
+#     if i_reach == 1
+#         startFrame = 1;
+#     else
+#         startFrame = reachData.reachEnds(i_reach - 1);
+#     end
+#     lastFrame = reachData.reachEnds(i_reach);
+#
+#     interval_dig2_z_max = max(dig2_z(startFrame:lastFrame));
+#     interval_pd_z_max = max(pd_z(startFrame:lastFrame));
+#     if isnan(
+#             interval_pd_z_max) % paw dorsum wasn't found before this reach end point; can happen if rat reaches with wrong paw first
+#     % invalidate
+#     this
+#     reach
+#     removeReachEndFlag(i_reach) = true;
+#
+#
+# end
+# % reachStarts(dig2_z == interval_dig2_z_max) = true;
+# reachStarts(pd_z == interval_pd_z_max) = true;
+#
+# end
+# reachData.reachEnds = reachData.reachEnds(~removeReachEndFlag);
+# reachData.reachStarts = find(reachStarts);
     pass
 
 def get_reaching_traj(pts3d, dlc_output, reaching_pawparts):

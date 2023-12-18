@@ -8,17 +8,26 @@ import os
 import glob
 
 
-def analyze_trajectories(traj_folder):
+def analyze_trajectories(traj_folder, pellet_score_thresh=0.95):
 
     traj_files = glob.glob(os.path.join(traj_folder, '*r3d.pickle'))
 
-    # first, estimate the slot position for this session
+    # first, estimate the slot position and mean initial pellet location for this session
     trials_slot_z = np.zeros(len(traj_files))
+    init_pellet_locs = np.zeros((len(traj_files), 3))
     for i_traj_file, traj_file in enumerate(traj_files):
         r3d_data = skilled_reaching_io.read_pickle(traj_file)
         paw_pref = r3d_data['rat_info']['pawpref'].values[0]
         trials_slot_z[i_traj_file] = find_slot_z(r3d_data, paw_pref)
 
+        trial_pellet_loc = find_initial_pellet_loc(r3d_data['dlc_output'], r3d_data['points3d'], score_threshold=pellet_score_thresh,
+                                                   pelletname='pellet', test_frame_range=(200, 250))
+        if trial_pellet_loc is None:
+            init_pellet_locs[i_traj_file, :] = np.nan
+        else:
+            init_pellet_locs[i_traj_file, :] = trial_pellet_loc
+
+    mean_init_pellet_loc = np.nanmean(init_pellet_locs, axis=0)
     # need to do something to eliminate outliers
     slot_z_inliers = exclude_outliers_by_zscore(trials_slot_z, max_zscore=3.)
     session_slot_z = np.mean(slot_z_inliers)
@@ -45,7 +54,9 @@ def exclude_outliers_by_zscore(data, max_zscore=3.):
     return inliers
 
 
-def analyze_trajectory(trajectory_fname, slot_z=None):
+def analyze_trajectory(trajectory_fname, slot_z=None,
+                       pellet_score_thresh=0.95,
+                       pelletname='pellet'):
     # trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
     #                                                                parent_directories)
 
@@ -59,7 +70,14 @@ def analyze_trajectory(trajectory_fname, slot_z=None):
 
     if slot_z is None:
         slot_z = find_slot_z(r3d_data, paw_pref)
-    identify_reaches(pts3d, bodyparts, paw_pref, slot_z)
+
+    initial_pellet_loc = find_initial_pellet_loc(r3d_data['dlc_output'], pts3d, score_threshold=pellet_score_thresh,
+                                         pelletname=pelletname, test_frame_range=[200, 250])
+
+    # slot_z_wrtpellet =
+    pts3d_wrt_pellet = pts3d - initial_pellet_loc
+    reach_data = identify_reaches(pts3d_wrt_pellet, bodyparts, paw_pref, slot_z)
+    reach_data = identify_grasps(pts3d_wrt_pellet, bodyparts, paw_pref, slot_z, reach_data)
 
     f_contact, bp_contact = identify_pellet_contact(r3d_data, paw_pref, pelletname='pellet')
     pass
@@ -177,6 +195,7 @@ def identify_reaches(pts3d, bodyparts, paw_pref, slot_z, pp2follow='dig2', min_r
             valid_reach_ends.append(min_idx)
 
     # find the paw dorsum maxima in between each reach termination
+    valid_reach_starts = []
     for i_reach, reach_end in enumerate(valid_reach_ends):
         if i_reach == 0:
             start_frame = 0
@@ -184,39 +203,45 @@ def identify_reaches(pts3d, bodyparts, paw_pref, slot_z, pp2follow='dig2', min_r
             start_frame = valid_reach_ends[i_reach - 1]
         last_frame = valid_reach_ends[i_reach]
         interval_dig2_z_max = max(pp2follow_z[start_frame : last_frame])
+        interval_pd_z_max = max(pd_z[start_frame : last_frame])
 
-    # working here...
-    # reachStarts = false(numFrames, 1);
-#     num_reaches = length(reachData.reachEnds);
-#     removeReachEndFlag = false(num_reaches, 1);
-#     for i_reach = 1: num_reaches
-#     % look in the interval from the previous reach( or trial start) to the
-#     % current reach.find where paw dorsum started moving forward
-#     if i_reach == 1
-#         startFrame = 1;
-#     else
-#         startFrame = reachData.reachEnds(i_reach - 1);
-#     end
-#     lastFrame = reachData.reachEnds(i_reach);
-#
-#     interval_dig2_z_max = max(dig2_z(startFrame:lastFrame));
-#     interval_pd_z_max = max(pd_z(startFrame:lastFrame));
-#     if isnan(
-#             interval_pd_z_max) % paw dorsum wasn't found before this reach end point; can happen if rat reaches with wrong paw first
-#     % invalidate
-#     this
-#     reach
-#     removeReachEndFlag(i_reach) = true;
-#
-#
-# end
-# % reachStarts(dig2_z == interval_dig2_z_max) = true;
-# reachStarts(pd_z == interval_pd_z_max) = true;
-#
-# end
-# reachData.reachEnds = reachData.reachEnds(~removeReachEndFlag);
-# reachData.reachStarts = find(reachStarts);
+        # find the frame where the paw dorsum starts moving forward before this reach ends
+        valid_reach_starts.append(np.where(pd_z[start_frame : last_frame] == interval_pd_z_max)[0][0])
+        valid_reach_starts[-1] += start_frame
+
+    reach_data = {'start_frames': valid_reach_starts,
+                  'end_frames': valid_reach_ends}
+
+    return reach_data
+
+
+def identify_grasps(pts3d, bodyparts, paw_pref, slot_z, reach_data):
+    all_mcp = [paw_pref.lower() + 'mcp{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    all_pip = [paw_pref.lower() + 'pip{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    all_dig = [paw_pref.lower() + 'dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
+
+    all_parts = all_mcp + all_pip + all_dig
+    all_parts.append(paw_pref.lower() + 'pawdorsum')
+
+    all_parts_idx = [bodyparts.index(pp) for pp in all_parts]
+
+    # all_mcp_idx = [bodyparts.index(mcp_name) for mcp_name in all_mcp]
+    # all_pip_idx = [bodyparts.index(pip_name) for pip_name in all_pip]
+    # all_dig_idx = [bodyparts.index(dig_name) for dig_name in all_dig]
+
+    xyz_coords = pts3d[:, all_parts_idx, :]
+
+    # assume the pellet location has already been subtracted from the trajectory
+    dist_from_pellet = np.linalg.norm(xyz_coords, axis=2)
+
+    num_reaches = len(reach_data['start_frames'])
+
+    for i_reach in range(num_reaches):
+        start_frame = reach_data['start_frames'][i_reach]
+        end_frame = reach_data['end_frames'][i_reach]
     pass
+
+
 
 def get_reaching_traj(pts3d, dlc_output, reaching_pawparts):
     # working here...

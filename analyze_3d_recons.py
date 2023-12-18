@@ -54,7 +54,8 @@ def exclude_outliers_by_zscore(data, max_zscore=3.):
     return inliers
 
 
-def analyze_trajectory(trajectory_fname, slot_z=None,
+def analyze_trajectory(trajectory_fname, mean_init_pellet_loc,
+                       slot_z=None,
                        pellet_score_thresh=0.95,
                        pelletname='pellet'):
     # trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
@@ -74,10 +75,13 @@ def analyze_trajectory(trajectory_fname, slot_z=None,
     initial_pellet_loc = find_initial_pellet_loc(r3d_data['dlc_output'], pts3d, score_threshold=pellet_score_thresh,
                                          pelletname=pelletname, test_frame_range=[200, 250])
 
-    # slot_z_wrtpellet =
+    if initial_pellet_loc is None:
+        initial_pellet_loc = mean_init_pellet_loc
+
+    slot_z_wrt_pellet = slot_z - initial_pellet_loc[2]
     pts3d_wrt_pellet = pts3d - initial_pellet_loc
-    reach_data = identify_reaches(pts3d_wrt_pellet, bodyparts, paw_pref, slot_z)
-    reach_data = identify_grasps(pts3d_wrt_pellet, bodyparts, paw_pref, slot_z, reach_data)
+    reach_data = identify_reaches(pts3d_wrt_pellet, bodyparts, paw_pref, slot_z_wrt_pellet)
+    reach_data = identify_grasps(pts3d_wrt_pellet, bodyparts, paw_pref, slot_z_wrt_pellet, reach_data)
 
     f_contact, bp_contact = identify_pellet_contact(r3d_data, paw_pref, pelletname='pellet')
     pass

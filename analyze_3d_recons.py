@@ -34,7 +34,7 @@ def analyze_trajectories(traj_folder, pellet_score_thresh=0.95):
     pass
 
     for traj_file in traj_files:
-        analyze_trajectory(traj_file, slot_z=session_slot_z)
+        analyze_trajectory(traj_file, mean_init_pellet_loc, slot_z=session_slot_z)
 
 
 def exclude_outliers_by_zscore(data, max_zscore=3.):

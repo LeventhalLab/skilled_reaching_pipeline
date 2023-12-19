@@ -459,7 +459,7 @@ if __name__ == '__main__':
     # crop calibration videos and perform the calibrations
     # perform_calibrations(parent_directories, vidtype='.avi', cam_names=cam_names, filtertype=filtertype, rat_nums=rats_to_analyze)
 
-    test_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0452\R0452_20230406_sr_ses01'
+    test_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0452\R0452_20230329_sr_ses01'
     analyze_3d_recons.analyze_trajectories(test_folder)
 
     for expt in experiment_list:

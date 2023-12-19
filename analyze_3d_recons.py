@@ -81,7 +81,7 @@ def analyze_trajectory(trajectory_fname, mean_init_pellet_loc,
     slot_z_wrt_pellet = slot_z - initial_pellet_loc[2]
     pts3d_wrt_pellet = pts3d - initial_pellet_loc
     reach_data = identify_reaches(pts3d_wrt_pellet, bodyparts, paw_pref, slot_z_wrt_pellet)
-    reach_data = identify_grasps(pts3d_wrt_pellet, bodyparts, paw_pref, slot_z_wrt_pellet, reach_data)
+    reach_data = identify_grasps(pts3d_wrt_pellet, r3d_data['dlc_output'], paw_pref, reach_data, r3d_data['reprojerror'], frames2lookforward=40)
 
     f_contact, bp_contact = identify_pellet_contact(r3d_data, paw_pref, pelletname='pellet')
     pass
@@ -219,7 +219,12 @@ def identify_reaches(pts3d, bodyparts, paw_pref, slot_z, pp2follow='dig2', min_r
     return reach_data
 
 
-def identify_grasps(pts3d, bodyparts, paw_pref, slot_z, reach_data):
+def identify_grasps(pts3d, dlc_output, paw_pref, reach_data, reprojerrors, init_pellet_loc = np.zeros(3), frames2lookforward=40,
+                    pelletname='pellet', pellet_movement_tolerance=1.):
+    # find the nearest paw part to the initial pellet location to identify end of grasp
+    # assume trajectory has already been adjusted to put the pellet at the origin
+
+    bodyparts = dlc_output['bodyparts']
     all_mcp = [paw_pref.lower() + 'mcp{:d}'.format(i_dig + 1) for i_dig in range(4)]
     all_pip = [paw_pref.lower() + 'pip{:d}'.format(i_dig + 1) for i_dig in range(4)]
     all_dig = [paw_pref.lower() + 'dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
@@ -233,17 +238,49 @@ def identify_grasps(pts3d, bodyparts, paw_pref, slot_z, reach_data):
     # all_pip_idx = [bodyparts.index(pip_name) for pip_name in all_pip]
     # all_dig_idx = [bodyparts.index(dig_name) for dig_name in all_dig]
 
+    pts3d = pts3d - init_pellet_loc
     xyz_coords = pts3d[:, all_parts_idx, :]
 
     # assume the pellet location has already been subtracted from the trajectory
     dist_from_pellet = np.linalg.norm(xyz_coords, axis=2)
 
-    num_reaches = len(reach_data['start_frames'])
-
-    for i_reach in range(num_reaches):
-        start_frame = reach_data['start_frames'][i_reach]
+    n_frames = np.shape(pts3d)[0]
+    n_reaches = len(reach_data['start_frames'])
+    n_parts = len(all_parts)
+    min_dist = np.empty(n_reaches)
+    min_dist_partidx = np.empty(n_reaches)
+    min_dist_frame = np.empty((n_reaches, n_parts))
+    all_min_dist = np.empty((n_reaches, n_parts))
+    for i_reach in range(n_reaches):
+        # start_frame = reach_data['start_frames'][i_reach]
         end_frame = reach_data['end_frames'][i_reach]
-    pass
+
+        # make sure the reach ended within frames2lookforward frames of the end of the video
+        if end_frame + frames2lookforward > n_frames:
+            last_frame2check = n_frames
+        else:
+            last_frame2check = end_frame + frames2lookforward
+
+        # minimum distance for each paw part from the pellet
+        all_min_dist[i_reach, :] = np.min(dist_from_pellet[end_frame : last_frame2check, :], axis=0)
+        # minimum distance among all paw parts from the pellet
+        min_dist[i_reach] = np.min(all_min_dist[i_reach, :])
+        min_dist_partidx[i_reach] = np.where(all_min_dist[i_reach, :] == min_dist[i_reach])[0][0]
+        min_dist_frame_reach = np.array([np.where(dist_from_pellet[end_frame : last_frame2check, i_part] == all_min_dist[i_reach, i_part]) for i_part in range(n_parts)])
+        min_dist_frame_reach = np.squeeze(min_dist_frame_reach) + end_frame
+        min_dist_frame[i_reach, :] = min_dist_frame_reach
+
+        # note that pts3d has been adjusted to set the origin at the pellet
+        did_pellet_move = test_if_pellet_moved(dlc_output, pts3d, np.zeros(3), pelletscore_threshold=0.95,
+                                               pelletname=pelletname,
+                                               pellet_movement_tolerance=pellet_movement_tolerance)
+
+    reach_data['min_dist_frame'] = min_dist_frame
+    reach_data['min_dist_to_pellet'] = all_min_dist
+    reach_data['reaching_pawparts'] = all_parts
+    reach_data['min_dist_partidx'] = min_dist_partidx
+
+    return reach_data
 
 
 

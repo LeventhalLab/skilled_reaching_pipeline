@@ -275,8 +275,8 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     # analyze_3d_recons.analyze_trajectory(trajectory_fname)
     # todo: get trial info and store that with the 3d reconstruction as well
 
-    if os.path.exists(trajectory_fname):
-        return
+    # if os.path.exists(trajectory_fname):
+    #     return
 
     cgroup_name = '_'.join((h5_metadata['ratID'],
                             h5_metadata['triggertime'].strftime('%Y%m%d'),
@@ -369,6 +369,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
                 'anipose_config': anipose_config,
                 'dlc_output': d,
                 'rat_info': ratdf_row,
+                'reprojerr': reprojerr,
                 'trial_info': trialdf_row}
     skilled_reaching_io.write_pickle(trajectory_fname, r3d_data)
 

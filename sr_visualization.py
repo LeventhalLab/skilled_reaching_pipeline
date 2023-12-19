@@ -33,8 +33,8 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
         traj_name, _ = os.path.splitext(traj_name)
 
         df_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
-        pawpref = df_row['pawpref'].values[0]
-        bpts2plot = [pawpref.lower() + pawpart for pawpart in pawparts2plot]#  'rightpawdorsum', 'rightdig1', 'rightdig2', 'rightdig3', 'rightdig4']
+        paw_pref = df_row['pawpref'].values[0]
+        bpts2plot = [paw_pref.lower() + pawpart for pawpart in pawparts2plot]#  'rightpawdorsum', 'rightdig1', 'rightdig2', 'rightdig3', 'rightdig4']
         num_bpts = len(bpts2plot)
         r3d_data = skilled_reaching_io.read_pickle(traj3d_fname)
 
@@ -121,11 +121,11 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
 
         plt.close('all')
 
-    create_anipose_vids(traj3d_fname, session_metadata, parent_directories, session_summary, trials_df)
+    create_anipose_vids(traj3d_fname, session_metadata, parent_directories, session_summary, trials_df, paw_pref)
 
 
 
-def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, session_summary, trials_df,
+def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, session_summary, trials_df, paw_pref,
                         bpts2plot='all', phot_ylim=[-2.5, 5]):
 
     vid_params = {'lm': 0.05,
@@ -155,6 +155,16 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
 
     if bpts2plot == 'all':
         bpts2plot = r3d_data['dlc_output']['bodyparts']
+    elif bpts2plot == 'reachingpaw':
+        bodyparts = r3d_data['dlc_output']['bodyparts']
+        bpts2plot = ['leftear', 'rightear', 'lefteye', 'righteye']
+        mcp_names = ['mcp{:d}'.format(i_dig) for i_dig in range(4)]
+        pip_names = ['pip{:d}'.format(i_dig) for i_dig in range(4)]
+        dig_names = ['dig{:d}'.format(i_dig) for i_dig in range(4)]
+
+        all_reaching_parts = ['elbow'] + ['pawdorsum'] + mcp_names + pip_names + dig_names
+        bpts2plot = bpts2plot + [paw_pref + part_name for part_name in all_reaching_parts]
+
     num_bpts = len(bpts2plot)
 
     orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
@@ -244,14 +254,18 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
         connect_3d_bpts(r3d_data['points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2connect, ax3d)
         connect_3d_bpts(r3d_data['optim_points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2connect, ax3d_optim)
 
-        # ax3d.set_xlim((-50, 25))
-        # ax3d.set_ylim((200, 350))  # this is actually z
-        # ax3d.set_zlim((20, 120))  # this is actually y
+        ax3d.set_xlim((-50, 25))
+        ax3d.set_ylim((200, 350))  # this is actually z
+        ax3d.set_zlim((20, 120))  # this is actually y
 
         ax3d.set_xlabel('x')
         ax3d.set_ylabel('z')
         ax3d.set_zlabel('y')
         ax3d.invert_zaxis()
+
+        ax3d_optim.set_xlim((-50, 25))
+        ax3d_optim.set_ylim((200, 350))  # this is actually z
+        ax3d_optim.set_zlim((20, 120))  # this is actually y
 
         ax3d_optim.set_xlabel('x')
         ax3d_optim.set_ylabel('z')

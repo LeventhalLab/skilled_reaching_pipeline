@@ -6,9 +6,10 @@ import scipy.signal
 import scipy.stats
 import os
 import glob
+import compute_angles
 
 
-def analyze_trajectories(traj_folder, pellet_score_thresh=0.95):
+def analyze_trajectories(traj_folder, anipose_config, pellet_score_thresh=0.95, init_pellet_frames=(299, 301)):
 
     traj_files = glob.glob(os.path.join(traj_folder, '*r3d.pickle'))
 
@@ -21,12 +22,13 @@ def analyze_trajectories(traj_folder, pellet_score_thresh=0.95):
         trials_slot_z[i_traj_file] = find_slot_z(r3d_data, paw_pref)
 
         trial_pellet_loc = find_initial_pellet_loc(r3d_data['dlc_output'], r3d_data['points3d'], score_threshold=pellet_score_thresh,
-                                                   pelletname='pellet', test_frame_range=(200, 250))
+                                                   pelletname='pellet', test_frame_range=init_pellet_frames)
         if trial_pellet_loc is None:
             init_pellet_locs[i_traj_file, :] = np.nan
         else:
             init_pellet_locs[i_traj_file, :] = trial_pellet_loc
 
+    # sometimes, the rat reaches before the pellet elevated all the way, so probably should ignore reaches where the pellet was lower
     mean_init_pellet_loc = np.nanmean(init_pellet_locs, axis=0)
     # need to do something to eliminate outliers
     slot_z_inliers = exclude_outliers_by_zscore(trials_slot_z, max_zscore=3.)
@@ -34,7 +36,8 @@ def analyze_trajectories(traj_folder, pellet_score_thresh=0.95):
     pass
 
     for traj_file in traj_files:
-        analyze_trajectory(traj_file, mean_init_pellet_loc, slot_z=session_slot_z)
+        traj_file = traj_files[-1]
+        analyze_trajectory(traj_file, mean_init_pellet_loc, anipose_config, slot_z=session_slot_z)
 
 
 def exclude_outliers_by_zscore(data, max_zscore=3.):
@@ -57,10 +60,12 @@ def exclude_outliers_by_zscore(data, max_zscore=3.):
     return inliers
 
 
-def analyze_trajectory(trajectory_fname, mean_init_pellet_loc,
+def analyze_trajectory(trajectory_fname, mean_init_pellet_loc, anipose_config,
                        slot_z=None,
                        pellet_score_thresh=0.95,
-                       pelletname='pellet'):
+                       init_pellet_frames=(299, 301),
+                       pelletname='pellet',
+                       pellet_movement_tolerance=1.):
     # trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
     #                                                                parent_directories)
 
@@ -72,21 +77,51 @@ def analyze_trajectory(trajectory_fname, mean_init_pellet_loc,
 
     pts3d = r3d_data['optim_points3d']
 
+    # construct the vecs dictionary that gets passed to get_angles in anipose
+    vecs = dict()
+    for bp in bodyparts:
+        bp_idx = bodyparts.index(bp)
+        vec = pts3d[:, bp_idx, :]
+        vecs[bp] = vec
+
+    dig_angles = compute_angles.get_angles(vecs, anipose_config.get('angles', dict()))
+
     if slot_z is None:
         slot_z = find_slot_z(r3d_data, paw_pref)
 
-    initial_pellet_loc = find_initial_pellet_loc(r3d_data['dlc_output'], pts3d, score_threshold=pellet_score_thresh,
-                                         pelletname=pelletname, test_frame_range=[200, 250])
+    init_pellet_loc = find_initial_pellet_loc(r3d_data['dlc_output'], pts3d, score_threshold=pellet_score_thresh,
+                                         pelletname=pelletname, test_frame_range=init_pellet_frames)
 
-    if initial_pellet_loc is None:
-        initial_pellet_loc = mean_init_pellet_loc
+    if init_pellet_loc is None:
+        init_pellet_loc = mean_init_pellet_loc
 
-    slot_z_wrt_pellet = slot_z - initial_pellet_loc[2]
-    pts3d_wrt_pellet = pts3d - initial_pellet_loc
+    slot_z_wrt_pellet = slot_z - init_pellet_loc[2]
+    pts3d_wrt_pellet = pts3d - init_pellet_loc
+
+    pellet_move_frame = find_pellet_movement(r3d_data['dlc_output'], pts3d, np.zeros(3), r3d_data['reprojerr'], pelletscore_threshold=0.95,
+                                           pelletname=pelletname,
+                                           pellet_movement_tolerance=pellet_movement_tolerance,
+                                           init_pellet_loc=init_pellet_loc)
     reach_data = identify_reaches(pts3d_wrt_pellet, bodyparts, paw_pref, slot_z_wrt_pellet)
-    reach_data = identify_grasps(pts3d_wrt_pellet, r3d_data['dlc_output'], paw_pref, reach_data, r3d_data['reprojerr'], frames2lookforward=40)
+    reach_data['pellet_move_frame'] = pellet_move_frame
+    reach_data = identify_grasps(pts3d_wrt_pellet, r3d_data['dlc_output'], paw_pref, dig_angles, reach_data, r3d_data['reprojerr'], frames2lookforward=40)
+
+    # define retraction as when the pellet comes back inside the chamber (+/- pellet)? then the start of retraction would be when paw
+    # starts moving backwards after grasp?
+    reach_data = identify_retraction(pts3d_wrt_pellet, r3d_data['dlc_output'], paw_pref, reach_data, r3d_data['reprojerr'], frames2lookforward=40)
+
+    # calculate aperture, paw orientation
+    reach_data = calculate_reach_kinematics(reach_data, paw_pref, pts3d)
 
     f_contact, bp_contact = identify_pellet_contact(r3d_data, paw_pref, pelletname='pellet')
+    pass
+
+
+def calc_paw_orientation(pts3d, paw_pref, bodyparts):
+    pass
+
+
+def calc_aperture(pts3d, paw_pref, bodyparts):
     pass
 
 
@@ -167,7 +202,7 @@ def find_slot_z(r3d_data, paw_pref):
 
     return slot_z
 
-def identify_reaches(pts3d, bodyparts, paw_pref, slot_z, pp2follow='dig2', min_reach_prominence=7):
+def identify_reaches(pts3d, bodyparts, paw_pref, slot_z, pp2follow='dig2', min_reach_prominence=7, triggerframe=300):
     pp2follow = paw_pref.lower() + pp2follow
     pp_idx = bodyparts.index(pp2follow)
 
@@ -183,9 +218,10 @@ def identify_reaches(pts3d, bodyparts, paw_pref, slot_z, pp2follow='dig2', min_r
     z_mins_idx, min_props = scipy.signal.find_peaks(-pp2follow_z, prominence=min_reach_prominence)
     z_mins = pp2follow_z[z_mins_idx]
 
-    # only take reaches where z_min is less than the slot_z
+    # only take reaches where z_min is less than the slot_z and it occurred after the trigger frame
     reach_z_mins = z_mins[z_mins < slot_z]
     reach_z_mins_idx = z_mins_idx[z_mins < slot_z]
+    reach_z_mins_idx = reach_z_mins_idx[reach_z_mins_idx > triggerframe]
 
     # from matlab code, need to decide if we need this
     # reaches_to_keep = islocalmin(-pp2follow_z, prominence=1, 'prominencewindow',[0,1000], distance=minGraspSeparation)
@@ -222,8 +258,21 @@ def identify_reaches(pts3d, bodyparts, paw_pref, slot_z, pp2follow='dig2', min_r
     return reach_data
 
 
-def identify_grasps(pts3d, dlc_output, paw_pref, reach_data, reprojerr, init_pellet_loc = np.zeros(3), frames2lookforward=40,
+def identify_grasps(pts3d, dlc_output, paw_pref, dig_angles, reach_data, reprojerr, init_pellet_loc = np.zeros(3), frames2lookforward=40,
                     pelletname='pellet', pellet_movement_tolerance=1.):
+    '''
+
+    :param pts3d: should be with the pellet at the origin
+    :param dlc_output:
+    :param paw_pref:
+    :param reach_data:
+    :param reprojerr:
+    :param init_pellet_loc:
+    :param frames2lookforward:
+    :param pelletname:
+    :param pellet_movement_tolerance:
+    :return:
+    '''
     # find the nearest paw part to the initial pellet location to identify end of grasp
     # assume trajectory has already been adjusted to put the pellet at the origin
 
@@ -251,11 +300,18 @@ def identify_grasps(pts3d, dlc_output, paw_pref, reach_data, reprojerr, init_pel
     n_reaches = len(reach_data['start_frames'])
     n_parts = len(all_parts)
     min_dist = np.empty(n_reaches)
-    min_dist_partidx = np.empty(n_reaches)
-    min_dist_frame = np.empty((n_reaches, n_parts))
+    min_dist_partidx = np.zeros(n_reaches, dtype=int)
+    min_dist_frame = np.zeros((n_reaches, n_parts), dtype=int)
     all_min_dist = np.empty((n_reaches, n_parts))
+    reach_data['grasp_starts'] = []
+    reach_data['grasp_ends'] = []
+    reach_data['pellet_contact'] = []
+    reach_data['min_dist_frame'] = []
+    reach_data['min_dist_to_pellet'] = []
+    reach_data['reaching_pawparts'] = []
+    reach_data['min_dist_partidx'] = []
     for i_reach in range(n_reaches):
-        # start_frame = reach_data['start_frames'][i_reach]
+        start_frame = reach_data['start_frames'][i_reach]
         end_frame = reach_data['end_frames'][i_reach]
 
         # make sure the reach ended within frames2lookforward frames of the end of the video
@@ -268,22 +324,49 @@ def identify_grasps(pts3d, dlc_output, paw_pref, reach_data, reprojerr, init_pel
         all_min_dist[i_reach, :] = np.min(dist_from_pellet[end_frame : last_frame2check, :], axis=0)
         # minimum distance among all paw parts from the pellet
         min_dist[i_reach] = np.min(all_min_dist[i_reach, :])
-        min_dist_partidx[i_reach] = np.where(all_min_dist[i_reach, :] == min_dist[i_reach])[0][0]
+        min_dist_partidx[i_reach] = int(np.where(all_min_dist[i_reach, :] == min_dist[i_reach])[0][0])
         min_dist_frame_reach = np.array([np.where(dist_from_pellet[end_frame : last_frame2check, i_part] == all_min_dist[i_reach, i_part]) for i_part in range(n_parts)])
         min_dist_frame_reach = np.squeeze(min_dist_frame_reach) + end_frame
         min_dist_frame[i_reach, :] = min_dist_frame_reach
 
-        # note that pts3d has been adjusted to set the origin at the pellet
-        did_pellet_move = test_if_pellet_moved(dlc_output, pts3d, np.zeros(3), pelletscore_threshold=0.95,
-                                               pelletname=pelletname,
-                                               pellet_movement_tolerance=pellet_movement_tolerance)
+        if i_reach == n_reaches - 1:
+            next_reach_frame = n_frames
+        else:
+            next_reach_frame = reach_data['start_frames'][i_reach + 1]
+        if reach_data['pellet_move_frame'] > start_frame and reach_data['pellet_move_frame'] < next_reach_frame:
+            reach_data['pellet_contact'].append(reach_data['pellet_move_frame'])
+        else:
+            reach_data['pellet_contact'].append(None)
 
-    reach_data['min_dist_frame'] = min_dist_frame
-    reach_data['min_dist_to_pellet'] = all_min_dist
-    reach_data['reaching_pawparts'] = all_parts
-    reach_data['min_dist_partidx'] = min_dist_partidx
+        ''' from Bova et al, 2021
+         The start of the grasp was defined as the frame at which flexion of the second digit started to increase after reaching minimum flexion 
+         (i.e., maximum extension). Grasp end was defined as the first frame with maximum digit flexion after grasp start. 
+         '''
+        # find the maximum digit2 extension for this reach
+        dig_angle2track = paw_pref + 'dig2_angle'
+        dig2_angles = dig_angles[dig_angle2track]
+
+        max_extension = max(dig2_angles[start_frame : end_frame])
+        max_ext_frame = np.where(dig2_angles[start_frame : end_frame] == max_extension)[0][0] + start_frame
+
+        # find the next local minimum after max digit extension
+        maxflex_idx, maxflex_props = scipy.signal.find_peaks(-dig2_angles[max_ext_frame:], prominence=10)
+        reach_data['grasp_starts'].append(max_ext_frame)
+        reach_data['grasp_ends'].append(maxflex_idx[0] + max_ext_frame)
+        # max_flexion = min(dig2_angles[max_ext_frame : last_frame2check])
+        # max_flex_frame = np.where(dig2_angles[max_ext_frame : last_frame2check] == max_flexion)[0][0] + max_ext_frame
+
+        reach_data['min_dist_frame'].append(min_dist_frame)
+        reach_data['min_dist_to_pellet'].append(all_min_dist)
+        reach_data['reaching_pawparts'].append(all_parts)
+        reach_data['min_dist_partidx'].append(min_dist_partidx)
 
     return reach_data
+
+
+def identify_retraction(pts3d_wrt_pellet, dlc_output, paw_pref, reach_data, reprojerr, frames2lookforward=40):
+
+    pass
 
 
 
@@ -318,6 +401,55 @@ def find_initial_pellet_loc(dlc_output, pts3d, score_threshold=0.95, pelletname=
         initial_pellet_loc = None
 
     return initial_pellet_loc
+
+
+def find_pellet_movement(dlc_output, pts3d, initial_pellet_loc, reprojerr, pelletscore_threshold=0.95, pelletname='pellet', pellet_movement_tolerance=1.0,
+                         triggerframe=300, init_pellet_loc=np.zeros(3)):
+
+    if initial_pellet_loc is None:
+        # the pellet wasn't identified in the first place
+        return None
+
+    pts3d = pts3d - init_pellet_loc
+
+    bodyparts = dlc_output['bodyparts']
+    pellet_idx = bodyparts.index(pelletname.lower())
+
+    pellet_scores = dlc_output['scores'][:, :, pellet_idx]
+
+    pellet_traj = pts3d[:, pellet_idx, :]
+    pellet_diff_from_init = pellet_traj - initial_pellet_loc
+    pellet_dist_from_init = np.linalg.norm(pellet_diff_from_init, axis=1)
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
+    # ax.plot(pellet_dist_from_init)
+    # plt.show()
+    # find the first place the pellet displacement is greater than pellet_movement_tolerance
+
+    pellet_moved_frames = (pellet_dist_from_init > pellet_movement_tolerance)
+    first_pellet_moved_frame = np.argmax(pellet_moved_frames)
+
+    if first_pellet_moved_frame == 0:
+        # what if there is no clear pellet movement frame? Not sure if I need to worry about this...
+
+        # did the pellet disappear or did it just never move?
+        # find the first frame where the pellet could not be found in any view
+        max_frame_pellet_scores = np.max(pellet_scores, axis=0)
+
+        pass
+
+    return first_pellet_moved_frame
+
+
+
+
+    if np.mean(pellet_dist_from_init) > pellet_movement_tolerance:
+        # is this the right metric? I think better than just any single value far from the initial pellet location.
+        # this means it must have moved a fair amount after being touched.
+        return True
+    else:
+        return False
 
 
 def test_if_pellet_moved(dlc_output, pts3d, initial_pellet_loc, pelletscore_threshold=0.95, pelletname='pellet', pellet_movement_tolerance=1.0):

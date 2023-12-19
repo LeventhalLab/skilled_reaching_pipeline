@@ -459,8 +459,10 @@ if __name__ == '__main__':
     # crop calibration videos and perform the calibrations
     # perform_calibrations(parent_directories, vidtype='.avi', cam_names=cam_names, filtertype=filtertype, rat_nums=rats_to_analyze)
 
+    anipose_config = toml.load(anipose_config_path)
+
     test_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0452\R0452_20230329_sr_ses01'
-    # analyze_3d_recons.analyze_trajectories(test_folder)
+    # analyze_3d_recons.analyze_trajectories(test_folder, anipose_config)
 
     for expt in experiment_list:
 
@@ -543,8 +545,6 @@ if __name__ == '__main__':
     for expt in experiment_list:
         rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
         folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(parent_directories[expt]['cropped_videos_parent'], cam_names)
-
-        anipose_config = toml.load(anipose_config_path)
 
         DLC_folder_keys = DLC_folder_names.keys()
         # for DLC_key in DLC_folder_keys:

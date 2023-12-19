@@ -47,6 +47,9 @@ def exclude_outliers_by_zscore(data, max_zscore=3.):
     '''
     data = data[np.logical_not(np.isnan(data))]
 
+    if len(data) == 1:
+        return data
+
     data_zscores = scipy.stats.zscore(data)
 
     inliers = data[abs(data_zscores) < max_zscore]
@@ -81,7 +84,7 @@ def analyze_trajectory(trajectory_fname, mean_init_pellet_loc,
     slot_z_wrt_pellet = slot_z - initial_pellet_loc[2]
     pts3d_wrt_pellet = pts3d - initial_pellet_loc
     reach_data = identify_reaches(pts3d_wrt_pellet, bodyparts, paw_pref, slot_z_wrt_pellet)
-    reach_data = identify_grasps(pts3d_wrt_pellet, r3d_data['dlc_output'], paw_pref, reach_data, r3d_data['reprojerror'], frames2lookforward=40)
+    reach_data = identify_grasps(pts3d_wrt_pellet, r3d_data['dlc_output'], paw_pref, reach_data, r3d_data['reprojerr'], frames2lookforward=40)
 
     f_contact, bp_contact = identify_pellet_contact(r3d_data, paw_pref, pelletname='pellet')
     pass
@@ -219,7 +222,7 @@ def identify_reaches(pts3d, bodyparts, paw_pref, slot_z, pp2follow='dig2', min_r
     return reach_data
 
 
-def identify_grasps(pts3d, dlc_output, paw_pref, reach_data, reprojerrors, init_pellet_loc = np.zeros(3), frames2lookforward=40,
+def identify_grasps(pts3d, dlc_output, paw_pref, reach_data, reprojerr, init_pellet_loc = np.zeros(3), frames2lookforward=40,
                     pelletname='pellet', pellet_movement_tolerance=1.):
     # find the nearest paw part to the initial pellet location to identify end of grasp
     # assume trajectory has already been adjusted to put the pellet at the origin

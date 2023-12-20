@@ -111,18 +111,35 @@ def analyze_trajectory(trajectory_fname, mean_init_pellet_loc, anipose_config,
     reach_data = identify_retraction(pts3d_wrt_pellet, slot_z_wrt_pellet, r3d_data['dlc_output'], paw_pref, reach_data, r3d_data['reprojerr'], frames2lookforward=40)
 
     # calculate aperture, paw orientation
-    reach_data = calculate_reach_kinematics(reach_data, paw_pref, pts3d)
+    reach_data = calculate_reach_kinematics(pts3d_wrt_pellet, paw_pref, bodyparts, reach_data, init_pellet_loc=np.zeros(3))
 
     f_contact, bp_contact = identify_pellet_contact(r3d_data, paw_pref, pelletname='pellet')
     pass
 
 
-def calculate_reach_kinematics(reach_data, paw_pref, pts3d, init_pellet_loc=np.zeros(3)):
+def calculate_reach_kinematics(pts3d, paw_pref, bodyparts, reach_data, init_pellet_loc=np.zeros(3)):
 
     pts3d = pts3d - init_pellet_loc
 
+    trial_aperture = calc_aperture(pts3d, paw_pref, bodyparts)
+
+    return reach_data
+
 
 def calc_paw_orientation(pts3d, paw_pref, bodyparts):
+
+    all_mcp = [paw_pref.lower() + 'mcp{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    all_pip = [paw_pref.lower() + 'pip{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    all_dig = [paw_pref.lower() + 'dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
+
+    all_parts = all_mcp + all_pip + all_dig
+    all_parts.append(paw_pref.lower() + 'pawdorsum')
+
+    all_parts_idx = [bodyparts.index(pp) for pp in all_parts]
+
+    n_frames = np.shape(pts3d)[0]
+    n_reach_parts = len(all_parts_idx)
+
     pass
 
 
@@ -134,6 +151,18 @@ def calc_aperture(pts3d, paw_pref, bodyparts):
     :param bodyparts:
     :return:
     '''
+
+    all_mcp = [paw_pref.lower() + 'mcp{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    all_pip = [paw_pref.lower() + 'pip{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    all_dig = [paw_pref.lower() + 'dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
+
+    all_parts = all_mcp + all_pip + all_dig
+    all_parts.append(paw_pref.lower() + 'pawdorsum')
+
+    all_parts_idx = [bodyparts.index(pp) for pp in all_parts]
+
+    n_frames = np.shape(pts3d)[0]
+    n_reach_parts = len(all_parts_idx)
     pass
 
 
@@ -405,13 +434,13 @@ def identify_retraction(pts3d_wrt_pellet, slot_z, dlc_output, paw_pref, reach_da
     reach_data['retract_frames'] = []
     for i_reach in range(n_reaches):
 
-        end_frame = reach_data['grasp_ends'][i_reach]
+        graspend_frame = reach_data['grasp_ends'][i_reach]
 
         # find the paw points at the end of the grasping phase
-        graspend_pawpts = xyz_coords[end_frame, :, :]
+        graspend_pawpts = xyz_coords[graspend_frame, :, :]
         graspend_meanloc = np.nanmean(graspend_pawpts, axis=0)
 
-        future_frames_meanloc = np.nanmean(xyz_coords[end_frame:, :, :], axis=1)
+        future_frames_meanloc = np.nanmean(xyz_coords[graspend_frame:, :, :], axis=1)
 
         z_v = np.diff(future_frames_meanloc[:, 2]) * fps
 
@@ -429,13 +458,10 @@ def identify_retraction(pts3d_wrt_pellet, slot_z, dlc_output, paw_pref, reach_da
         else:
             # todo: figure out what to do if no peak velocity is found - maybe lower requirement for max velocity or just use the average z-coordinate?
             pass
+        v_trough_idx += graspend_frame
         reach_data['retract_frames'].append(v_trough_idx)
 
     return reach_data
-
-
-    pass
-
 
 
 def get_reaching_traj(pts3d, dlc_output, reaching_pawparts):

@@ -128,7 +128,7 @@ def calculate_reach_kinematics(pts3d, paw_pref, bodyparts, reach_data, init_pell
     reach_data = find_reach_extremes(reach_data, 'trial_aperture', 'max')
     reach_data = find_reach_extremes(reach_data, 'paw_orientation', 'min')
     reach_data = find_reach_extremes(reach_data, 'paw_orientation', 'max')
-    
+
     return reach_data
 
 
@@ -136,7 +136,7 @@ def find_reach_extremes(reach_data, reach_feature, ext_type):
 
     # do I need to have different limits for different parameters (i.e., should orientation only be assessed from reach start
     # to reach end?
-    n_reaches = len(reach_data['reach_starts'])
+    n_reaches = len(reach_data['start_frames'])
 
     for i_reach in range(n_reaches):
         start_frame = reach_data['start_frames'][i_reach]

@@ -108,7 +108,7 @@ def analyze_trajectory(trajectory_fname, mean_init_pellet_loc, anipose_config,
 
     # define retraction as when the pellet comes back inside the chamber (+/- pellet)? then the start of retraction would be when paw
     # starts moving backwards after grasp?
-    reach_data = identify_retraction(pts3d_wrt_pellet, r3d_data['dlc_output'], paw_pref, reach_data, r3d_data['reprojerr'], frames2lookforward=40)
+    reach_data = identify_retraction(pts3d_wrt_pellet, slot_z_wrt_pellet, r3d_data['dlc_output'], paw_pref, reach_data, r3d_data['reprojerr'], frames2lookforward=40)
 
     # calculate aperture, paw orientation
     reach_data = calculate_reach_kinematics(reach_data, paw_pref, pts3d)
@@ -117,11 +117,23 @@ def analyze_trajectory(trajectory_fname, mean_init_pellet_loc, anipose_config,
     pass
 
 
+def calculate_reach_kinematics(reach_data, paw_pref, pts3d, init_pellet_loc=np.zeros(3)):
+
+    pts3d = pts3d - init_pellet_loc
+
+
 def calc_paw_orientation(pts3d, paw_pref, bodyparts):
     pass
 
 
 def calc_aperture(pts3d, paw_pref, bodyparts):
+    '''
+
+    :param pts3d: 3d points already normalized to make the pellet the origin
+    :param paw_pref:
+    :param bodyparts:
+    :return:
+    '''
     pass
 
 
@@ -286,6 +298,8 @@ def identify_grasps(pts3d, dlc_output, paw_pref, dig_angles, reach_data, reproje
 
     all_parts_idx = [bodyparts.index(pp) for pp in all_parts]
 
+    n_frames = np.shape(pts3d)[0]
+    n_reach_parts = len(all_parts_idx)
     # all_mcp_idx = [bodyparts.index(mcp_name) for mcp_name in all_mcp]
     # all_pip_idx = [bodyparts.index(pip_name) for pip_name in all_pip]
     # all_dig_idx = [bodyparts.index(dig_name) for dig_name in all_dig]
@@ -294,9 +308,16 @@ def identify_grasps(pts3d, dlc_output, paw_pref, dig_angles, reach_data, reproje
     xyz_coords = pts3d[:, all_parts_idx, :]
 
     # assume the pellet location has already been subtracted from the trajectory
-    dist_from_pellet = np.linalg.norm(xyz_coords, axis=2)
 
-    n_frames = np.shape(pts3d)[0]
+    # this needs to be modified to use the current pellet location, not the initial pellet location. These should usually
+    # be the same thing, but often the rat reaches before the pellet is all the way up, and is therefore still moving
+    # when the paw breaches the slot
+    pellet_idx = bodyparts.index(pelletname)
+    pellet_locs = pts3d[:, pellet_idx, :]
+    dist_from_pellet = np.zeros((n_frames, n_reach_parts))
+    for i_bpt in range(n_reach_parts):
+        dist_from_pellet[:, i_bpt] = np.linalg.norm(xyz_coords[:, i_bpt, :] - pellet_locs, axis=1)
+
     n_reaches = len(reach_data['start_frames'])
     n_parts = len(all_parts)
     min_dist = np.empty(n_reaches)
@@ -364,7 +385,54 @@ def identify_grasps(pts3d, dlc_output, paw_pref, dig_angles, reach_data, reproje
     return reach_data
 
 
-def identify_retraction(pts3d_wrt_pellet, dlc_output, paw_pref, reach_data, reprojerr, frames2lookforward=40):
+def identify_retraction(pts3d_wrt_pellet, slot_z, dlc_output, paw_pref, reach_data, reprojerr, fps=300, v_thresh=50, frames2lookforward=40):
+
+    # figure out z-coordinates of reaching paw parts at end of grasp, see when they start moving backwards
+    bodyparts = dlc_output['bodyparts']
+    all_mcp = [paw_pref.lower() + 'mcp{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    all_pip = [paw_pref.lower() + 'pip{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    all_dig = [paw_pref.lower() + 'dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
+
+    all_parts = all_mcp + all_pip + all_dig
+    all_parts.append(paw_pref.lower() + 'pawdorsum')
+
+    all_parts_idx = [bodyparts.index(pp) for pp in all_parts]
+
+    xyz_coords = pts3d_wrt_pellet[:, all_parts_idx, :]
+
+    n_reaches = len(reach_data['start_frames'])
+
+    reach_data['retract_frames'] = []
+    for i_reach in range(n_reaches):
+
+        end_frame = reach_data['grasp_ends'][i_reach]
+
+        # find the paw points at the end of the grasping phase
+        graspend_pawpts = xyz_coords[end_frame, :, :]
+        graspend_meanloc = np.nanmean(graspend_pawpts, axis=0)
+
+        future_frames_meanloc = np.nanmean(xyz_coords[end_frame:, :, :], axis=1)
+
+        z_v = np.diff(future_frames_meanloc[:, 2]) * fps
+
+        max_v_idx, max_props = scipy.signal.find_peaks(z_v, prominence=10)
+        max_v_idx = max_v_idx[z_v[max_v_idx] > v_thresh]
+        if len(max_v_idx) > 0:
+            max_v_idx = max_v_idx[0]
+
+            v_trough_idx, trough_props = scipy.signal.find_peaks(-z_v[:max_v_idx])
+            # find last velocity trough before peak
+            if len(v_trough_idx) > 0:
+                v_trough_idx = v_trough_idx[-1]
+            else:
+                v_trough_idx = 0
+        else:
+            # todo: figure out what to do if no peak velocity is found - maybe lower requirement for max velocity or just use the average z-coordinate?
+            pass
+        reach_data['retract_frames'].append(v_trough_idx)
+
+    return reach_data
+
 
     pass
 

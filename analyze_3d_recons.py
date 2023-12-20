@@ -121,26 +121,67 @@ def calculate_reach_kinematics(pts3d, paw_pref, bodyparts, reach_data, init_pell
 
     pts3d = pts3d - init_pellet_loc
 
-    trial_aperture = calc_aperture(pts3d, paw_pref, bodyparts)
+    reach_data['trial_aperture'] = calc_aperture(pts3d, paw_pref, bodyparts)
+    reach_data['paw_orientation'] = calc_paw_orientation(pts3d, paw_pref, bodyparts)
+
+    reach_data = find_reach_extremes(reach_data, 'trial_aperture', 'min')
+    reach_data = find_reach_extremes(reach_data, 'trial_aperture', 'max')
+    reach_data = find_reach_extremes(reach_data, 'paw_orientation', 'min')
+    reach_data = find_reach_extremes(reach_data, 'paw_orientation', 'max')
+    
+    return reach_data
+
+
+def find_reach_extremes(reach_data, reach_feature, ext_type):
+
+    # do I need to have different limits for different parameters (i.e., should orientation only be assessed from reach start
+    # to reach end?
+    n_reaches = len(reach_data['reach_starts'])
+
+    for i_reach in range(n_reaches):
+        start_frame = reach_data['start_frames'][i_reach]
+        end_frame = reach_data['grasp_ends'][i_reach]
+
+        if ext_type.lower() == 'max':
+            ext_val = max(reach_data[reach_feature][start_frame : end_frame])
+        elif ext_type.lower() == 'min':
+            ext_val = min(reach_data[reach_feature[start_frame : end_frame]])
+
+        ext_idx = reach_data['reach_feature'].index(ext_val) + start_frame
+
+        feature_name = ext_type.lower() + '_' + reach_feature
+        reach_data[feature_name] = max_val
+        feature_idx_key = feature_name + '_idx'
+        reach_data[feature_idx_key] = ext_idx
 
     return reach_data
 
 
 def calc_paw_orientation(pts3d, paw_pref, bodyparts):
 
-    all_mcp = [paw_pref.lower() + 'mcp{:d}'.format(i_dig + 1) for i_dig in range(4)]
-    all_pip = [paw_pref.lower() + 'pip{:d}'.format(i_dig + 1) for i_dig in range(4)]
-    all_dig = [paw_pref.lower() + 'dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    # all_mcp = [paw_pref.lower() + 'mcp{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    # all_pip = [paw_pref.lower() + 'pip{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    # all_dig = [paw_pref.lower() + 'dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    #
+    # all_parts = all_mcp + all_pip + all_dig
+    # all_parts.append(paw_pref.lower() + 'pawdorsum')
+    #
+    # all_parts_idx = [bodyparts.index(pp) for pp in all_parts]
+    #
+    # n_frames = np.shape(pts3d)[0]
+    # n_reach_parts = len(all_parts_idx)
 
-    all_parts = all_mcp + all_pip + all_dig
-    all_parts.append(paw_pref.lower() + 'pawdorsum')
+    dig1_idx = bodyparts.index(paw_pref.lower() + 'dig1')
+    dig4_idx = bodyparts.index(paw_pref.lower() + 'dig4')
 
-    all_parts_idx = [bodyparts.index(pp) for pp in all_parts]
+    dig1_4_diff = pts3d[:, dig1_idx, :] - pts3d[:, dig4_idx, :]
 
-    n_frames = np.shape(pts3d)[0]
-    n_reach_parts = len(all_parts_idx)
+    cplx_array = dig1_4_diff[:, :2].astype(np.complex128)
+    cplx_diff = dig1_4_diff[:, 0] - dig1_4_diff[:, 1] * 1j   # subtract because y is positive downward
 
-    pass
+    paw_orientation = np.angle(cplx_diff)
+
+    return paw_orientation
 
 
 def calc_aperture(pts3d, paw_pref, bodyparts):
@@ -152,18 +193,27 @@ def calc_aperture(pts3d, paw_pref, bodyparts):
     :return:
     '''
 
-    all_mcp = [paw_pref.lower() + 'mcp{:d}'.format(i_dig + 1) for i_dig in range(4)]
-    all_pip = [paw_pref.lower() + 'pip{:d}'.format(i_dig + 1) for i_dig in range(4)]
-    all_dig = [paw_pref.lower() + 'dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    # all_mcp = [paw_pref.lower() + 'mcp{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    # all_pip = [paw_pref.lower() + 'pip{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    # all_dig = [paw_pref.lower() + 'dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
+    #
+    # all_parts = all_mcp + all_pip + all_dig
+    # all_parts.append(paw_pref.lower() + 'pawdorsum')
+    #
+    # all_parts_idx = [bodyparts.index(pp) for pp in all_parts]
 
-    all_parts = all_mcp + all_pip + all_dig
-    all_parts.append(paw_pref.lower() + 'pawdorsum')
+    # n_frames = np.shape(pts3d)[0]
+    # n_reach_parts = len(all_parts_idx)
 
-    all_parts_idx = [bodyparts.index(pp) for pp in all_parts]
+    # reaching_paw_traj = pts3d[:, all_parts_idx, :]
 
-    n_frames = np.shape(pts3d)[0]
-    n_reach_parts = len(all_parts_idx)
-    pass
+    dig1_idx = bodyparts.index(paw_pref.lower() + 'dig1')
+    dig4_idx = bodyparts.index(paw_pref.lower() + 'dig4')
+
+    dig1_4_diff = pts3d[:, dig4_idx, :] - pts3d[:, dig1_idx, :]
+    aperture = np.linalg.norm(dig1_4_diff, axis=1)
+
+    return aperture
 
 
 def identify_pellet_contact(r3d_data, paw_pref, score_threshold=0.95, pelletname='pellet', test_frame_range=(200, 250),

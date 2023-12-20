@@ -462,7 +462,7 @@ if __name__ == '__main__':
     anipose_config = toml.load(anipose_config_path)
 
     test_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0452\R0452_20230329_sr_ses01'
-    analyze_3d_recons.analyze_trajectories(test_folder, anipose_config)
+    # analyze_3d_recons.analyze_trajectories(test_folder, anipose_config)
 
     for expt in experiment_list:
 

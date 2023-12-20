@@ -138,6 +138,10 @@ def find_reach_extremes(reach_data, reach_feature, ext_type):
     # to reach end?
     n_reaches = len(reach_data['start_frames'])
 
+    feature_name = ext_type.lower() + '_' + reach_feature
+    feature_idx_key = feature_name + '_idx'
+    reach_data[feature_name] = []
+    reach_data[feature_idx_key] = []
     for i_reach in range(n_reaches):
         start_frame = reach_data['start_frames'][i_reach]
         end_frame = reach_data['grasp_ends'][i_reach]
@@ -145,14 +149,17 @@ def find_reach_extremes(reach_data, reach_feature, ext_type):
         if ext_type.lower() == 'max':
             ext_val = max(reach_data[reach_feature][start_frame : end_frame])
         elif ext_type.lower() == 'min':
-            ext_val = min(reach_data[reach_feature[start_frame : end_frame]])
+            ext_val = min(reach_data[reach_feature][start_frame : end_frame])
 
-        ext_idx = reach_data['reach_feature'].index(ext_val) + start_frame
+        # do we need to worry about multiple indices with the same extremum value?
+        if type(reach_data[reach_feature]) is np.ndarray:
+            ext_idx = np.where(reach_data[reach_feature][start_frame : end_frame] == ext_val)[0][0] + start_frame
+        elif type(reach_data[reach_feature]) is list:
+            ext_idx = reach_data[reach_feature][start_frame : end_frame].index(ext_val) + start_frame
 
-        feature_name = ext_type.lower() + '_' + reach_feature
-        reach_data[feature_name] = max_val
-        feature_idx_key = feature_name + '_idx'
-        reach_data[feature_idx_key] = ext_idx
+
+        reach_data[feature_name].append(ext_val)
+        reach_data[feature_idx_key].append(ext_idx)
 
     return reach_data
 

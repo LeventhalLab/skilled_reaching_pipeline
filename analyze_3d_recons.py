@@ -242,7 +242,8 @@ def identify_pellet_contact(r3d_data, paw_pref, score_threshold=0.95, pelletname
     #             'h5_group': h5_group,
     #             'anipose_config': anipose_config,
     #             'dlc_output': d}
-    bodyparts = r3d_data['dlc_output']['bodyparts']
+    dlc_output = r3d_data['dlc_output']
+    bodyparts = dlc_output['bodyparts']
     pts3d = r3d_data['optim_points3d']   # better with optim_points3d or points3d?
 
     reaching_pawparts = find_reaching_pawparts(bodyparts, paw_pref)

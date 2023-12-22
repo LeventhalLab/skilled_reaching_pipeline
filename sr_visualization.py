@@ -228,7 +228,7 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
 
         for bpt2plot in bpts2plot:
             cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
-            legend_ax.text(0, i_bpt/num_bpts, bpt2plot, color=cmap(cur_bpt_idx / num_bptstotal), transform=legend_ax.transAxes)
+            legend_ax.text(0, cur_bpt_idx/num_bptstotal, bpt2plot, color=cmap(cur_bpt_idx / num_bptstotal), transform=legend_ax.transAxes)
         legend_ax.set_xticks([])
         legend_ax.set_yticks([])
 

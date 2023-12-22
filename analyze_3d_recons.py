@@ -110,13 +110,29 @@ def analyze_trajectory(trajectory_fname, mean_init_pellet_loc, anipose_config,
     # starts moving backwards after grasp?
     reach_data = identify_retraction(pts3d_wrt_pellet, slot_z_wrt_pellet, r3d_data['dlc_output'], paw_pref, reach_data, r3d_data['reprojerr'], frames2lookforward=40)
 
+    reach_data = identify_drop_or_grab(pts3d_wrt_pellet, slot_z_wrt_pellet, r3d_data['dlc_output'], paw_pref, reach_data)
     # calculate aperture, paw orientation
     reach_data = calculate_reach_kinematics(pts3d_wrt_pellet, paw_pref, bodyparts, reach_data, init_pellet_loc=np.zeros(3))
 
-    f_contact, bp_contact = identify_pellet_contact(r3d_data, paw_pref, pelletname='pellet')
+    contact_frame, contact_bp = identify_pellet_contact(r3d_data, paw_pref, pelletname='pellet')
     pass
 
 
+def identify_drop_or_grab(pts3d_wrt_pellet, slot_z_wrt_pellet, dlc_output, paw_pref, reach_data, pelletname='pellet', min_pellet_conf=0.95):
+
+    n_reaches = len(reach_data['start_frames'])
+    pellet_idx = dlc_output['bodyparts'].index(pelletname)
+    pellet_scores = dlc_output['scores'][:, :, pellet_idx].T
+
+    for i_reach in range(n_reaches):
+        start_frame = reach_data['start_frames'][i_reach]
+        end_frame = reach_data['grasp_ends'][i_reach]
+
+        # was pellet visible at the start of this reach?
+        startframe_pellet_scores = pellet_scores[start_frame]
+        # was_pellet_available =
+
+    pass
 def calculate_reach_kinematics(pts3d, paw_pref, bodyparts, reach_data, init_pellet_loc=np.zeros(3)):
 
     pts3d = pts3d - init_pellet_loc

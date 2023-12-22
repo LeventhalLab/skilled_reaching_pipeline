@@ -52,6 +52,7 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     # E, F, rot, t = mirror_stereo_cal(imgp_dict, cam_intrinsics, view_names=cam_names)
     error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra=None, verbose=verbose)
 
+
     # cgroup was modified by the bundle_adjust_iter_fixed_dist function
     cgroup_name = '_'.join((h5_metadata['ratID'],
                             h5_metadata['triggertime'].strftime('%Y%m%d'),
@@ -2113,52 +2114,52 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     # calculate the fundamental matrices for direct-->left mirror and direct-->right mirror
     merged = merge_rows(all_rows, cam_names=cam_names)
     stereo_cal_points, matched_points_metadata = collect_matched_mirror_points(merged, mirror_board)
-    if calibration_data['E'] is None:
-        E, F, rot, t = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
+    # if calibration_data['E'] is None:
+    E, F, rot, t = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
 
-        calibration_data['E'] = E
-        calibration_data['F'] = F
+    calibration_data['E'] = E
+    calibration_data['F'] = F
 
-    if not calibration_data['extrinsics_initialized']:
-        rvecs = [[0., 0., 0.]]
-        cam_t = [[0., 0., 0.]]
-        scale_factors = np.zeros(2)
-        for i_view in range(2):
-            cam_rvec, _ = cv2.Rodrigues(rot[:, :, i_view])
-            rvecs.append(cam_rvec)
+    # if not calibration_data['extrinsics_initialized']:
+    rvecs = [[0., 0., 0.]]
+    cam_t = [[0., 0., 0.]]
+    scale_factors = np.zeros(2)
+    for i_view in range(2):
+        cam_rvec, _ = cv2.Rodrigues(rot[:, :, i_view])
+        rvecs.append(cam_rvec)
 
-            scale_factors[i_view] = calc_3d_scale_factor(stereo_cal_points[view_names[i_view][0]],
-                                                        stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'],
-                                                        rot[:, :, i_view], t[:, i_view], matched_points_metadata[i_view], mirror_board)
+        scale_factors[i_view] = calc_3d_scale_factor(stereo_cal_points[view_names[i_view][0]],
+                                                    stereo_cal_points[view_names[i_view][1]], cam_intrinsics['mtx'],
+                                                    rot[:, :, i_view], t[:, i_view], matched_points_metadata[i_view], mirror_board)
 
-            cam_t.append(t[:, i_view] * scale_factors[i_view])
-        calibration_data['scale_factors'] = scale_factors
+        cam_t.append(t[:, i_view] * scale_factors[i_view])
+    calibration_data['scale_factors'] = scale_factors
 
-        cgroup.set_rotations(rvecs)
-        cgroup.set_translations(cam_t)
+    cgroup.set_rotations(rvecs)
+    cgroup.set_translations(cam_t)
 
-        calibration_data['extrinsics_initialized'] = True
+    calibration_data['extrinsics_initialized'] = True
 
     cgroup_old = copy.deepcopy(cgroup)
     imgp, extra = extract_points(merged, mirror_board, cam_names=cam_names, min_cameras=2)
 
-    if not calibration_data['bundle_adjust_completed']:
+    # if not calibration_data['bundle_adjust_completed']:
         # if one of the views couldn't be calibrated, skip bundle adjustment for now
-        if not np.isnan(calibration_data['E']).any():
-            error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
+    if not np.isnan(calibration_data['E']).any():
+        error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
 
-            calibration_data['cgroup'] = cgroup
-            calibration_data['error'] = error
-            calibration_data['bundle_adjust_completed'] = True
-        else:
-            # todo: manually calibrate if automatic detection didn't work
-            error = None
-
-        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
-
+        calibration_data['cgroup'] = cgroup
+        calibration_data['error'] = error
+        calibration_data['bundle_adjust_completed'] = True
     else:
-        cgroup = calibration_data['cgroup']
-        error = calibration_data['error']
+        # todo: manually calibrate if automatic detection didn't work
+        error = None
+
+    skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+
+    # else:
+    #     cgroup = calibration_data['cgroup']
+    #     error = calibration_data['error']
 
     return cgroup, error
 

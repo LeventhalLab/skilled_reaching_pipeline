@@ -329,7 +329,7 @@ def identify_reaches(pts3d, bodyparts, paw_pref, slot_z, pp2follow='dig2', min_r
     # matlab code now looks for pawparts being too far apart to be a legit reach; I think
     # that is already taken care of in the optim_3dpts routine from anipose
 
-    # make sure all digits were through the slot at the end of the reach
+    # make sure all digits were through the slot at the end of the reach; or should we define it as just digit 2 breaching the slot?
     all_dig_z = pts3d[:, all_dig_idx, 2]
     valid_reach_ends = []
     for min_idx in reach_z_mins_idx:

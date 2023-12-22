@@ -126,7 +126,7 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
 
 
 def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, session_summary, trials_df, paw_pref,
-                        bpts2plot='all', phot_ylim=[-2.5, 5]):
+                        bpts2plot='reachingpaw', phot_ylim=[-2.5, 5]):
 
     vid_params = {'lm': 0.05,
                   'rm': 0.,
@@ -142,11 +142,11 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
     traj_metadata['task'] = session_metadata['task']
 
     animation_name = navigation_utilities.create_3dvid_name(traj_metadata, session_metadata, parent_directories)
-    if os.path.exists(animation_name):
-        return
+    # if os.path.exists(animation_name):
+    #     return
 
     print('creating video for {}'.format(animation_name))
-    markersize = 4
+    markersize = 5
     cmap = cm.get_cmap('rainbow')
 
     bpts2connect = rat_sr_bodyparts2connect()
@@ -157,15 +157,16 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
         bpts2plot = r3d_data['dlc_output']['bodyparts']
     elif bpts2plot == 'reachingpaw':
         bodyparts = r3d_data['dlc_output']['bodyparts']
-        bpts2plot = ['leftear', 'rightear', 'lefteye', 'righteye']
-        mcp_names = ['mcp{:d}'.format(i_dig) for i_dig in range(4)]
-        pip_names = ['pip{:d}'.format(i_dig) for i_dig in range(4)]
-        dig_names = ['dig{:d}'.format(i_dig) for i_dig in range(4)]
+        bpts2plot = ['leftear', 'rightear', 'lefteye', 'righteye', 'nose']
+        mcp_names = ['mcp{:d}'.format(i_dig + 1) for i_dig in range(4)]
+        pip_names = ['pip{:d}'.format(i_dig + 1) for i_dig in range(4)]
+        dig_names = ['dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
 
         all_reaching_parts = ['elbow'] + ['pawdorsum'] + mcp_names + pip_names + dig_names
         bpts2plot = bpts2plot + [paw_pref + part_name for part_name in all_reaching_parts]
 
-    num_bpts = len(bpts2plot)
+    num_bpts2plot = len(bpts2plot)
+    num_bptstotal = len(r3d_data['dlc_output']['bodyparts'])
 
     orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
 
@@ -187,6 +188,9 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
         # os.chmod(jpg_folder, stat.S_IWRITE)
         # shutil.rmtree(jpg_folder)
         os.makedirs(jpg_folder)
+
+    # change "optim_points3d" to "points3d" to switch to reprojection from simple triangulation
+    pts3d_reproj_key = 'optim_points3d'
 
     for i_frame in range(num_frames):
 
@@ -213,9 +217,18 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
 
         img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+        h, w, _ = np.shape(img_ud)
 
-        for i_bpt, bpt2plot in enumerate(bpts2plot):
-            legend_ax.text(0, i_bpt/num_bpts, bpt2plot, color=cmap(i_bpt / num_bpts), transform=legend_ax.transAxes)
+        if pts3d_reproj_key == 'optim_points3d':
+            reproj_text = 'reprojected optimal 3d points'
+        else:
+            reproj_text = 'reprojected simple triangulation 3d points'
+        frame_text = session_metadata['ratID'] + ', ' + 'frame {:04d}'.format(i_frame) + ', ' + reproj_text
+        img_ud = cv2.putText(img_ud, frame_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, color=0, thickness=3)
+
+        for bpt2plot in bpts2plot:
+            cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
+            legend_ax.text(0, i_bpt/num_bpts, bpt2plot, color=cmap(cur_bpt_idx / num_bptstotal), transform=legend_ax.transAxes)
         legend_ax.set_xticks([])
         legend_ax.set_yticks([])
 
@@ -224,9 +237,9 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
             for i_bpt, bpt2plot in enumerate(bpts2plot):
                 cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
 
-                col = cmap(cur_bpt_idx / num_bpts)
+                col = cmap(cur_bpt_idx / num_bptstotal)
 
-                p3d = r3d_data['points3d'][i_frame, cur_bpt_idx, :]
+                p3d = r3d_data[pts3d_reproj_key][i_frame, cur_bpt_idx, :]
                 reproj = np.squeeze(r3d_data['calibration_data']['cgroup'].cameras[i_view].project(p3d).reshape([1, 2]))
                 if scores[i_view, i_frame, i_bpt] > min_valid_score:
                     vid_ax.scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0],
@@ -250,6 +263,8 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
                          r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 1],
                          s=markersize,
                          color=cmap(cur_bpt_idx / num_bpts))
+        ax3d.set_title('simple triangulation')
+        ax3d_optim.set_title('optimized triangulation')
 
         connect_3d_bpts(r3d_data['points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2connect, ax3d)
         connect_3d_bpts(r3d_data['optim_points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2connect, ax3d_optim)
@@ -263,15 +278,18 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
         ax3d.set_zlabel('y')
         ax3d.invert_zaxis()
 
-        ax3d_optim.set_xlim((-50, 25))
-        ax3d_optim.set_ylim((200, 350))  # this is actually z
-        ax3d_optim.set_zlim((20, 120))  # this is actually y
+        ax3d_optim.set_xlim((-40, 25))
+        ax3d_optim.set_ylim((225, 350))  # this is actually z
+        ax3d_optim.set_zlim((20, 100))  # this is actually y
 
         ax3d_optim.set_xlabel('x')
         ax3d_optim.set_ylabel('z')
         ax3d_optim.set_zlabel('y')
         ax3d_optim.invert_zaxis()
 
+        vid_ax.set_xlim((0, w - 1))
+        vid_ax.set_ylim((0, h - 1))
+        vid_ax.invert_yaxis()
         vid_ax.set_xticks([])
         vid_ax.set_yticks([])
 

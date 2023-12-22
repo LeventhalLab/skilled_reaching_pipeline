@@ -157,7 +157,7 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
         bpts2plot = r3d_data['dlc_output']['bodyparts']
     elif bpts2plot == 'reachingpaw':
         bodyparts = r3d_data['dlc_output']['bodyparts']
-        bpts2plot = ['leftear', 'rightear', 'lefteye', 'righteye', 'nose']
+        bpts2plot = ['leftear', 'rightear', 'lefteye', 'righteye', 'nose', 'pellet']
         mcp_names = ['mcp{:d}'.format(i_dig + 1) for i_dig in range(4)]
         pip_names = ['pip{:d}'.format(i_dig + 1) for i_dig in range(4)]
         dig_names = ['dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
@@ -256,18 +256,18 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
                          r3d_data['points3d'][i_frame, cur_bpt_idx, 2],
                          r3d_data['points3d'][i_frame, cur_bpt_idx, 1],
                          s=markersize,
-                         color=cmap(cur_bpt_idx / num_bpts))
+                         color=cmap(cur_bpt_idx / num_bptstotal))
 
             ax3d_optim.scatter(r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 0],
                          r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 2],
                          r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 1],
                          s=markersize,
-                         color=cmap(cur_bpt_idx / num_bpts))
+                         color=cmap(cur_bpt_idx / num_bptstotal))
         ax3d.set_title('simple triangulation')
         ax3d_optim.set_title('optimized triangulation')
 
-        connect_3d_bpts(r3d_data['points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2connect, ax3d)
-        connect_3d_bpts(r3d_data['optim_points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2connect, ax3d_optim)
+        connect_3d_bpts(r3d_data['points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2plot, bpts2connect, ax3d)
+        connect_3d_bpts(r3d_data['optim_points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2plot, bpts2connect, ax3d_optim)
 
         ax3d.set_xlim((-50, 25))
         ax3d.set_ylim((200, 350))  # this is actually z
@@ -311,19 +311,22 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
     # shutil.rmtree(jpg_folder)
 
 
-def connect_3d_bpts(points3d, bodyparts, bpts2connect, ax):
+def connect_3d_bpts(points3d, bodyparts, bpts2plot, bpts2connect, ax):
 
     for bpts_pair in bpts2connect:
-        endpt_x = []
-        endpt_y = []
-        endpt_z = []
-        for bpt in bpts_pair:
-            bpt_idx = bodyparts.index(bpt)
-            endpt_x.append(points3d[bpt_idx, 0])
-            endpt_y.append(points3d[bpt_idx, 2])    # plotting y-coord on the z-axis
-            endpt_z.append(points3d[bpt_idx, 1])    # plotting z-coord on the y-axis
 
-        ax.plot(endpt_x, endpt_y, endpt_z, color='gray')
+        test_bpts = [bpt in bpts2plot for bpt in bpts_pair]
+        if all(test_bpts):
+            endpt_x = []
+            endpt_y = []
+            endpt_z = []
+            for bpt in bpts_pair:
+                bpt_idx = bodyparts.index(bpt)
+                endpt_x.append(points3d[bpt_idx, 0])
+                endpt_y.append(points3d[bpt_idx, 2])    # plotting y-coord on the z-axis
+                endpt_z.append(points3d[bpt_idx, 1])    # plotting z-coord on the y-axis
+
+            ax.plot(endpt_x, endpt_y, endpt_z, color='gray')
 
 
 def create_vids_plus_3danimation_figure(figsize=(18, 10), num_views=2, dpi=100.):

@@ -2074,6 +2074,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     if os.path.exists(calibration_pickle_name):
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
         cgroup = calibration_data['cgroup']
+        return cgroup, None
     else:
         cgroup = CameraGroup.from_names(cam_names, fisheye=False)
         for camera in cgroup.cameras:

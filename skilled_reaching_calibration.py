@@ -2724,13 +2724,17 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
             continue
 
         if isinstance(board, CharucoBoard):
-            if 'mirror' in cvid_name:
+            if 'rm' in cvid_name or 'lm' in cvid_name or 'mirror' in cvid_name:
+                ismirrorview = True
+            else:
+                ismirrorview = False
+            if ismirrorview:
                 # aruco markers are flipped left-right in the mirror, so need to flip the frame image to detect them
                 orig_frame = np.copy(frame)
                 frame = cv2.flip(frame, 1)
             charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame, board)
 
-            if 'mirror' in cvid_name and charucoCorners is not None and len(charucoCorners) > 0:
+            if ismirrorview and charucoCorners is not None and len(charucoCorners) > 0:
                 # now need to flip the identified points left-right to match in the original image
                 w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
                 for i_cc, cc in enumerate(charucoCorners):

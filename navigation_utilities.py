@@ -2962,7 +2962,7 @@ def find_manual_scoring_sheet(parent_directories, mouseID):
     return scoring_file
 
 def get_pickled_metadata_fname(session_metadata, parent_directories):
-    session_folder = find_session_folder(parent_directories['data'], session_metadata)
+    session_folder = find_session_folder(parent_directories, session_metadata)
 
     formatstring = date_formatstring()
     datestring = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
@@ -2977,7 +2977,7 @@ def get_pickled_metadata_fname(session_metadata, parent_directories):
 
 
 def get_pickled_analog_processeddata_fname(session_metadata, parent_directories):
-    session_folder = find_session_folder(parent_directories['data'], session_metadata)
+    session_folder = find_session_folder(parent_directories, session_metadata)
 
     formatstring = date_formatstring()
     datestring = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
@@ -2992,7 +2992,7 @@ def get_pickled_analog_processeddata_fname(session_metadata, parent_directories)
 
 
 def get_pickled_ts_fname(session_metadata, parent_directories):
-    session_folder = find_session_folder(parent_directories['data'], session_metadata)
+    session_folder = find_session_folder(parent_directories, session_metadata)
 
     formatstring = date_formatstring()
     datestring = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
@@ -3004,6 +3004,82 @@ def get_pickled_ts_fname(session_metadata, parent_directories):
     full_path_fname = os.path.join(session_folder, fname)
 
     return full_path_fname
+
+
+def find_analog_bin_file(parent_directory, session_metadata):
+
+    session_folder = find_session_folder(parent_directory, session_metadata)
+    ratID = session_metadata['ratID']
+
+    formatstring = date_formatstring()
+    date_string = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
+    test_analog_string = '_'.join([ratID,
+                                  date_string,
+                                  '*',
+                                  'nidaq',
+                                  session_metadata['task'],
+                                  'analog.bin']
+                                  )
+
+    test_analog_path = os.path.join(session_folder, test_analog_string)
+    analog_names = glob.glob(test_analog_path)
+    if len(analog_names) == 1:
+        analog_name = analog_names[0]
+    else:
+        analog_name = None
+
+    return analog_name
+
+
+def find_digital_bin_file(parent_directory, session_metadata):
+
+    session_folder = find_session_folder(parent_directory, session_metadata)
+    ratID = session_metadata['ratID']
+
+    formatstring = date_formatstring()
+    date_string = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
+    test_digital_string = '_'.join([ratID,
+                                  date_string,
+                                  '*',
+                                  'nidaq',
+                                  session_metadata['task'],
+                                  'digital.bin']
+                                  )
+
+    test_digital_path = os.path.join(session_folder, test_digital_string)
+    digital_names = glob.glob(test_digital_path)
+    if len(digital_names) == 1:
+        digital_name = digital_names[0]
+    else:
+        digital_name = None
+
+    return digital_name
+
+
+def find_metadata_file(parent_directory, session_metadata):
+
+    session_folder = find_session_folder(parent_directory, session_metadata)
+    ratID = session_metadata['ratID']
+
+    formatstring = date_formatstring()
+    date_string = fname_datestring_from_datetime(session_metadata['date'], formatstring=formatstring)
+    test_metafile_string = '_'.join([ratID,
+                                  date_string,
+                                  '*',
+                                  'nidaq',
+                                  session_metadata['task'],
+                                  'md.mat']
+                                  )
+
+    test_metafile_path = os.path.join(session_folder, test_metafile_string)
+    metafile_names = glob.glob(test_metafile_path)
+    if len(metafile_names) == 1:
+        metafile_name = metafile_names[0]
+    else:
+        metafile_name = None
+
+    return metafile_name
+
 
 def processed_data_pickle_name(session_metadata, parent_directories):
 

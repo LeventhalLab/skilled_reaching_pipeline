@@ -210,15 +210,25 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         trials_df = rat_phys_data['rat_df']
         skilled_reaching_io.write_pickle(trials_db_name, trials_df)
 
-    processed_phot_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories)
-    processed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
-
+    # todo: in lines above, need to figure out what to read instead of processed.pickle
     if session_metadata['date'] < datetime(2023, 9, 4):
+        processed_phot_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories)
+        processed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
+
         session_summary, trials_df = srphot_anal.aggregate_data_pre_20230904(processed_phot_data, session_metadata, trials_df,
                                                                              smooth_window=smooth_window,
                                                                              f0_pctile=f0_pctile, expected_baseline=expected_baseline)
     else:
-        session_summary, trials_df = srphot_anal.aggregate_data_post_20230904(processed_phot_data, session_metadata,
+        analog_bin_file = navigation_utilities.find_analog_bin_file(parent_directories, session_metadata)
+        digital_bin_file = navigation_utilities.find_digital_bin_file(parent_directories, session_metadata)
+        metadata_file = navigation_utilities.find_metadata_file(parent_directories, session_metadata)
+
+        data_files = {'analog_bin': analog_bin_file,
+                      'digital_bin': digital_bin_file,
+                      'metadata': metadata_file
+                      }
+
+        session_summary, trials_df = srphot_anal.aggregate_data_post_20230904(data_files, parent_directories, session_metadata,
                                                                              trials_df,
                                                                              smooth_window=smooth_window,
                                                                              f0_pctile=f0_pctile,

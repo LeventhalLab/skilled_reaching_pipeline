@@ -369,8 +369,8 @@ def perform_calibrations(parent_directories, cam_names=('dir', 'lm', 'rm'),
 if __name__ == '__main__':
 
 
-    # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
-    experiment_list = ['dLight', 'sr6OHDA', 'GRABAch-rDA']
+    experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
+    # experiment_list = ['dLight', 'sr6OHDA', 'GRABAch-rDA']
     # experiment_list = ['dLight']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
@@ -482,11 +482,11 @@ if __name__ == '__main__':
                                     rat_nums=rats_to_analyze)
     # #
     # #
-        calibrate_all_sessions(parent_directories[expt],
-                               calibration_metadata_df,
-                               cam_names,
-                               filtertype=filtertype,
-                               rat_nums=rats_to_analyze)
+    #     calibrate_all_sessions(parent_directories[expt],
+    #                            calibration_metadata_df,
+    #                            cam_names,
+    #                            filtertype=filtertype,
+    #                            rat_nums=rats_to_analyze)
 
     # for expt in experiment_list:
     #     rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])

@@ -28,7 +28,7 @@ def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_director
     pawtraces_fname = summary_3dbasename + '_pawtraces.pdf'
     imgsamp_fname = summary_3dbasename + '_imgsamp.tiff'
 
-    if True:# not (os.path.exists(scores_fname) and os.path.exists(pawtraces_fname) and os.path.exists(imgsamp_fname)):
+    if not (os.path.exists(scores_fname) and os.path.exists(pawtraces_fname) and os.path.exists(imgsamp_fname)):
         _, traj_name = os.path.split(traj3d_fname)
         traj_name, _ = os.path.splitext(traj_name)
 
@@ -142,8 +142,8 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
     traj_metadata['task'] = session_metadata['task']
 
     animation_name = navigation_utilities.create_3dvid_name(traj_metadata, session_metadata, parent_directories)
-    # if os.path.exists(animation_name):
-    #     return
+    if os.path.exists(animation_name):
+        return
 
     print('creating video for {}'.format(animation_name))
     markersize = 5

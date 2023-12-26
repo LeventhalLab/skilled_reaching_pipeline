@@ -369,8 +369,8 @@ def perform_calibrations(parent_directories, cam_names=('dir', 'lm', 'rm'),
 if __name__ == '__main__':
 
 
-    experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
-    # experiment_list = ['dLight', 'sr6OHDA', 'GRABAch-rDA']
+    # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
+    experiment_list = ['dLight', 'sr6OHDA', 'GRABAch-rDA']
     # experiment_list = ['dLight']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
@@ -552,8 +552,8 @@ if __name__ == '__main__':
         DLC_folder_keys = DLC_folder_names.keys()
         # for DLC_key in DLC_folder_keys:
         #     train_autoencoder.train_autoencoder(anipose_config, DLC_folder_names[DLC_key])
-        ftr = [folder for folder in folders_to_reconstruct if ((folder['ratID'] == 'R0486') and (folder['date'] == datetime(2023, 9, 8)))]
-        # ftr = folders_to_reconstruct
+        # ftr = [folder for folder in folders_to_reconstruct if ((folder['ratID'] == 'R0486') and (folder['date'] == datetime(2023, 9, 8)))]
+        ftr = folders_to_reconstruct
         reconstruct_3d.reconstruct_folders_anipose(ftr, parent_directories[expt], expt, rat_df, anipose_config, filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)

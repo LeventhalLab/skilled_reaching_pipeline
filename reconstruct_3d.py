@@ -210,7 +210,6 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         trials_df = rat_phys_data['rat_df']
         skilled_reaching_io.write_pickle(trials_db_name, trials_df)
 
-    # todo: in lines above, need to figure out what to read instead of processed.pickle
     if session_metadata['date'] < datetime(2023, 9, 4):
         processed_phot_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories)
         processed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)

@@ -86,8 +86,8 @@ def extract_sr_event_ts(processed_phot_data, session_metadata, rat_srdf, perieve
 
     eventlist, event_ts = srphot_anal.get_photometry_events(processed_phot_data, session_metadata)
     Fs = processed_phot_data['Fs']
-    num_samples = len(processed_phot_data['t'])
-    session_duration = num_samples / Fs
+    n_samples = len(processed_phot_data['t'])
+    session_duration = n_samples / Fs
 
     # collect all actuator3 events
     act3_idx = eventlist.index('Actuator3')
@@ -155,24 +155,28 @@ def aggregate_data_post_20230904(data_files, parent_directories, session_metadat
     processed_analog = skilled_reaching_io.read_pickle(pickled_analog_processeddata_fname)
     ts_dict = skilled_reaching_io.read_pickle(pickled_ts_fname)
 
-    smoothed_data, detrended_data, session_dff, interval_popt, interval_exp2_fit_successful, baseline_used = srphot_anal.calc_segmented_dff(
-        processed_phot_data, processed_phot_data['mean_baseline'],
-        smooth_window=smooth_window,
-        f0_pctile=f0_pctile,
-        expected_baseline=expected_baseline)
+    # smoothed_data, detrended_data, session_dff, interval_popt, interval_exp2_fit_successful, baseline_used = srphot_anal.calc_segmented_dff(
+    #     processed_phot_data, processed_phot_data['mean_baseline'],
+    #     smooth_window=smooth_window,
+    #     f0_pctile=f0_pctile,
+    #     expected_baseline=expected_baseline)
 
-    session_zscore = srphot_anal.zscore_full_session(processed_phot_data['analysis_intervals'], session_dff)
+    # session_zscore = srphot_anal.zscore_full_session(processed_phot_data['analysis_intervals'], session_dff)
 
-    rat_srdf, session_earlyreach_info = extract_sr_event_ts(processed_phot_data, session_metadata, rat_srdf,
+    Fs = phot_metadata['Fs']
+    n_samples = np.shape(processed_analog['dff'])[0]
+    phot_metadata['t'] = np.linspace(1/Fs, n_samples/Fs, n_samples)
+    rat_srdf, session_earlyreach_info = extract_sr_event_ts(phot_metadata, session_metadata, rat_srdf,
                                                             perievent_window=perievent_window,
                                                             smooth_window=smooth_window, f0_pctile=f0_pctile,
                                                             expected_baseline=expected_baseline)
-    session_summary = {'sr_dff1': session_dff,
-                       'sr_zscores1': session_zscore,
-                       'sr_dff2': [],
-                       'sr_zscores2': [],
+
+    session_summary = {'sr_dff1': processed_analog['dff'][:, 0],
+                       'sr_zscores1': processed_analog['session_zscores'][:, 0],
+                       'sr_dff2': processed_analog['dff'][:, 1],
+                       'sr_zscores2': processed_analog['session_zscores'][:, 1],
                        'sr_metadata_list': session_metadata,
-                       'sr_processed_phot': processed_phot_data,
+                       'sr_processed_phot': phot_metadata,
                        'sr_earlyreach_info': session_earlyreach_info
                        }
 

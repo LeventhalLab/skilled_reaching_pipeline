@@ -378,7 +378,7 @@ if __name__ == '__main__':
 
     label_videos = True
 
-    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514]
+    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514, 519, 520, 521]
 
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
@@ -553,7 +553,8 @@ if __name__ == '__main__':
         # for DLC_key in DLC_folder_keys:
         #     train_autoencoder.train_autoencoder(anipose_config, DLC_folder_names[DLC_key])
         # ftr = [folder for folder in folders_to_reconstruct if ((folder['ratID'] == 'R0486') and (folder['date'] == datetime(2023, 9, 8)))]
-        ftr = folders_to_reconstruct
+        ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453']]
+        # ftr = folders_to_reconstruct
         reconstruct_3d.reconstruct_folders_anipose(ftr, parent_directories[expt], expt, rat_df, anipose_config, filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)

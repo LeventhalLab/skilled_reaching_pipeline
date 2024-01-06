@@ -1613,7 +1613,10 @@ def collect_matched_mirror_points(merged, board):
         for merged_row in leftmirror_rows:
             imgp_direct = merged_row['dir']['corners']
             imgp_mirror = merged_row['lm']['corners']
-            leftmirror_imgp[current_lm_row:current_lm_row+pts_per_frame, :, :] = imgp_mirror
+            try:
+                leftmirror_imgp[current_lm_row:current_lm_row+pts_per_frame, :, :] = imgp_mirror
+            except:
+                pass
             directleft_imgp[current_lm_row:current_lm_row+pts_per_frame, :, :] = imgp_direct
 
             left_objp[current_lm_row:current_lm_row+pts_per_frame, :] = board.get_object_points()
@@ -2433,10 +2436,11 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
             if isinstance(board, Checkerboard):
                 # make sure the top left corner is always labeled first in the direct view and the labels go left->right across rows
                 # make sure the top right corner is labeled first in the mirror views and labels go right->left across rows
+
+                fliplr = True
                 if 'dir' in cropped_vid:
                     fliplr = False
-                elif 'mirr' in cropped_vid:
-                    fliplr = True
+
                 corners_ud = reorder_checkerboard_points(corners_ud, board.get_size(), fliplr)
                 filled_ud = reorder_checkerboard_points(filled_ud, board.get_size(), fliplr)
             corners_ud = np.expand_dims(corners_ud, 1)
@@ -2838,9 +2842,9 @@ def reorder_checkerboard_points(corners, size, fliplr):
             # first corner is top right; then it will go down the column (I think)
             id_order = []
             # since it's going right-->left, first index in size is the number of columns
-            for i_row in range(size[1]):
-                for i_col in range(size[0]):
-                    id_order.append((size[0] * size[1]) - (i_col * size[0]) - i_row - 1)
+            for i_row in range(size[0]):
+                for i_col in range(size[1]):
+                    id_order.append((i_col * size[0]) + i_row)
             id_order = np.array(id_order)
         elif first_corner[0] > last_corner[0] and first_corner[1] > last_corner[1]:
             # first corner is bottom right; then it will go left along the bottom row (I think)
@@ -2866,7 +2870,7 @@ def reorder_checkerboard_points(corners, size, fliplr):
 
 def reorder_checkerboard_points_anipose(corners, size, fliplr):
 
-    # reordeer chessboard corners so first point is top left
+    # reorder chessboard corners so first point is top left
     if np.ndim(corners) == 3:
         first_corner = corners[0, 0]
         last_corner = corners[-1, 0]

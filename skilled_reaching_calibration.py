@@ -1613,10 +1613,8 @@ def collect_matched_mirror_points(merged, board):
         for merged_row in leftmirror_rows:
             imgp_direct = merged_row['dir']['corners']
             imgp_mirror = merged_row['lm']['corners']
-            try:
-                leftmirror_imgp[current_lm_row:current_lm_row+pts_per_frame, :, :] = imgp_mirror
-            except:
-                pass
+
+            leftmirror_imgp[current_lm_row:current_lm_row+pts_per_frame, :, :] = imgp_mirror
             directleft_imgp[current_lm_row:current_lm_row+pts_per_frame, :, :] = imgp_direct
 
             left_objp[current_lm_row:current_lm_row+pts_per_frame, :] = board.get_object_points()
@@ -2698,7 +2696,10 @@ def match_mirror_points(mirrors_corner, direct_corner, direct_ids):
 def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=True, min_rows_detected=20):
     # adapted from anipose
     cap = cv2.VideoCapture(calibration_video)
-    _, cvid_name = os.path.split(calibration_video)
+    try:
+        _, cvid_name = os.path.split(calibration_video)
+    except:
+        pass
 
     if not cap.isOpened():
         raise FileNotFoundError(f'missing video file "{calibration_video}"')

@@ -862,7 +862,7 @@ class CameraGroup:
 
         good = errors_norm < mu
         extra_good = subset_extra(extra, good)
-        self.bundle_adjust_fixed_dist(p2ds[:, good], extra_good,
+        self.bundle_adjust_fixed_intrinsics(p2ds[:, good], extra_good,
                            loss='linear',
                            ftol=ftol, max_nfev=max(200, max_nfev),
                            verbose=verbose)
@@ -1082,7 +1082,7 @@ class CameraGroup:
 
         good = errors_norm < mu
         extra_good = subset_extra(extra, good)
-        self.bundle_adjust_fixed_dist(p2ds[:, good], extra_good,
+        self.bundle_adjust_fixed_intrinsics(p2ds[:, good], extra_good,
                            loss='linear',
                            ftol=ftol, max_nfev=max(200, max_nfev),
                            verbose=verbose)
@@ -1244,7 +1244,7 @@ class CameraGroup:
             x0 = start_params
             n_cam_params = len(self.cameras[0].get_params())
 
-        error_fun = self._error_fun_bundle_fixed_dist
+        error_fun = self._error_fun_bundle_fixed_intrinsics
 
         jac_sparse = self._jac_sparsity_bundle(p2ds, n_cam_params, extra)
 
@@ -1268,8 +1268,12 @@ class CameraGroup:
         for i, cam in enumerate(self.cameras):
             a = i * n_cam_params
             b = (i + 1) * n_cam_params
-            this_cam_params = np.zeros(9)
+            # this_cam_params = np.zeros(9)
+            # this_cam_params[0:n_cam_params] = best_params[a:b]
+            # keep original focal length
+            this_cam_params = cam.get_params()
             this_cam_params[0:n_cam_params] = best_params[a:b]
+            # this_cam_params[n_cam_params] = prev_params[n_cam_params]
             cam.set_params(this_cam_params)
 
         error = self.average_error(p2ds)
@@ -1331,6 +1335,47 @@ class CameraGroup:
             # params[7] = dist[0] and params[8]=dist[1] for each camera
 
         # n_cams = len(self.cameras)
+        sub = n_cam_params * n_cams
+        n3d = p2ds.shape[1] * 3
+        p3ds_test = params[sub:sub+n3d].reshape(-1, 3)
+        errors = self.reprojection_error(p3ds_test, p2ds)
+        errors_reproj = errors[good]
+
+        if extra is not None:
+            ids = extra['ids_map']
+            objp = extra['objp']
+            min_scale = np.min(objp[objp > 0])
+            n_boards = int(np.max(ids)) + 1
+            a = sub+n3d
+            rvecs = params[a:a+n_boards*3].reshape(-1, 3)
+            tvecs = params[a+n_boards*3:a+n_boards*6].reshape(-1, 3)
+            expected = transform_points(objp, rvecs[ids], tvecs[ids])
+            errors_obj = 2 * (p3ds_test - expected).ravel() / min_scale
+        else:
+            errors_obj = np.array([])
+
+        return np.hstack([errors_reproj, errors_obj])
+
+
+    @jit(parallel=True, forceobj=True)
+    def _error_fun_bundle_fixed_intrinsics(self, params, p2ds, n_cam_params, extra):
+        """Error function for bundle adjustment"""
+        good = ~np.isnan(p2ds)
+        n_cams = len(self.cameras)
+
+        for i, cam in enumerate(self.cameras):
+
+            a = i * n_cam_params
+            b = (i + 1) * n_cam_params
+
+            # workaround to force the distortion coefficients (which should be zero) and focal length to be the same
+            # as previously so only rotation and translation are adjusted
+            # this_cam_params = np.zeros(9)
+            this_cam_params = cam.get_params()
+            this_cam_params[0:n_cam_params] = params[a:b]
+            cam.set_params(this_cam_params)
+            # params[7] = dist[0] and params[8]=dist[1] for each camera
+
         sub = n_cam_params * n_cams
         n3d = p2ds.shape[1] * 3
         p3ds_test = params[sub:sub+n3d].reshape(-1, 3)
@@ -1566,7 +1611,7 @@ class CameraGroup:
         # params[7] is the first distortion coefficient, which we're ignoring here
 
         # get rid of the focal length as a parameter as well, since it should be the same for each virtual camera
-        cam_params = np.hstack([cam.get_params()[:7] for cam in self.cameras])
+        cam_params = np.hstack([cam.get_params()[:6] for cam in self.cameras])
         n_cam_params = len(cam_params) // len(self.cameras)
 
         total_cam_params = len(cam_params)

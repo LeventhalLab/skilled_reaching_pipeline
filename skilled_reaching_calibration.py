@@ -51,6 +51,7 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     # cam_intrinsics = calibration_data['cam_intrinsics']
     # E, F, rot, t = mirror_stereo_cal(imgp_dict, cam_intrinsics, view_names=cam_names)
     error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra=None, verbose=verbose)
+    error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, extra=None, verbose=verbose)
 
 
     # cgroup was modified by the bundle_adjust_iter_fixed_dist function
@@ -2148,7 +2149,8 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     # if not calibration_data['bundle_adjust_completed']:
         # if one of the views couldn't be calibrated, skip bundle adjustment for now
     if not np.isnan(calibration_data['E']).any():
-        error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
+        # error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
+        error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, extra, verbose=verbose)
 
         calibration_data['cgroup'] = cgroup
         calibration_data['error'] = error

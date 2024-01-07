@@ -2696,10 +2696,8 @@ def match_mirror_points(mirrors_corner, direct_corner, direct_ids):
 def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=True, min_rows_detected=20):
     # adapted from anipose
     cap = cv2.VideoCapture(calibration_video)
-    try:
-        _, cvid_name = os.path.split(calibration_video)
-    except:
-        pass
+
+    _, cvid_name = os.path.split(calibration_video)
 
     if not cap.isOpened():
         raise FileNotFoundError(f'missing video file "{calibration_video}"')

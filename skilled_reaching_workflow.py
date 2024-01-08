@@ -446,13 +446,13 @@ if __name__ == '__main__':
                             }
                             for expt in experiment_list}
 
-    # use the function below to write a charuco board to a file
-    # ncols = 12
-    # nrows = 8
-    # square_length = 16
-    # marker_length = 12
-    # board = skilled_reaching_calibration.create_charuco(nrows, ncols, square_length, marker_length)
-    # skilled_reaching_calibration.write_charuco_image(board, 600, calibration_vids_parents['dLight'])
+    # use the code below to write a charuco board to a file
+    ncols = 12
+    nrows = 8
+    square_length = 16
+    marker_length = 12
+    board = skilled_reaching_calibration.create_charuco(nrows, ncols, square_length, marker_length)
+    skilled_reaching_calibration.write_charuco_image(board, 600, calibration_vids_parents['dLight'])
 
     # excel file containing the cropping parameters, which calibration file to use for each session, etc.
     # session_metadata_xlsx_path = os.path.join(video_root_folders[expt],

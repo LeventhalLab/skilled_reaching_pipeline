@@ -50,7 +50,7 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     # imgp_dict ={cam_name: imgp[i_cam] for i_cam, cam_name in enumerate(cam_names)}
     # cam_intrinsics = calibration_data['cam_intrinsics']
     # E, F, rot, t = mirror_stereo_cal(imgp_dict, cam_intrinsics, view_names=cam_names)
-    error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra=None, verbose=verbose)
+    # error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra=None, verbose=verbose)
     error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, extra=None, verbose=verbose)
 
 

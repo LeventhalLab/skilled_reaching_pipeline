@@ -258,7 +258,7 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file_group[0])
         trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
                                                                        parent_directories)
-        # sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
+        sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
 
 
 def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, anipose_config, rat_df, trials_df, parent_directories):

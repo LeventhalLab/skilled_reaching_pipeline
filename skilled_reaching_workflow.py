@@ -448,8 +448,8 @@ if __name__ == '__main__':
                             for expt in experiment_list}
 
     # use the code below to write a charuco board to a file
-    # ncols = 12
-    # nrows = 8
+    # ncols = 8
+    # nrows = 6
     # square_length = 16
     # marker_length = 12
     # board = skilled_reaching_calibration.create_charuco(nrows, ncols, square_length, marker_length)

@@ -20,6 +20,10 @@ def get_vidtrigger_ts(vid_metadata, trials_df):
 
     trial_df = get_trialdf_row(vid_metadata, trials_df)
 
+    if trial_df.empty:
+        # most likely, this was a trial that was performed after the photometry recording ended
+        return None, None
+
     vidtrigger_ts = trial_df['vidtrigger_ts'].values[0]
     vidtrigger_interval = trial_df['vidtrigger_interval'].values[0]
 

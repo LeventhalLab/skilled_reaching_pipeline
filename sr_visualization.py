@@ -178,6 +178,10 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
     cap = cv2.VideoCapture(orig_vid)
 
     vidtrigger_ts, vidtrigger_interval = ipk.get_vidtrigger_ts(traj_metadata, trials_df)
+    if vidtrigger_ts is None:
+        # most likely, trial occurred after photometry recording ended
+        return
+
     Fs = session_summary['sr_processed_phot']['Fs']
     vid_phot_signal = srphot_anal.resample_photometry_to_video(session_summary['sr_zscores1'], vidtrigger_ts, Fs, trigger_frame=300, num_frames=num_frames, fps=fps)
     t = np.linspace(1/fps, num_frames/fps, num_frames)

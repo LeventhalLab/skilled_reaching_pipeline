@@ -51,7 +51,7 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     # cam_intrinsics = calibration_data['cam_intrinsics']
     # E, F, rot, t = mirror_stereo_cal(imgp_dict, cam_intrinsics, view_names=cam_names)
     # error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra=None, verbose=verbose)
-    error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, extra=None, verbose=verbose)
+    error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, undistort=False, extra=None, verbose=verbose)
 
 
     # cgroup was modified by the bundle_adjust_iter_fixed_dist function
@@ -2423,8 +2423,8 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
 
             # not sure what the difference is between 'filled' and 'corners' in each row dictionary, just trying to make
             # this work with anipose
-            orig_filled_x = row['filled'][:,:,0] + cropped_vid_metadata['crop_params'][0]
-            orig_filled_y = row['filled'][:,:,1] + cropped_vid_metadata['crop_params'][2]
+            orig_filled_x = row['filled'][:, :, 0] + cropped_vid_metadata['crop_params'][0]
+            orig_filled_y = row['filled'][:, :, 1] + cropped_vid_metadata['crop_params'][2]
             orig_filled = np.hstack((orig_filled_x, orig_filled_y))
 
             orig_ud_norm = cv2.undistortPoints(orig_coord, cam_intrinsics['mtx'], cam_intrinsics['dist'])
@@ -2441,6 +2441,7 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
                 if 'dir' in cropped_vid:
                     fliplr = False
 
+                oc = corners_ud
                 corners_ud = reorder_checkerboard_points(corners_ud, board.get_size(), fliplr)
                 filled_ud = reorder_checkerboard_points(filled_ud, board.get_size(), fliplr)
             corners_ud = np.expand_dims(corners_ud, 1)
@@ -2782,6 +2783,20 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
         crop_videos.write_video_frames(calibration_video, img_type='.jpg')
 
     return rows, size
+
+
+def test_img(frame, corners):
+    corners = np.squeeze(corners)
+    fig = plt.figure()
+    ax = fig.add_subplot()
+
+    ax.imshow(frame)
+    n_corners = np.shape(corners)[0]
+
+    for i_pt in range(n_corners):
+        ax.text(corners[i_pt, 0], corners[i_pt, 1], '{:d}'.format(i_pt))
+
+    plt.show()
 
 
 def reorder_checkerboard_points(corners, size, fliplr):

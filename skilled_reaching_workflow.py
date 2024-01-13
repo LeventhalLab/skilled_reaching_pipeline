@@ -275,12 +275,7 @@ def calibrate_all_sessions(parent_directories,
             mirror_board = skilled_reaching_calibration.mirror_board_from_df(session_row)
             # skilled_reaching_calibration.write_board_image(mirror_board, 600, parent_directories['calibration_vids_parent'])
 
-            # todo: test if chessboard detection is sufficient for the old boards
-            # calibration_toml_name = navigation_utilities.create_calibration_toml_name(full_calib_vid_name, calibration_files_parent)
             calibration_pickle_name = navigation_utilities.create_calibration_summary_name(full_calib_vid_name, calibration_files_parent)
-            # if os.path.exists(calibration_toml_name):
-            #     cgroup = CameraGroup.load(calibration_toml_name)
-            # else:
 
             # need this here so we have the video names, not because we need videos cropped
             current_cropped_calibration_vids = skilled_reaching_calibration.crop_calibration_video(
@@ -554,7 +549,7 @@ if __name__ == '__main__':
         # for DLC_key in DLC_folder_keys:
         #     train_autoencoder.train_autoencoder(anipose_config, DLC_folder_names[DLC_key])
         # ftr = [folder for folder in folders_to_reconstruct if ((folder['ratID'] == 'R0486') and (folder['date'] == datetime(2023, 9, 8)))]
-        ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453']]
+        ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453', 'R0468']]
         # ftr = folders_to_reconstruct
         reconstruct_3d.reconstruct_folders_anipose(ftr, parent_directories[expt], expt, rat_df, anipose_config, filtered=False)
 

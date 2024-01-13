@@ -346,13 +346,25 @@ class CalibrationObject(ABC):
 
         return rows
 
-    def estimate_pose_rows(self, camera, rows):
-        for row in rows:
+    def estimate_pose_rows(self, camera, rows, max_t=10000):
+
+        # sometimes, estimate_pose_points blows up and gives very large (like > 10^10) values for translation
+        # not sure why, but easiest to just get rid of these rows
+        valid_rows = np.ones(len(rows), dtype=bool)
+        for i_row, row in enumerate(rows):
             rvec, tvec = self.estimate_pose_points(camera,
                                                    row['corners'],
                                                    row['ids'])
-            row['rvec'] = rvec
-            row['tvec'] = tvec
+            if tvec is None:
+                valid_rows[i_row] = False
+            elif any(np.absolute(tvec) > max_t):
+                valid_rows[i_row] = False
+            else:
+                row['rvec'] = rvec
+                row['tvec'] = tvec
+
+        rows = [row for row, valid_row in zip(rows, valid_rows) if valid_row]
+
         return rows
 
     def fill_points_rows(self, rows):

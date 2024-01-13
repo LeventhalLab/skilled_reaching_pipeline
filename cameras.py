@@ -486,7 +486,10 @@ class CameraGroup:
             for cnum, cam in enumerate(self.cameras):
                 # must copy in order to satisfy opencv underneath
                 sub = np.copy(points[cnum])
-                temp = cvb.normalize_points(sub, cam.get_camera_matrix())
+                try:
+                    temp = cvb.normalize_points(sub, cam.get_camera_matrix())
+                except:
+                    pass
                 new_points[cnum] = temp.T
 
         points = new_points
@@ -1017,7 +1020,7 @@ class CameraGroup:
 
         p2ds, extra = resample_points(p2ds_full, extra_full,
                                       n_samp=n_samp_full)
-        error = self.average_error(p2ds, median=True)
+        error = self.average_error(p2ds, median=True, undistort=undistort)
 
         if verbose:
             print('error: ', error)
@@ -1602,12 +1605,10 @@ class CameraGroup:
         where N is the number of points and C is the number of cameras,
         initializes the parameters for bundle adjustment"""
 
-        # TODO: working here! - remove intrinsics as adjustable parameters in bundle adjustment
-
-        # only take the first 5 params - ignore the focal length and distortion coefficients
+        # only take the first 6 params - ignore the focal length and distortion coefficients
         # params[0:3] is the rotation vector
         # params[3:6] is the translation vector
-        # params[6] is the focal length
+        # params[6] is the focal length, which we're ignoring here
         # params[7] is the first distortion coefficient, which we're ignoring here
 
         # get rid of the focal length as a parameter as well, since it should be the same for each virtual camera

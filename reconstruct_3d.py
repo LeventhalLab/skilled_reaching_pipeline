@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 from datetime import datetime
 import os
-
+import random
 import analyze_3d_recons
 import navigation_utilities
 import glob
@@ -258,7 +258,10 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file_group[0])
         trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
                                                                        parent_directories)
-        sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
+
+        # select 1/4 of trials at random to make videos
+        if random.random() < 0.2:
+            sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
 
 
 def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, anipose_config, rat_df, trials_df, parent_directories):

@@ -54,7 +54,7 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, undistort=False, extra=None, verbose=verbose)
 
 
-    # cgroup was modified by the bundle_adjust_iter_fixed_dist function
+    # cgroup was modified by the bundle_adjust_iter_fixed_intrinsics function
     cgroup_name = '_'.join((h5_metadata['ratID'],
                             h5_metadata['triggertime'].strftime('%Y%m%d'),
                             'ses{:02d}'.format(h5_metadata['session_num']),

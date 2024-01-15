@@ -253,15 +253,16 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         if len(h5_file_group) != 3:
             continue
 
-        reconstruct_single_vid_anipose(h5_file_group, session_metadata, calibration_data, anipose_config, rat_df, trials_df, parent_directories)
+        already_reconstructed = reconstruct_single_vid_anipose(h5_file_group, session_metadata, calibration_data, anipose_config, rat_df, trials_df, parent_directories)
+        # already_reconstructed will be True if this video was previously reconstructed, False if it was newly reconstructed
 
         h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file_group[0])
         trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
                                                                        parent_directories)
 
         # select 1/4 of trials at random to make videos
-        if random.random() < 0.2:
-            sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
+        # if random.random() < 0.1 and not already_reconstructed:
+        #     sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
 
 
 def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, anipose_config, rat_df, trials_df, parent_directories):
@@ -288,7 +289,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     # todo: get trial info and store that with the 3d reconstruction as well
 
     if os.path.exists(trajectory_fname):
-        return
+        return True
 
     _, traj_name = os.path.split(trajectory_fname)
     print('calculating 3d trajectory for {}'.format(traj_name))
@@ -387,6 +388,8 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
                 'reprojerr': reprojerr,
                 'trial_info': trialdf_row}
     skilled_reaching_io.write_pickle(trajectory_fname, r3d_data)
+
+    return False
 
 
 # def filter_pose_medfilt(config, all_points, bodyparts):

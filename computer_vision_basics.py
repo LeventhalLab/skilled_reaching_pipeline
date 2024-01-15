@@ -848,7 +848,3 @@ def find_nearest_neighbor(test_point, other_points, num_neighbors=1):
     nnidx = sorted_idx[:num_neighbors]
 
     return nndist, nnidx
-
-
-
-    pass

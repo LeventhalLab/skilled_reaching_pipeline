@@ -458,8 +458,6 @@ if __name__ == '__main__':
     # crop calibration videos and perform the calibrations
     # perform_calibrations(parent_directories, vidtype='.avi', cam_names=cam_names, filtertype=filtertype, rat_nums=rats_to_analyze)
 
-    anipose_config = toml.load(anipose_config_path)
-
     test_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0452\R0452_20230329_sr_ses01'
     # analyze_3d_recons.analyze_trajectories(test_folder, anipose_config)
 
@@ -478,11 +476,11 @@ if __name__ == '__main__':
                                     rat_nums=rats_to_analyze)
     # #
     # #
-        calibrate_all_sessions(parent_directories[expt],
-                               calibration_metadata_df,
-                               cam_names,
-                               filtertype=filtertype,
-                               rat_nums=rats_to_analyze)
+    #     calibrate_all_sessions(parent_directories[expt],
+    #                            calibration_metadata_df,
+    #                            cam_names,
+    #                            filtertype=filtertype,
+    #                            rat_nums=rats_to_analyze)
 
     # for expt in experiment_list:
     #     rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
@@ -549,7 +547,7 @@ if __name__ == '__main__':
         # for DLC_key in DLC_folder_keys:
         #     train_autoencoder.train_autoencoder(anipose_config, DLC_folder_names[DLC_key])
         # ftr = [folder for folder in folders_to_reconstruct if ((folder['ratID'] == 'R0486') and (folder['date'] == datetime(2023, 9, 8)))]
-        ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453']]
+        ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453', 'R0469', 'R0470', 'R0471']]
         # ftr = folders_to_reconstruct
         reconstruct_3d.reconstruct_folders_anipose(ftr, parent_directories[expt], expt, rat_df, anipose_config, filtered=False)
 

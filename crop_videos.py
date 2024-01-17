@@ -24,7 +24,14 @@ def crop_params_dict_from_df(crop_params_df, session_date, box_num, view_list=['
         #     view_list[1]: [1, 470, 270, 920],
         #     view_list[2]: [1570, 2040, 270, 920]
         # }
+        # was this a problem with date formatting?
+        df_dates = [navigation_utilities.datetime64_2_datetime(cp_date) for cp_date in crop_params_df['date'].values]
+        matched_date = [dd.date() == session_date for dd in df_dates]
+        date_box_row = crop_params_df[matched_date & (crop_params_df['box_num'] == box_num)]
+
+    if date_box_row.empty:
         crop_params_dict = {}
+
     elif date_box_row.shape[0] == 1:
         crop_params_dict = dict.fromkeys(view_list, None)
         for view in view_list:
@@ -76,13 +83,18 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
             # vids_list is empty
             continue
 
+        test_vid = vids_list[0]
+        vid_metadata = navigation_utilities.parse_video_name(test_vid)
+        if isinstance(crop_params, dict):
+            if vid_metadata['ratID'] in list(crop_params.keys()):
+                cp = crop_params[vid_metadata['ratID']]
+            else:
+                cp = crop_params
         # if crop_params is a DataFrame object, create a crop_params dictionary based on the current folder
-        if isinstance(crop_params, pd.DataFrame):
+        if isinstance(cp, pd.DataFrame):
             # pick an .avi file in this folder
-            test_vid = vids_list[0]
-            vid_metadata = navigation_utilities.parse_video_name(test_vid)
             session_date = vid_metadata['triggertime'].date()
-            crop_params_dict = crop_params_dict_from_df(crop_params, session_date, vid_metadata['boxnum'])
+            crop_params_dict = crop_params_dict_from_df(cp, session_date, vid_metadata['boxnum'])
         elif isinstance(crop_params, dict):
             crop_params_dict = crop_params
 
@@ -330,7 +342,17 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
 
 
 def preprocess_videos(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi', filtertype='mjpeg2jpeg'):
+    '''
 
+    :param vid_folder_list:
+    :param cropped_vids_parent:
+    :param crop_params: either a dictionary with keys 'dir', 'lm', 'rm', each with a 4-element list [left, right, top, bottom]
+            OR a pandas dataframe with columns 'date', 'box_num', 'direct_left', 'direct_right',...
+    :param view_list:
+    :param vidtype:
+    :param filtertype:
+    :return:
+    '''
     cropped_video_directories = crop_folders(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi', filtertype=filtertype)
 
     return cropped_video_directories

@@ -392,7 +392,7 @@ def create_cropped_video_destination_list(cropped_vids_parent, video_folder_list
         ratID, session_name = parse_session_dir_name(session_dir)
 
         # create direct view directory for this raw video directory
-        cropped_vid_dir = session_dir + '_direct'
+        cropped_vid_dir = session_dir + '_dir'
         direct_view_directory = os.path.join(cropped_vids_parent, ratID, session_dir, cropped_vid_dir)
 
         # create left mirror view directory for this raw video directory
@@ -1022,6 +1022,14 @@ def parse_cropped_optitrack_video_name(cropped_video_name):
     return cropped_vid_metadata
 
 
+def datetime64_2_datetime(dt64):
+    year = pd.to_datetime(dt64).year
+    month = pd.to_datetime(dt64).month
+    day = pd.to_datetime(dt64).day
+
+    return datetime(year, month, day)
+
+
 def parse_video_name(video_name):
     """
     extract metadata information from the video name
@@ -1068,7 +1076,7 @@ def parse_video_name(video_name):
     video_metadata['rat_num'] = int(num_string)
 
     # if box number is stored in file name, then extract it
-    if 'box' in metadata_list[1]:
+    if 'b' in metadata_list[1]:
         video_metadata['boxnum'] = int(metadata_list[1][-1:])
         next_metadata_idx = 2
     else:

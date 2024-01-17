@@ -311,10 +311,10 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     # and return the data structure
     d = load_pose2d_fnames(fname_dict, cam_names=cam_names)
     d = crop_all_points_2_full_frame(d, h5_group, calibration_data['cam_intrinsics'])
-    fname_el_dict = {cam_name: h5_el_name for cam_name, h5_el_name in zip(cam_names, h5_el_group)}
+    # fname_el_dict = {cam_name: h5_el_name for cam_name, h5_el_name in zip(cam_names, h5_el_group)}
 
-    d_el = load_pose2d_fnames(fname_el_dict, cam_names=cam_names)
-    d_el = crop_all_points_2_full_frame(d_el, h5_el_group, calibration_data['cam_intrinsics'])
+    # d_el = load_pose2d_fnames(fname_el_dict, cam_names=cam_names)
+    # d_el = crop_all_points_2_full_frame(d_el, h5_el_group, calibration_data['cam_intrinsics'])
 
     n_cams, n_frames, n_joints, _, _ = d['all_points'].shape
 

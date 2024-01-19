@@ -275,6 +275,8 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_group[0])
     trajectory_fname = navigation_utilities.create_trajectory_name(h5_metadata, session_metadata, calibration_data,
                                                                    parent_directories)
+    if os.path.exists(trajectory_fname):
+        return True
 
     # select out the row from the rat info table and the trials table to store with the kinematic data
     ratdf_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
@@ -286,10 +288,6 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     ]
 
     # analyze_3d_recons.analyze_trajectory(trajectory_fname)
-    # todo: get trial info and store that with the 3d reconstruction as well
-
-    if os.path.exists(trajectory_fname):
-        return True
 
     _, traj_name = os.path.split(trajectory_fname)
     print('calculating 3d trajectory for {}'.format(traj_name))

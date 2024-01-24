@@ -221,6 +221,25 @@ def session_metadata_from_path(full_pathname):
     return session_metadata
 
 
+def datetime_from_fname_string(datetime_string):
+    '''
+    extract datetime elements from datetime string used for filenames.
+    Format is either YYYYMMDD or YYYYMMDD_HH-MM-SS
+    :param date_string:
+    :return:
+    '''
+
+
+    if len(datetime_string) == 8:
+        format_string = '%Y%m%d'
+    elif len(datetime_string) == 17:
+        format_string = '%Y%m%d_%H-%M-%S'
+
+    dtime = datetime.strptime(datetime_string, format_string)
+
+    return dtime
+
+
 def get_video_folders_to_crop(video_root_folder, rats_to_analyze='all'):
 
     rat_folders = glob.glob(os.path.join(video_root_folder, 'R*'))

@@ -240,6 +240,17 @@ def datetime_from_fname_string(datetime_string):
     return dtime
 
 
+def find_scores_xlsx(parent_directories, expt_name):
+
+    test_name = '_'.join(['rat', expt_name, 'SRsessions.xlsx'])
+    test_name = os.path.join(parent_directories['videos_root_folder'], test_name)
+
+    if os.path.exists(test_name):
+        return test_name
+    else:
+        return None
+
+
 def get_video_folders_to_crop(video_root_folder, rats_to_analyze='all'):
 
     rat_folders = glob.glob(os.path.join(video_root_folder, 'R*'))

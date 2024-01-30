@@ -3,24 +3,25 @@ import cv2
 from datetime import datetime
 import os
 import random
-import analyze_3d_recons
-import navigation_utilities
-import glob
-import skilled_reaching_calibration
-import skilled_reaching_io
 import pandas as pd
 import scipy.io as sio
 from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
-import computer_vision_basics as cvb
 import shapely.geometry as sg
-import sr_visualization
-import dlc_utilities
-import sr_photometry_analysis as srphot_anal
 import copy
-import aniposefilter_pose
 import toml
+import glob
 
+import sr_behavior_summary
+import sr_photometry_analysis as srphot_anal
+import dlc_utilities
+import sr_visualization
+import computer_vision_basics as cvb
+import skilled_reaching_calibration
+import skilled_reaching_io
+import analyze_3d_recons
+import navigation_utilities
+import aniposefilter_pose
 import utils
 from utils import load_pose2d_fnames
 from anipose_utils import crop_all_points_2_full_frame
@@ -129,7 +130,7 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt
         if not os.path.exists(calibration_pickle_name):
             continue
 
-        reconstruct_folder_anipose(folder_to_reconstruct, calibration_pickle_name, rat_df, parent_directories, anipose_config, filtered=filtered)
+        reconstruct_folder_anipose(folder_to_reconstruct, calibration_pickle_name, rat_df, parent_directories, anipose_config, expt, filtered=filtered)
         # cgroup = calibration_data['cgroup']
         #
         # calibration_folder = navigation_utilities.find_calibration_files_folder(session_date, box_num, calibration_files_parent)
@@ -141,7 +142,7 @@ def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt
         #     reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
-def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df, parent_directories, anipose_config, filtered=True,
+def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df, parent_directories, anipose_config, expt, filtered=True,
                                smooth_window=101, f0_pctile=10, expected_baseline=0.2, perievent_window=(-5, 5), num_outputs=3):
     '''
 
@@ -206,8 +207,11 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         trials_df = skilled_reaching_io.read_pickle(trials_db_name)
     else:
         rat_aggdata_fname = navigation_utilities.get_aggregated_singlerat_data_name(parent_directories, session_metadata['ratID'], 'sr')
-        rat_phys_data = skilled_reaching_io.read_pickle(rat_aggdata_fname)
-        trials_df = rat_phys_data['rat_df']
+        if os.path.exists(rat_aggdata_fname):
+            rat_phys_data = skilled_reaching_io.read_pickle(rat_aggdata_fname)
+            trials_df = rat_phys_data['rat_df']
+        else:
+             trials_df = sr_behavior_summary.create_rat_srdf(session_metadata['ratID'], parent_directories, expt)
         skilled_reaching_io.write_pickle(trials_db_name, trials_df)
 
     if session_metadata['date'] < datetime(2023, 9, 4):

@@ -366,8 +366,8 @@ if __name__ == '__main__':
 
     # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
     # experiment_list = ['dLight', 'sr6OHDA', 'GRABAch-rDA']
-    # experiment_list = ['sr6OHDA']
-    experiment_list = ['dLight']
+    experiment_list = ['sr6OHDA']
+    # experiment_list = ['dLight']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
     create_marked_vids = True

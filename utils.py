@@ -196,7 +196,10 @@ def get_initial_extrinsics(rtvecs, cam_names=None):
 def fullpickle2h5(fpickle_name, h5_out_name, num_outputs):
 
     pickle_metadata = navigation_utilities.parse_dlc_output_pickle_name(fpickle_name)
-    pickled_data = skilled_reaching_io.read_pickle(fpickle_name)
+    try:
+        pickled_data = skilled_reaching_io.read_pickle(fpickle_name)
+    except:
+        pass
 
     all_joints_names = pickled_data['metadata']['all_joints_names']
     nframes = pickled_data['metadata']['nframes']

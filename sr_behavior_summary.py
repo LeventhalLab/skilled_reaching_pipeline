@@ -2,6 +2,7 @@ import pandas as pd
 import navigation_utilities
 import skilled_reaching_io
 from datetime import datetime
+import numpy as np
 
 def create_empty_skilledreaching_dataframe():
     srdf_variables = {'trial_num': pd.Series(dtype='int'),

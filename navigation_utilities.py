@@ -2539,6 +2539,46 @@ def parse_3d_reconstruction_pickle_name(r3d_fullpath):
     return r3d_metadata
 
 
+def find_valid_session_folders(cropped_videos_parent, ratID, cam_names):
+    rat_folder = os.path.join(cropped_videos_parent, ratID)
+    session_folder_list = glob.glob(os.path.join(rat_folder, ratID + '_*'))
+
+    valid_session_folders = []
+    for session_folder in session_folder_list:
+        _, session_folder_name = os.path.split(session_folder)
+
+        # check for a direct view folder; if doesn't exist, just continue the loop
+        test_direct_folder = os.path.join(session_folder, session_folder_name + '_dir')
+        if not os.path.exists(test_direct_folder):
+            continue
+        # check to see if there are .h5 files containing labeled data
+        session_metadata = parse_croppedvid_dir_name(session_folder_name)
+
+        h5_names = []
+        for cam_name in cam_names:
+            test_h5_name = test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=False)
+            cam_folder_name = '_'.join((session_folder_name, cam_name))
+            full_test_h5_name = os.path.join(session_folder, cam_folder_name, test_h5_name)
+            h5_names.append(glob.glob(full_test_h5_name))
+
+        # test_pickle_name = '_'.join((ratID,
+        #                              'box01',
+        #                              session_name, '*',
+        #                              'full.pickle'))
+        # full_test_pickle_name = os.path.join(test_direct_folder, test_pickle_name)
+        # full_pickle_list = glob.glob(full_test_pickle_name)
+
+        if not all(h5_names):
+            # if there aren't matching .h5 files for different views, no point in trying to triangulate
+            continue
+
+        h5_metadata = parse_dlc_output_pickle_name(h5_names[0][0])
+        session_metadata['boxnum'] = h5_metadata['boxnum']
+        valid_session_folders.append(session_metadata)
+
+    return valid_session_folders
+
+
 def find_folders_to_reconstruct(cropped_videos_parent, cam_names):
     '''
     find all session folders in cropped_videos_parent that contain.pickle files with labeled coordinates

@@ -92,11 +92,13 @@ def reconstruct_folders(folders_to_reconstruct, parent_directories,  rat_df):
             reconstruct_folder(folder_to_reconstruct, cal_data, rat_df, trajectories_parent)
 
 
-def reconstruct_folders_anipose(folders_to_reconstruct, parent_directories, expt, rat_df, anipose_config, filtered=True):
+def reconstruct_folders_anipose(ratID, parent_directories, expt, rat_df, anipose_config, cam_names=['dir', 'lm', 'rm'], filtered=True):
 
     cropped_videos_parent = parent_directories['cropped_videos_parent']
     calibration_files_parent = parent_directories['calibration_files_parent']
     trajectories_parent = parent_directories['trajectories_parent']
+
+    folders_to_reconstruct = navigation_utilities.find_valid_session_folders(cropped_videos_parent, ratID, cam_names)
 
     videos_root_folder = parent_directories['videos_root_folder']
     session_metadata_xlsx_path = os.path.join(videos_root_folder, 'SR_{}_video_session_metadata.xlsx'.format(expt))
@@ -216,11 +218,15 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
 
     if session_metadata['date'] < datetime(2023, 9, 4):
         processed_phot_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories)
-        processed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
+        if os.path.exists(processed_phot_name):
+            # if no processed photometry file, just reconstruct the 3d points
+            processed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
+            session_summary, trials_df = srphot_anal.aggregate_data_pre_20230904(processed_phot_data, session_metadata,
+                                                                                 trials_df,
+                                                                                 smooth_window=smooth_window,
+                                                                                 f0_pctile=f0_pctile,
+                                                                                 expected_baseline=expected_baseline)
 
-        session_summary, trials_df = srphot_anal.aggregate_data_pre_20230904(processed_phot_data, session_metadata, trials_df,
-                                                                             smooth_window=smooth_window,
-                                                                             f0_pctile=f0_pctile, expected_baseline=expected_baseline)
     else:
         analog_bin_file = navigation_utilities.find_analog_bin_file(parent_directories, session_metadata)
         digital_bin_file = navigation_utilities.find_digital_bin_file(parent_directories, session_metadata)
@@ -231,11 +237,13 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
                       'metadata': metadata_file
                       }
 
-        session_summary, trials_df = srphot_anal.aggregate_data_post_20230904(data_files, parent_directories, session_metadata,
-                                                                             trials_df,
-                                                                             smooth_window=smooth_window,
-                                                                             f0_pctile=f0_pctile,
-                                                                             expected_baseline=expected_baseline)
+        if os.path.exists(analog_bin_file):
+            # if no processed photometry file, just reconstruct the 3d points
+            session_summary, trials_df = srphot_anal.aggregate_data_post_20230904(data_files, parent_directories, session_metadata,
+                                                                                 trials_df,
+                                                                                 smooth_window=smooth_window,
+                                                                                 f0_pctile=f0_pctile,
+                                                                                 expected_baseline=expected_baseline)
 
     # now find matching files from each view
     for h5_file in h5_list[0]:
@@ -266,7 +274,8 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
 
         # select 1/4 of trials at random to make videos
         # if random.random() < 0.1 and not already_reconstructed:
-        #     sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
+        if not already_reconstructed:
+            sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
 
 
 def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, anipose_config, rat_df, trials_df, parent_directories):

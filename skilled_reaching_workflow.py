@@ -366,8 +366,8 @@ if __name__ == '__main__':
 
     # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
     # experiment_list = ['dLight', 'sr6OHDA', 'GRABAch-rDA']
-    experiment_list = ['sr6OHDA']
-    # experiment_list = ['dLight']
+    # experiment_list = ['sr6OHDA', 'dLight']
+    experiment_list = ['dLight']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
     create_marked_vids = True
@@ -443,8 +443,8 @@ if __name__ == '__main__':
                             for expt in experiment_list}
 
     # use the code below to write a charuco board to a file
-    # ncols = 8
-    # nrows = 6
+    # ncols = 10
+    # nrows = 7
     # square_length = 16
     # marker_length = 12
     # board = skilled_reaching_calibration.create_charuco(nrows, ncols, square_length, marker_length)
@@ -522,15 +522,16 @@ if __name__ == '__main__':
 
     for expt in experiment_list:
         rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
-        folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(parent_directories[expt]['cropped_videos_parent'], cam_names)
+        # folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(parent_directories[expt]['cropped_videos_parent'], cam_names)
 
         DLC_folder_keys = DLC_folder_names.keys()
         # for DLC_key in DLC_folder_keys:
         #     train_autoencoder.train_autoencoder(anipose_config, DLC_folder_names[DLC_key])
         # ftr = [folder for folder in folders_to_reconstruct if ((folder['ratID'] == 'R0486') and (folder['date'] == datetime(2023, 9, 8)))]
-        ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453', 'R0468', 'R0469', 'R0470', 'R0471', 'R0472', 'R0473']]
+        # ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453', 'R0468', 'R0469', 'R0472', 'R0473']]
+        # ftr = [folder for folder in folders_to_reconstruct if folder['ratID'] in ['R0472']]
         # ftr = folders_to_reconstruct
-        reconstruct_3d.reconstruct_folders_anipose(ftr, parent_directories[expt], expt, rat_df, anipose_config, filtered=False)
+        reconstruct_3d.reconstruct_folders_anipose('R0472', parent_directories[expt], expt, rat_df, anipose_config, cam_names=cam_names, filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)
 

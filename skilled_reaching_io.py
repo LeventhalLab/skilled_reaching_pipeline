@@ -59,11 +59,17 @@ def read_session_metadata_xlsx(session_metadata_xlsx_path):
     sheet_names = xl.sheet_names
     # the sheet names should be 'R0XXX' - should all be in the format of rat IDs; if it's not, ignore it
     xl_ratIDs = [sn for sn in sheet_names if sn[0] == 'R' and len(sn) == 5]
+    xl_dlccrop = [sn for sn in sheet_names if sn[0] == 'R' and sn[-7:] == 'dlccrop']
 
-    cal_metadata = dict.fromkeys(xl_ratIDs)
+    cal_metadata = dict.fromkeys(xl_ratIDs + xl_dlccrop)
+    # xl_ratIDs is for sheets that contain the cropping regions for calibration
+    # xl_dlccrop is for sheets that contain cropping data for actual reaching vids to be used for dlc
 
     for ratID in xl_ratIDs:
         cal_metadata[ratID] = pd.read_excel(session_metadata_xlsx_path, sheet_name=ratID)
+
+    for dlccrop in xl_dlccrop:
+        cal_metadata[dlccrop] = pd.read_excel(session_metadata_xlsx_path, sheet_name=dlccrop)
 
     return cal_metadata
 

@@ -367,14 +367,14 @@ if __name__ == '__main__':
     # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
     # experiment_list = ['dLight', 'sr6OHDA', 'GRABAch-rDA']
     # experiment_list = ['sr6OHDA', 'dLight']
-    experiment_list = ['dLight']
+    experiment_list = ['dLight', 'sr6OHDA']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
     create_marked_vids = True
 
     label_videos = True
 
-    rats_to_analyze = [452, 453, 468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514, 519, 520, 521]
+    rats_to_analyze = [452, 453, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514, 519, 520, 521, 522]
 
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
@@ -482,16 +482,16 @@ if __name__ == '__main__':
     #                            filtertype=filtertype,
     #                            rat_nums=rats_to_analyze)
 
-    # for expt in experiment_list:
-    #     # crop_params_csv_path = os.path.join(video_root_folders[expt], 'SR_video_crop_regions.csv')
-    #     # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
-    #     crop_filtertype = 'h264'  # currently choices are 'h264' or 'mjpeg2jpeg'. Python based vid conversion (vs labview) should use h264
-    #
-    #     session_metadata_xlsx_path = os.path.join(video_root_folders[expt],
-    #                                               'SR_{}_video_session_metadata.xlsx'.format(expt))
-    #     calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
-    #     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folders[expt], rats_to_analyze=rats_to_analyze)
-    #     cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parents[expt], calibration_metadata_df, cam_names, vidtype='avi', filtertype=crop_filtertype)
+    for expt in experiment_list:
+        # crop_params_csv_path = os.path.join(video_root_folders[expt], 'SR_video_crop_regions.csv')
+        # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
+        crop_filtertype = 'h264'  # currently choices are 'h264' or 'mjpeg2jpeg'. Python based vid conversion (vs labview) should use h264
+
+        session_metadata_xlsx_path = os.path.join(video_root_folders[expt],
+                                                  'SR_{}_video_session_metadata.xlsx'.format(expt))
+        calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+        video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folders[expt], rats_to_analyze=rats_to_analyze)
+        cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parents[expt], calibration_metadata_df, cam_names, vidtype='avi', filtertype=crop_filtertype)
 
 
     # step 2: run the vids through DLC

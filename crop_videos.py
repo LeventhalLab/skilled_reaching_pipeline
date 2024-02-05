@@ -87,7 +87,7 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
         vid_metadata = navigation_utilities.parse_video_name(test_vid)
         if isinstance(crop_params, dict):
             if vid_metadata['ratID'] in list(crop_params.keys()):
-                cp = crop_params[vid_metadata['ratID']]
+                cp = crop_params[vid_metadata['ratID'] + '_dlccrop']
             else:
                 cp = crop_params
         # if crop_params is a DataFrame object, create a crop_params dictionary based on the current folder

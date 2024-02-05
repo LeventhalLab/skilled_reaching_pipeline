@@ -312,7 +312,11 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
 
     h5_el_group = [h5_name.strip('.h5') + '_el.h5' for h5_name in h5_group]
 
-    cgroup = calibration_data[cgroup_name]
+    # cgroup = calibration_data[cgroup_name]
+    try:
+        cgroup = calibration_data['original_cgroup']
+    except:
+        cgroup = calibration_data['cgroup']
     cam_names = cgroup.get_names()
     fname_dict = dict.fromkeys(cam_names)
     for i_cam, cam_name in enumerate(cam_names):

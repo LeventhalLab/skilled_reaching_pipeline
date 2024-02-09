@@ -317,7 +317,8 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
 
 
 def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, session_summary, trials_df, paw_pref,
-                        bpts2plot='reachingpaw', phot_ylim=[-2.5, 5], cw = [[850, 1250, 450, 900], [175, 600, 475, 825], [1460, 1875, 500, 850]]):
+                        bpts2plot='all', phot_ylim=[-2.5, 5], cw = [[850, 1250, 450, 900], [175, 600, 475, 825], [1460, 1875, 500, 850]],
+                        lim_3d=[[-30, 30], [0, 80], [280, 340]]):
 
     vid_params = {'lm': 0.05,
                   'rm': 0.,
@@ -374,7 +375,8 @@ def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, 
         return
 
     Fs = session_summary['sr_processed_phot']['Fs']
-    vid_phot_signal = srphot_anal.resample_photometry_to_video(session_summary['sr_zscores1'], vidtrigger_ts, Fs, trigger_frame=300, num_frames=n_frames, fps=fps)
+    # vid_phot_signal = srphot_anal.resample_photometry_to_video(session_summary['sr_zscores1'], vidtrigger_ts, Fs, trigger_frame=300, num_frames=n_frames, fps=fps)
+    vid_phot_signal = None
     t = np.linspace(1/fps, n_frames/fps, n_frames)
 
     session_folder, _ = os.path.split(traj3d_fname)
@@ -387,16 +389,16 @@ def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, 
     # change "optim_points3d" to "points3d" to switch to reprojection from simple triangulation
     pts3d_reproj_key = 'optim_points3d'
 
-    for i_frame in range(n_frames):
+    for i_frame in range(290, n_frames):
 
         frame_fig = plt.figure(figsize=(20, 10))
-        gs = frame_fig.add_gridspec(4, 2, width_ratios=(1, 1, 1), height_ratios=(1, 4), wspace=0.05, hspace=0.02,
+        gs = frame_fig.add_gridspec(ncols=4, nrows=2, width_ratios=(1, 1, 1, 1), height_ratios=(1, 4), wspace=0.05, hspace=0.02,
                                     left=vid_params['lm'], right=vid_params['rm'], top=vid_params['tm'], bottom=vid_params['bm'])
 
-        vid_ax = frame_fig.add_subplot(gs[1:, 0])
-        lm_ax = frame_fig.add_subplot(gs[:, 0])
-        dir_ax = frame_fig.add_subplot(gs[:, 1])
-        rm_ax = frame_fig.add_subplot(gs[:, 2])
+        # vid_ax = frame_fig.add_subplot(gs[1:, 0])
+        view_ax = [frame_fig.add_subplot(gs[:, 1])]             # direct view
+        view_ax.append(frame_fig.add_subplot(gs[:, 0]))         # left view
+        view_ax.append(frame_fig.add_subplot(gs[:, 2]))         # right view
 
         ax3d = frame_fig.add_subplot(gs[1, 3], projection='3d')
 
@@ -404,9 +406,14 @@ def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, 
         phot_trace_ax = frame_fig.add_subplot(gs[0, 3])
 
         phot_trace_ax.set_ylim(phot_ylim)
-        phot_trace_ax.set_ylabel('DF/F z-score')
+        # phot_trace_ax.set_ylabel('DF/F z-score')
         phot_trace_ax.set_xlim([0, max(t)])
         phot_trace_ax.set_xticks([0, 300/fps, max(t)])
+        phot_trace_ax.set_yticks([])
+
+        # plot a vertical line with DF/F = 1
+        phot_trace_ax.plot([0.1, 0.1], [2, 4])
+        phot_trace_ax.axis('off')
         if not vid_phot_signal is None:
             # only plot if a photometry signal was recorded during this trial
             phot_trace_ax.plot(t[:i_frame+1], vid_phot_signal[:i_frame+1], color='g')
@@ -427,17 +434,19 @@ def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, 
 
         for bpt2plot in bpts2plot:
             cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
-            legend_ax.text(0, cur_bpt_idx/num_bptstotal, bpt2plot, color=cmap(cur_bpt_idx / num_bptstotal), transform=legend_ax.transAxes)
-        legend_ax.set_xticks([])
-        legend_ax.set_yticks([])
+        #     legend_ax.text(0, cur_bpt_idx/num_bptstotal, bpt2plot, color=cmap(cur_bpt_idx / num_bptstotal), transform=legend_ax.transAxes)
+        # legend_ax.set_xticks([])
+        # legend_ax.set_yticks([])
 
-        lm_cw = cw[1]
-        lm_ax.imshow(img_ud[lm_cw[0] : lm_cw[1], lm_cw[2] : lm_cw[3], :])
-        dir_cw = cw[0]
-        dir_ax.imshow(img_ud[dir_cw[0]: dir_cw[1], dir_cw[2]: dir_cw[3], :])
-        rm_cw = cw[2]
-        rm_ax.imshow(img_ud[rm_cw[0] : rm_cw[1], rm_cw[2] : rm_cw[3], :])
         for i_view in range(3):
+            view_ax[i_view].imshow(img_ud[cw[i_view][2] : cw[i_view][3], cw[i_view][0] : cw[i_view][1], :])
+        # lm_cw = cw[1]
+        # view_ax[1].imshow(img_ud[lm_cw[2] : lm_cw[3], lm_cw[0] : lm_cw[1], :])
+        # dir_cw = cw[0]
+        # dir_ax.imshow(img_ud[dir_cw[2]: dir_cw[3], dir_cw[0] : dir_cw[1], :])
+        # rm_cw = cw[2]
+        # rm_ax.imshow(img_ud[rm_cw[2] : rm_cw[3], rm_cw[0] : rm_cw[1], :])
+        # for i_view in range(3):
             for i_bpt, bpt2plot in enumerate(bpts2plot):
                 cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
 
@@ -446,56 +455,57 @@ def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, 
                 p3d = r3d_data[pts3d_reproj_key][i_frame, cur_bpt_idx, :]
                 reproj = np.squeeze(r3d_data['calibration_data']['cgroup'].cameras[i_view].project(p3d).reshape([1, 2]))
                 if scores[i_view, i_frame, i_bpt] > min_valid_score:
-                    vid_ax.scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0],
-                                   dlc_coords[i_view, i_frame, cur_bpt_idx, 1], s=markersize, color=col)
-                    vid_ax.scatter(reproj[0], reproj[1], s=markersize, color=col, marker='+')
+                    view_ax[i_view].scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0] - cw[i_view][0],
+                                   dlc_coords[i_view, i_frame, cur_bpt_idx, 1] - cw[i_view][2], s=markersize, color=col)
+                    # vid_ax.scatter(reproj[0], reproj[1], s=markersize, color=col, marker='+')
 
                 else:
-                    vid_ax.scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0],
-                                   dlc_coords[i_view, i_frame, cur_bpt_idx, 1], s=markersize, color=col, marker='*')
+                    pass
+                    # vid_ax.scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0],
+                    #                dlc_coords[i_view, i_frame, cur_bpt_idx, 1], s=markersize, color=col, marker='*')
 
         for bpt2plot in bpts2plot:
             cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
-            ax3d.scatter(r3d_data['points3d'][i_frame, cur_bpt_idx, 0],
-                         r3d_data['points3d'][i_frame, cur_bpt_idx, 2],
-                         r3d_data['points3d'][i_frame, cur_bpt_idx, 1],
-                         s=markersize,
-                         color=cmap(cur_bpt_idx / num_bptstotal))
+            # ax3d.scatter(r3d_data['points3d'][i_frame, cur_bpt_idx, 0],
+            #              r3d_data['points3d'][i_frame, cur_bpt_idx, 2],
+            #              r3d_data['points3d'][i_frame, cur_bpt_idx, 1],
+            #              s=markersize,
+            #              color=cmap(cur_bpt_idx / num_bptstotal))
 
             ax3d.scatter(r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 0],
                          r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 2],
                          r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 1],
                          s=markersize,
                          color=cmap(cur_bpt_idx / num_bptstotal))
-        ax3d.set_title('simple triangulation')
-        ax3d.set_title('optimized triangulation')
+
+        # ax3d.set_title('optimized triangulation')
 
         connect_3d_bpts(r3d_data['points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2plot, bpts2connect, ax3d)
         connect_3d_bpts(r3d_data['optim_points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2plot, bpts2connect, ax3d)
 
-        ax3d.set_xlim((-50, 25))
-        ax3d.set_ylim((200, 350))  # this is actually z
-        ax3d.set_zlim((20, 120))  # this is actually y
+        ax3d.set_xlim((lim_3d[0][0], lim_3d[0][1]))
+        ax3d.set_ylim((lim_3d[2][0], lim_3d[2][1]))  # this is actually z
+        ax3d.set_zlim((lim_3d[1][0], lim_3d[1][1]))  # this is actually y
 
         ax3d.set_xlabel('x')
         ax3d.set_ylabel('z')
         ax3d.set_zlabel('y')
         ax3d.invert_zaxis()
 
-        ax3d.set_xlim((-40, 25))
-        ax3d.set_ylim((225, 350))  # this is actually z
-        ax3d.set_zlim((20, 100))  # this is actually y
+        # ax3d.set_xlim((-40, 25))
+        # ax3d.set_ylim((225, 350))  # this is actually z
+        # ax3d.set_zlim((20, 100))  # this is actually y
 
-        ax3d.set_xlabel('x')
-        ax3d.set_ylabel('z')
-        ax3d.set_zlabel('y')
-        ax3d.invert_zaxis()
+        # ax3d.set_xlabel('x')
+        # ax3d.set_ylabel('z')
+        # ax3d.set_zlabel('y')
+        # ax3d.invert_zaxis()
 
-        vid_ax.set_xlim((0, w - 1))
-        vid_ax.set_ylim((0, h - 1))
-        vid_ax.invert_yaxis()
-        vid_ax.set_xticks([])
-        vid_ax.set_yticks([])
+        # vid_ax.set_xlim((0, w - 1))
+        # vid_ax.set_ylim((0, h - 1))
+        # vid_ax.invert_yaxis()
+        # vid_ax.set_xticks([])
+        # vid_ax.set_yticks([])
 
         jpg_name = os.path.join(jpg_folder, 'frame{:04d}.jpg'.format(i_frame))
         plt.savefig(jpg_name, format='jpeg')

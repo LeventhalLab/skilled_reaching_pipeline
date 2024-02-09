@@ -486,10 +486,13 @@ if __name__ == '__main__':
 
     df_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
     paw_pref = df_row['pawpref'].values[0]
+    cw = [[850, 1250, 450, 900], [175, 600, 475, 825], [1460, 1875, 500, 850]]
+    lim_3d = [[-30, 30], [0, 80], [280, 340]]
     sr_visualization.create_presentation_vid(traj3d_fname, session_metadata, parent_directories['dLight'], session_summary, trials_df,
                                 paw_pref,
                                 bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],
-                                cw=[[850, 1250, 450, 900], [175, 600, 475, 825], [1460, 1875, 500, 850]])
+                                cw=cw,
+                                lim_3d=lim_3d)
 
     for expt in experiment_list:
 

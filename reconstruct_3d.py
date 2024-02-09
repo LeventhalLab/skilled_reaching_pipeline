@@ -274,7 +274,8 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
 
         # select 1/4 of trials at random to make videos
         # if random.random() < 0.1 and not already_reconstructed:
-        if not already_reconstructed:
+        # if not already_reconstructed:
+        if random.random() < 0.1:
             sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
 
 

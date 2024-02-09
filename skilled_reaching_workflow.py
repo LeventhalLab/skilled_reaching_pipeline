@@ -16,6 +16,8 @@ from boards import CharucoBoard, Checkerboard
 from cameras import Camera, CameraGroup
 import train_autoencoder
 import analyze_3d_recons
+import sr_photometry_analysis as srphot_anal
+import sr_visualization
 
 
 def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_dirs, rat_df, cropped_vid_type='.avi', gputouse=0, save_as_csv=True, create_marked_vids=True):
@@ -461,6 +463,34 @@ if __name__ == '__main__':
     test_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0452\R0452_20230329_sr_ses01'
     # analyze_3d_recons.analyze_trajectories(test_folder, anipose_config)
 
+    traj_path = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0471\R0471_20230512_sr_ses01'
+    analysis_path = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\analysis\sr'
+    traj3d_fname = os.path.join(traj_path, 'R0471_b01_20230512_14-03-13_024_r3d.pickle')
+    session_metadata = navigation_utilities.metadata_from_traj_name(traj3d_fname)
+    # agg_pickle = os.path.join(analysis_path, session_metadata['ratID'] + '_sr_aggregated.pickle')
+    trials_df_name = os.path.join(analysis_path, session_metadata['ratID'] + '_sr_trialsdb.pickle')
+    trials_df = skilled_reaching_io.read_pickle(trials_df_name)
+    session_metadata['task'] = 'sr'
+    session_metadata['session_num'] =1
+    processed_phot_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories['dLight'])
+    if os.path.exists(processed_phot_name):
+        # if no processed photometry file, just reconstruct the 3d points
+        processed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
+        session_summary, trials_df = srphot_anal.aggregate_data_pre_20230904(processed_phot_data, session_metadata,
+                                                                             trials_df,
+                                                                             smooth_window=101,
+                                                                             f0_pctile=10,
+                                                                             expected_baseline=0.2)
+
+    rat_df = skilled_reaching_io.read_rat_db(parent_directories['dLight'], rat_db_fnames['dLight'])
+
+    df_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
+    paw_pref = df_row['pawpref'].values[0]
+    sr_visualization.create_presentation_vid(traj3d_fname, session_metadata, parent_directories['dLight'], session_summary, trials_df,
+                                paw_pref,
+                                bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],
+                                cw=[[850, 1250, 450, 900], [175, 600, 475, 825], [1460, 1875, 500, 850]])
+
     for expt in experiment_list:
 
         # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
@@ -531,7 +561,8 @@ if __name__ == '__main__':
         # ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453', 'R0468', 'R0469', 'R0472', 'R0473']]
         # ftr = [folder for folder in folders_to_reconstruct if folder['ratID'] in ['R0472']]
         # ftr = folders_to_reconstruct
-        reconstruct_3d.reconstruct_folders_anipose('R0472', parent_directories[expt], expt, rat_df, anipose_config, cam_names=cam_names, filtered=False)
+        for ratID in ['R0471', 'R0472', 'R0473', 'R0486']:
+            reconstruct_3d.reconstruct_folders_anipose(ratID, parent_directories[expt], expt, rat_df, anipose_config, cam_names=cam_names, filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)
 

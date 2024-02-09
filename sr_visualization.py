@@ -14,6 +14,7 @@ import skilled_reaching_io
 import integrate_phys_kinematics as ipk
 
 
+
 def plot_anipose_results(traj3d_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df, test_frame=297, pawparts2plot=['pawdorsum', 'palm', 'dig1', 'dig2','dig3','dig4']):
     prop_cycle = plt.rcParams['axes.prop_cycle']
     color_cycle = prop_cycle.by_key()['color']
@@ -313,6 +314,203 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
     subprocess.call(command, shell=True)
 
     # shutil.rmtree(jpg_folder)
+
+
+def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, session_summary, trials_df, paw_pref,
+                        bpts2plot='reachingpaw', phot_ylim=[-2.5, 5], cw = [[850, 1250, 450, 900], [175, 600, 475, 825], [1460, 1875, 500, 850]]):
+
+    vid_params = {'lm': 0.05,
+                  'rm': 0.,
+                  'tm': 0.,
+                  'bm': 0.05}
+    vid_params['rm'] = 1 - vid_params['lm']
+    vid_params['tm'] = 1 - vid_params['bm']
+
+    fps = 300    # need to record this somewhere in the data - maybe in the .log file?
+
+    traj_metadata = navigation_utilities.parse_trajectory_name(traj3d_fname)
+    traj_metadata['session_num'] = session_metadata['session_num']
+    traj_metadata['task'] = session_metadata['task']
+
+    animation_name = navigation_utilities.create_cropped_3dvid_name(traj_metadata, session_metadata, parent_directories)
+    if os.path.exists(animation_name):
+        return
+
+    print('creating video for {}'.format(animation_name))
+    markersize = 5
+    cmap = cm.get_cmap('rainbow')
+
+    bpts2connect = rat_sr_bodyparts2connect()
+
+    r3d_data = skilled_reaching_io.read_pickle(traj3d_fname)
+
+    if bpts2plot == 'all':
+        bpts2plot = r3d_data['dlc_output']['bodyparts']
+    elif bpts2plot == 'reachingpaw':
+        bodyparts = r3d_data['dlc_output']['bodyparts']
+        bpts2plot = ['leftear', 'rightear', 'lefteye', 'righteye', 'nose', 'pellet']
+        mcp_names = ['mcp{:d}'.format(i_dig + 1) for i_dig in range(4)]
+        pip_names = ['pip{:d}'.format(i_dig + 1) for i_dig in range(4)]
+        dig_names = ['dig{:d}'.format(i_dig + 1) for i_dig in range(4)]
+
+        all_reaching_parts = ['elbow'] + ['pawdorsum'] + mcp_names + pip_names + dig_names
+        bpts2plot = bpts2plot + [paw_pref + part_name for part_name in all_reaching_parts]
+
+    num_bpts2plot = len(bpts2plot)
+    num_bptstotal = len(r3d_data['dlc_output']['bodyparts'])
+
+    orig_vid = navigation_utilities.find_orig_rat_video(traj_metadata, parent_directories['videos_root_folder'])
+
+    dlc_coords = r3d_data['dlc_output']['points']
+    n_frames = np.shape(r3d_data['points3d'])[0]
+    cam_intrinsics = r3d_data['calibration_data']['cam_intrinsics']
+    scores = r3d_data['dlc_output']['scores']
+    min_valid_score = r3d_data['anipose_config']['triangulation']['score_threshold']
+    cap = cv2.VideoCapture(orig_vid)
+
+    vidtrigger_ts, vidtrigger_interval = ipk.get_vidtrigger_ts(traj_metadata, trials_df)
+    if vidtrigger_ts is None:
+        # most likely, trial occurred after photometry recording ended
+        return
+
+    Fs = session_summary['sr_processed_phot']['Fs']
+    vid_phot_signal = srphot_anal.resample_photometry_to_video(session_summary['sr_zscores1'], vidtrigger_ts, Fs, trigger_frame=300, num_frames=n_frames, fps=fps)
+    t = np.linspace(1/fps, n_frames/fps, n_frames)
+
+    session_folder, _ = os.path.split(traj3d_fname)
+    jpg_folder = os.path.join(session_folder, 'temp')
+    if not os.path.exists(jpg_folder):
+        # os.chmod(jpg_folder, stat.S_IWRITE)
+        # shutil.rmtree(jpg_folder)
+        os.makedirs(jpg_folder)
+
+    # change "optim_points3d" to "points3d" to switch to reprojection from simple triangulation
+    pts3d_reproj_key = 'optim_points3d'
+
+    for i_frame in range(n_frames):
+
+        frame_fig = plt.figure(figsize=(20, 10))
+        gs = frame_fig.add_gridspec(4, 2, width_ratios=(1, 1, 1), height_ratios=(1, 4), wspace=0.05, hspace=0.02,
+                                    left=vid_params['lm'], right=vid_params['rm'], top=vid_params['tm'], bottom=vid_params['bm'])
+
+        vid_ax = frame_fig.add_subplot(gs[1:, 0])
+        lm_ax = frame_fig.add_subplot(gs[:, 0])
+        dir_ax = frame_fig.add_subplot(gs[:, 1])
+        rm_ax = frame_fig.add_subplot(gs[:, 2])
+
+        ax3d = frame_fig.add_subplot(gs[1, 3], projection='3d')
+
+        # legend_ax = frame_fig.add_subplot(gs[:, 2])
+        phot_trace_ax = frame_fig.add_subplot(gs[0, 3])
+
+        phot_trace_ax.set_ylim(phot_ylim)
+        phot_trace_ax.set_ylabel('DF/F z-score')
+        phot_trace_ax.set_xlim([0, max(t)])
+        phot_trace_ax.set_xticks([0, 300/fps, max(t)])
+        if not vid_phot_signal is None:
+            # only plot if a photometry signal was recorded during this trial
+            phot_trace_ax.plot(t[:i_frame+1], vid_phot_signal[:i_frame+1], color='g')
+
+        cap.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
+        ret, img = cap.read()
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGBA)
+
+        img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+        h, w, _ = np.shape(img_ud)
+
+        if pts3d_reproj_key == 'optim_points3d':
+            reproj_text = 'reprojected optimal 3d points'
+        else:
+            reproj_text = 'reprojected simple triangulation 3d points'
+        frame_text = session_metadata['ratID'] + ', ' + 'frame {:04d}'.format(i_frame) + ', ' + reproj_text
+        img_ud = cv2.putText(img_ud, frame_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, color=0, thickness=3)
+
+        for bpt2plot in bpts2plot:
+            cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
+            legend_ax.text(0, cur_bpt_idx/num_bptstotal, bpt2plot, color=cmap(cur_bpt_idx / num_bptstotal), transform=legend_ax.transAxes)
+        legend_ax.set_xticks([])
+        legend_ax.set_yticks([])
+
+        lm_cw = cw[1]
+        lm_ax.imshow(img_ud[lm_cw[0] : lm_cw[1], lm_cw[2] : lm_cw[3], :])
+        dir_cw = cw[0]
+        dir_ax.imshow(img_ud[dir_cw[0]: dir_cw[1], dir_cw[2]: dir_cw[3], :])
+        rm_cw = cw[2]
+        rm_ax.imshow(img_ud[rm_cw[0] : rm_cw[1], rm_cw[2] : rm_cw[3], :])
+        for i_view in range(3):
+            for i_bpt, bpt2plot in enumerate(bpts2plot):
+                cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
+
+                col = cmap(cur_bpt_idx / num_bptstotal)
+
+                p3d = r3d_data[pts3d_reproj_key][i_frame, cur_bpt_idx, :]
+                reproj = np.squeeze(r3d_data['calibration_data']['cgroup'].cameras[i_view].project(p3d).reshape([1, 2]))
+                if scores[i_view, i_frame, i_bpt] > min_valid_score:
+                    vid_ax.scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0],
+                                   dlc_coords[i_view, i_frame, cur_bpt_idx, 1], s=markersize, color=col)
+                    vid_ax.scatter(reproj[0], reproj[1], s=markersize, color=col, marker='+')
+
+                else:
+                    vid_ax.scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0],
+                                   dlc_coords[i_view, i_frame, cur_bpt_idx, 1], s=markersize, color=col, marker='*')
+
+        for bpt2plot in bpts2plot:
+            cur_bpt_idx = r3d_data['dlc_output']['bodyparts'].index(bpt2plot)
+            ax3d.scatter(r3d_data['points3d'][i_frame, cur_bpt_idx, 0],
+                         r3d_data['points3d'][i_frame, cur_bpt_idx, 2],
+                         r3d_data['points3d'][i_frame, cur_bpt_idx, 1],
+                         s=markersize,
+                         color=cmap(cur_bpt_idx / num_bptstotal))
+
+            ax3d.scatter(r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 0],
+                         r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 2],
+                         r3d_data['optim_points3d'][i_frame, cur_bpt_idx, 1],
+                         s=markersize,
+                         color=cmap(cur_bpt_idx / num_bptstotal))
+        ax3d.set_title('simple triangulation')
+        ax3d.set_title('optimized triangulation')
+
+        connect_3d_bpts(r3d_data['points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2plot, bpts2connect, ax3d)
+        connect_3d_bpts(r3d_data['optim_points3d'][i_frame, :, :], r3d_data['dlc_output']['bodyparts'], bpts2plot, bpts2connect, ax3d)
+
+        ax3d.set_xlim((-50, 25))
+        ax3d.set_ylim((200, 350))  # this is actually z
+        ax3d.set_zlim((20, 120))  # this is actually y
+
+        ax3d.set_xlabel('x')
+        ax3d.set_ylabel('z')
+        ax3d.set_zlabel('y')
+        ax3d.invert_zaxis()
+
+        ax3d.set_xlim((-40, 25))
+        ax3d.set_ylim((225, 350))  # this is actually z
+        ax3d.set_zlim((20, 100))  # this is actually y
+
+        ax3d.set_xlabel('x')
+        ax3d.set_ylabel('z')
+        ax3d.set_zlabel('y')
+        ax3d.invert_zaxis()
+
+        vid_ax.set_xlim((0, w - 1))
+        vid_ax.set_ylim((0, h - 1))
+        vid_ax.invert_yaxis()
+        vid_ax.set_xticks([])
+        vid_ax.set_yticks([])
+
+        jpg_name = os.path.join(jpg_folder, 'frame{:04d}.jpg'.format(i_frame))
+        plt.savefig(jpg_name, format='jpeg')
+        plt.close('all')
+
+    cap.release()
+
+
+    # turn the cropped jpegs into a new movie
+    jpg_names = os.path.join(jpg_folder, 'frame%04d.jpg')
+    command = (
+        f"ffmpeg -i {jpg_names} "
+        f"-c:v copy {animation_name}"
+    )
+    subprocess.call(command, shell=True)
 
 
 def connect_3d_bpts(points3d, bodyparts, bpts2plot, bpts2connect, ax):

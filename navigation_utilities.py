@@ -492,6 +492,26 @@ def get_aggregated_singlerat_data_name(parent_directories, ratID, task):
     return full_name
 
 
+def metadata_from_traj_name(traj3d_fname):
+
+    _, fname = os.path.split(traj3d_fname)
+    fname, _ = os.path.splitext(fname)
+
+    fname_parts = fname.split('_')
+    box_num = int(fname_parts[1][1:])
+    session_date = datetime_from_fname_string(fname_parts[2])
+
+    traj_metadata = {'ratID': fname_parts[0],
+                     'box_num': box_num,
+                     'date': session_date,
+                     'session_num': 0,
+                     'vid_num': int(fname_parts[4])
+    }
+
+    return traj_metadata
+
+
+
 def create_3dvid_name(traj_metadata, session_metadata, parent_directories):
 
     traj_summary_folder = get_3dsummaries_folder(session_metadata, parent_directories)
@@ -503,6 +523,22 @@ def create_3dvid_name(traj_metadata, session_metadata, parent_directories):
                          'b{:02d}'.format(traj_metadata['boxnum']),
                          datetime_to_string_for_fname(traj_metadata['triggertime']),
                          '{:03d}.avi'.format(traj_metadata['video_number'])
+                         ))
+
+    return os.path.join(traj_summary_folder, vid_name)
+
+
+def create_cropped_3dvid_name(traj_metadata, session_metadata, parent_directories):
+
+    traj_summary_folder = get_3dsummaries_folder(session_metadata, parent_directories)
+
+    if not os.path.exists(traj_summary_folder):
+        os.makedirs(traj_summary_folder)
+
+    vid_name = '_'.join((traj_metadata['ratID'],
+                         'b{:02d}'.format(traj_metadata['boxnum']),
+                         datetime_to_string_for_fname(traj_metadata['triggertime']),
+                         '{:03d}_cropped.avi'.format(traj_metadata['video_number'])
                          ))
 
     return os.path.join(traj_summary_folder, vid_name)

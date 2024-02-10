@@ -317,13 +317,13 @@ def create_anipose_vids(traj3d_fname, session_metadata, parent_directories, sess
 
 
 def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, session_summary, trials_df, paw_pref,
-                        bpts2plot='all', phot_ylim=[-2.5, 5], cw = [[850, 1250, 450, 900], [175, 600, 475, 825], [1460, 1875, 500, 850]],
+                        bpts2plot='all', phot_ylim=[-2.5, 5], cw=[[850, 1250, 450, 900], [175, 600, 475, 825], [1460, 1875, 500, 850]],
                         lim_3d=[[-30, 30], [0, 80], [280, 340]]):
 
-    vid_params = {'lm': 0.05,
+    vid_params = {'lm': 0.0,
                   'rm': 0.,
                   'tm': 0.,
-                  'bm': 0.05}
+                  'bm': 0.0}
     vid_params['rm'] = 1 - vid_params['lm']
     vid_params['tm'] = 1 - vid_params['bm']
 
@@ -334,8 +334,8 @@ def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, 
     traj_metadata['task'] = session_metadata['task']
 
     animation_name = navigation_utilities.create_cropped_3dvid_name(traj_metadata, session_metadata, parent_directories)
-    if os.path.exists(animation_name):
-        return
+    # if os.path.exists(animation_name):
+    #     return
 
     print('creating video for {}'.format(animation_name))
     markersize = 5
@@ -375,8 +375,8 @@ def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, 
         return
 
     Fs = session_summary['sr_processed_phot']['Fs']
-    # vid_phot_signal = srphot_anal.resample_photometry_to_video(session_summary['sr_zscores1'], vidtrigger_ts, Fs, trigger_frame=300, num_frames=n_frames, fps=fps)
-    vid_phot_signal = None
+    vid_phot_signal = srphot_anal.resample_photometry_to_video(session_summary['sr_zscores1'], vidtrigger_ts, Fs, trigger_frame=300, num_frames=n_frames, fps=fps)
+    # vid_phot_signal = None
     t = np.linspace(1/fps, n_frames/fps, n_frames)
 
     session_folder, _ = os.path.split(traj3d_fname)
@@ -389,21 +389,21 @@ def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, 
     # change "optim_points3d" to "points3d" to switch to reprojection from simple triangulation
     pts3d_reproj_key = 'optim_points3d'
 
-    for i_frame in range(290, n_frames):
+    for i_frame in range(n_frames):
 
-        frame_fig = plt.figure(figsize=(20, 10))
-        gs = frame_fig.add_gridspec(ncols=4, nrows=2, width_ratios=(1, 1, 1, 1), height_ratios=(1, 4), wspace=0.05, hspace=0.02,
+        frame_fig = plt.figure(figsize=(8, 6))
+        gs = frame_fig.add_gridspec(ncols=3, nrows=4, width_ratios=(1, 1, 1), height_ratios=(1, 1, 1, 3), wspace=0.0, hspace=0.02,
                                     left=vid_params['lm'], right=vid_params['rm'], top=vid_params['tm'], bottom=vid_params['bm'])
 
         # vid_ax = frame_fig.add_subplot(gs[1:, 0])
-        view_ax = [frame_fig.add_subplot(gs[:, 1])]             # direct view
-        view_ax.append(frame_fig.add_subplot(gs[:, 0]))         # left view
-        view_ax.append(frame_fig.add_subplot(gs[:, 2]))         # right view
+        view_ax = [frame_fig.add_subplot(gs[3, 1])]             # direct view
+        view_ax.append(frame_fig.add_subplot(gs[3, 0]))         # left view
+        view_ax.append(frame_fig.add_subplot(gs[3, 2]))         # right view
 
-        ax3d = frame_fig.add_subplot(gs[1, 3], projection='3d')
+        ax3d = frame_fig.add_subplot(gs[:2, 1], projection='3d')
 
         # legend_ax = frame_fig.add_subplot(gs[:, 2])
-        phot_trace_ax = frame_fig.add_subplot(gs[0, 3])
+        phot_trace_ax = frame_fig.add_subplot(gs[1, 0])
 
         phot_trace_ax.set_ylim(phot_ylim)
         # phot_trace_ax.set_ylabel('DF/F z-score')
@@ -439,6 +439,8 @@ def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, 
         # legend_ax.set_yticks([])
 
         for i_view in range(3):
+            view_ax[i_view].set_xticks([])
+            view_ax[i_view].set_yticks([])
             view_ax[i_view].imshow(img_ud[cw[i_view][2] : cw[i_view][3], cw[i_view][0] : cw[i_view][1], :])
         # lm_cw = cw[1]
         # view_ax[1].imshow(img_ud[lm_cw[2] : lm_cw[3], lm_cw[0] : lm_cw[1], :])
@@ -455,8 +457,16 @@ def create_presentation_vid(traj3d_fname, session_metadata, parent_directories, 
                 p3d = r3d_data[pts3d_reproj_key][i_frame, cur_bpt_idx, :]
                 reproj = np.squeeze(r3d_data['calibration_data']['cgroup'].cameras[i_view].project(p3d).reshape([1, 2]))
                 if scores[i_view, i_frame, i_bpt] > min_valid_score:
-                    view_ax[i_view].scatter(dlc_coords[i_view, i_frame, cur_bpt_idx, 0] - cw[i_view][0],
-                                   dlc_coords[i_view, i_frame, cur_bpt_idx, 1] - cw[i_view][2], s=markersize, color=col)
+                    # make sure points are within the crop window
+                    x_shifted = dlc_coords[i_view, i_frame, cur_bpt_idx, 0] - cw[i_view][0]
+                    y_shifted = dlc_coords[i_view, i_frame, cur_bpt_idx, 1] - cw[i_view][2]
+                    valid_pt = True
+                    if x_shifted < 0 or x_shifted > (cw[i_view][1] - cw[i_view][0]):
+                        valid_pt = False
+                    if y_shifted < 0 or y_shifted > (cw[i_view][3] - cw[i_view][2]):
+                        valid_pt = False
+                    if valid_pt:
+                        view_ax[i_view].scatter(x_shifted, y_shifted, s=markersize, color=col)
                     # vid_ax.scatter(reproj[0], reproj[1], s=markersize, color=col, marker='+')
 
                 else:

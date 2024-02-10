@@ -463,10 +463,15 @@ if __name__ == '__main__':
     test_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0452\R0452_20230329_sr_ses01'
     # analyze_3d_recons.analyze_trajectories(test_folder, anipose_config)
 
-    traj_path = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0471\R0471_20230512_sr_ses01'
+    traj_path = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files'
     analysis_path = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\analysis\sr'
-    traj3d_fname = os.path.join(traj_path, 'R0471_b01_20230512_14-03-13_024_r3d.pickle')
+    traj3d_fname = 'R0487_b01_20230918_12-33-32_005_r3d.pickle'
     session_metadata = navigation_utilities.metadata_from_traj_name(traj3d_fname)
+    datestring = navigation_utilities.datetime_to_string_for_fname(session_metadata['date'])[:8]
+    ses_name = '_'.join((session_metadata['ratID'], datestring, 'sr', 'ses01'))
+    full_trajpath = os.path.join(traj_path, session_metadata['ratID'], ses_name)
+    traj3d_fname = os.path.join(full_trajpath, traj3d_fname)
+
     # agg_pickle = os.path.join(analysis_path, session_metadata['ratID'] + '_sr_aggregated.pickle')
     trials_df_name = os.path.join(analysis_path, session_metadata['ratID'] + '_sr_trialsdb.pickle')
     trials_df = skilled_reaching_io.read_pickle(trials_df_name)
@@ -481,18 +486,41 @@ if __name__ == '__main__':
                                                                              smooth_window=101,
                                                                              f0_pctile=10,
                                                                              expected_baseline=0.2)
+    else:
+        analog_bin_file = navigation_utilities.find_analog_bin_file(parent_directories['dLight'], session_metadata)
+        digital_bin_file = navigation_utilities.find_digital_bin_file(parent_directories['dLight'], session_metadata)
+        metadata_file = navigation_utilities.find_metadata_file(parent_directories['dLight'], session_metadata)
+
+        data_files = {'analog_bin': analog_bin_file,
+                      'digital_bin': digital_bin_file,
+                      'metadata': metadata_file
+                      }
+        session_summary, trials_df = srphot_anal.aggregate_data_post_20230904(data_files, parent_directories['dLight'],
+                                                                              session_metadata,
+                                                                              trials_df,
+                                                                              smooth_window=101,
+                                                                              f0_pctile=10,
+                                                                              expected_baseline=0.2)
+
 
     rat_df = skilled_reaching_io.read_rat_db(parent_directories['dLight'], rat_db_fnames['dLight'])
 
     df_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
     paw_pref = df_row['pawpref'].values[0]
-    cw = [[850, 1250, 450, 900], [175, 600, 475, 825], [1460, 1875, 500, 850]]
-    lim_3d = [[-30, 30], [0, 80], [280, 340]]
+    cw = [[850, 1250, 475, 900], [175, 575, 425, 850], [1460, 1860, 425, 850]]
+    lim_3d = [[-20, 30], [0, 70], [290, 340]]
     sr_visualization.create_presentation_vid(traj3d_fname, session_metadata, parent_directories['dLight'], session_summary, trials_df,
                                 paw_pref,
                                 bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],
                                 cw=cw,
                                 lim_3d=lim_3d)
+
+    traj3d_fname2 = ''
+    # sr_visualization.create_presentation_vid(traj3d_fname, session_metadata, parent_directories['dLight'], session_summary, trials_df,
+    #                             paw_pref,
+    #                             bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],
+    #                             cw=cw,
+    #                             lim_3d=lim_3d)
 
     for expt in experiment_list:
 
@@ -564,7 +592,7 @@ if __name__ == '__main__':
         # ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453', 'R0468', 'R0469', 'R0472', 'R0473']]
         # ftr = [folder for folder in folders_to_reconstruct if folder['ratID'] in ['R0472']]
         # ftr = folders_to_reconstruct
-        for ratID in ['R0471', 'R0472', 'R0473', 'R0486']:
+        for ratID in ['R0487']:
             reconstruct_3d.reconstruct_folders_anipose(ratID, parent_directories[expt], expt, rat_df, anipose_config, cam_names=cam_names, filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)

@@ -369,7 +369,7 @@ if __name__ == '__main__':
     # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
     # experiment_list = ['dLight', 'sr6OHDA', 'GRABAch-rDA']
     # experiment_list = ['sr6OHDA', 'dLight']
-    experiment_list = ['dLight', 'sr6OHDA']
+    experiment_list = ['sr6OHDA', 'dLight']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
     create_marked_vids = True
@@ -465,7 +465,7 @@ if __name__ == '__main__':
 
     traj_path = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files'
     analysis_path = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\analysis\sr'
-    traj3d_fname = 'R0487_b01_20230918_12-33-32_005_r3d.pickle'
+    traj3d_fname = 'R0487_b01_20230918_12-36-33_011_r3d.pickle'
     session_metadata = navigation_utilities.metadata_from_traj_name(traj3d_fname)
     datestring = navigation_utilities.datetime_to_string_for_fname(session_metadata['date'])[:8]
     ses_name = '_'.join((session_metadata['ratID'], datestring, 'sr', 'ses01'))
@@ -476,7 +476,7 @@ if __name__ == '__main__':
     trials_df_name = os.path.join(analysis_path, session_metadata['ratID'] + '_sr_trialsdb.pickle')
     trials_df = skilled_reaching_io.read_pickle(trials_df_name)
     session_metadata['task'] = 'sr'
-    session_metadata['session_num'] =1
+    session_metadata['session_num'] = 1
     processed_phot_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories['dLight'])
     if os.path.exists(processed_phot_name):
         # if no processed photometry file, just reconstruct the 3d points
@@ -507,15 +507,29 @@ if __name__ == '__main__':
 
     df_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
     paw_pref = df_row['pawpref'].values[0]
-    cw = [[850, 1250, 475, 900], [175, 575, 425, 850], [1460, 1860, 425, 850]]
-    lim_3d = [[-20, 30], [0, 70], [290, 340]]
-    sr_visualization.create_presentation_vid(traj3d_fname, session_metadata, parent_directories['dLight'], session_summary, trials_df,
-                                paw_pref,
-                                bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],
-                                cw=cw,
-                                lim_3d=lim_3d)
+    cw = [[800, 1200, 475, 900], [200, 600, 425, 850], [1425, 1825, 425, 850]]
+    lim_3d = [[-20, 30], [0, 70], [280, 340]]
+    # sr_visualization.create_presentation_vid(traj3d_fname, session_metadata, parent_directories['dLight'], session_summary, trials_df,
+    #                             paw_pref,
+    #                             bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],
+    #                             cw=cw,
+    #                             lim_3d=lim_3d)
+    # sr_visualization.create_presentation_vid_1view(traj3d_fname, session_metadata, parent_directories['dLight'], session_summary, trials_df,
+    #                             paw_pref,
+    #                             bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],
+    #                             cw=cw,
+    #                             lim_3d=lim_3d,
+    #                             frames2mark={'reach_on': 240, 'contact': 306, 'drop': 308})
 
-    traj3d_fname2 = ''
+    traj3d_fname2 = 'R0487_b01_20230918_12-33-32_005_r3d.pickle'
+    traj3d_fname2 = os.path.join(full_trajpath, traj3d_fname2)
+
+    # sr_visualization.create_presentation_vid_1view(traj3d_fname2, session_metadata, parent_directories['dLight'], session_summary, trials_df,
+    #                             paw_pref,
+    #                             bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],
+    #                             cw=cw,
+    #                             lim_3d=lim_3d,
+    #                             frames2mark={'reach_on': 233, 'contact': 306, 'retract': 330})
     # sr_visualization.create_presentation_vid(traj3d_fname, session_metadata, parent_directories['dLight'], session_summary, trials_df,
     #                             paw_pref,
     #                             bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],

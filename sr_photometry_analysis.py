@@ -32,7 +32,7 @@ def resample_photometry_to_video(photometry_signal, trigger_ts, Fs, trigger_fram
         frame_time = trigger_ts + (i_frame - trigger_frame) / fps
         time_diffs = abs(frame_time - photometry_t)
 
-        t_idx = np.where(time_diffs == min(time_diffs))
+        t_idx = np.where(time_diffs == min(time_diffs))[0][0]
         phot_vidsignal[i_frame] = photometry_signal[t_idx]
 
     return phot_vidsignal

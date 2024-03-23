@@ -13,10 +13,10 @@ import navigation_utilities
 import skilled_reaching_io
 
 
-def crop_params_dict_from_df(crop_params_df, session_date, box_num, view_list=['dir', 'lm', 'rm']):
+def crop_params_dict_from_df(crop_params_df, session_date, box_num, session_num, view_list=['dir', 'lm', 'rm']):
 
     # find the row with the relevant session data and box number
-    date_box_row = crop_params_df[(crop_params_df['date'] == session_date) & (crop_params_df['box_num'] == box_num)]
+    date_box_row = crop_params_df[(crop_params_df['date'] == session_date) & (crop_params_df['box_num'] == box_num) & (crop_params_df['session_num'] == session_num)]
 
     if date_box_row.empty:
         # crop_params_dict = {
@@ -27,7 +27,7 @@ def crop_params_dict_from_df(crop_params_df, session_date, box_num, view_list=['
         # was this a problem with date formatting?
         df_dates = [navigation_utilities.datetime64_2_datetime(cp_date) for cp_date in crop_params_df['date'].values]
         matched_date = [dd.date() == session_date for dd in df_dates]
-        date_box_row = crop_params_df[matched_date & (crop_params_df['box_num'] == box_num)]
+        date_box_row = crop_params_df[matched_date & (crop_params_df['box_num'] == box_num) & (crop_params_df['session_num'] == session_num)]
 
     if date_box_row.empty:
         crop_params_dict = {}
@@ -94,7 +94,7 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
         if isinstance(cp, pd.DataFrame):
             # pick an .avi file in this folder
             session_date = vid_metadata['triggertime'].date()
-            crop_params_dict = crop_params_dict_from_df(cp, session_date, vid_metadata['boxnum'])
+            crop_params_dict = crop_params_dict_from_df(cp, session_date, vid_metadata['boxnum'], vid_metadata['session_num'])
         elif isinstance(crop_params, dict):
             crop_params_dict = crop_params
 
@@ -323,7 +323,7 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
             command = (
                 f"ffmpeg -n -i {vid_path_in} "
                 f'-filter:v "crop={w}:{h}:{x1}:{y1}, hflip" '
-                f"-c:v h264 -c:a copy {vid_path_out}"
+                f"-c:v h264 -preset veryslow -crf 10 -c:a copy {vid_path_out}"
             )
             subprocess.call(command, shell=True)
             # command = (
@@ -336,7 +336,7 @@ def crop_video(vid_path_in, vid_path_out, crop_params, view_name, filtertype='mj
             command = (
                 f"ffmpeg -n -i {vid_path_in} "
                 f"-filter:v crop={w}:{h}:{x1}:{y1} "
-                f"-c:v h264 -c:a copy {vid_path_out}"
+                f"-c:v h264 -preset veryslow -crf 10 -c:a copy {vid_path_out}"
             )
             subprocess.call(command, shell=True)
 

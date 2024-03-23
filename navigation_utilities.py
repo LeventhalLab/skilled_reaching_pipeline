@@ -1136,6 +1136,7 @@ def parse_video_name(video_name):
         'boxnum': 99,
         'triggertime': datetime(1,1,1),
         'video_number': 0,
+        'session_num': 0,
         'video_type': '',
         'video_name': '',
         'im_size': (1024, 2040)
@@ -1151,6 +1152,8 @@ def parse_video_name(video_name):
     # the last folder in the tree should have the session name
     _, video_metadata['session_name'] = os.path.split(vid_path)
     vid_name, vid_type = os.path.splitext(vid_name)
+
+    video_metadata['session_num'] = int(video_metadata['session_name'][-2:])
 
     metadata_list = vid_name.split('_')
 

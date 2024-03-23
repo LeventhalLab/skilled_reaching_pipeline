@@ -368,15 +368,15 @@ if __name__ == '__main__':
 
     # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
     # experiment_list = ['dLight', 'sr6OHDA', 'GRABAch-rDA']
-    # experiment_list = ['sr6OHDA', 'dLight']
     experiment_list = ['sr6OHDA', 'dLight']
+    # experiment_list = ['dLight', 'sr6OHDA']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
     create_marked_vids = True
 
     label_videos = True
 
-    rats_to_analyze = [452, 453, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514, 519, 520, 521, 522]
+    rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514, 519, 520, 521, 522, 526, 528, 529, 532, 533, 534, 535, 536, 537]
 
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
@@ -481,11 +481,11 @@ if __name__ == '__main__':
     if os.path.exists(processed_phot_name):
         # if no processed photometry file, just reconstruct the 3d points
         processed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
-        session_summary, trials_df = srphot_anal.aggregate_data_pre_20230904(processed_phot_data, session_metadata,
-                                                                             trials_df,
-                                                                             smooth_window=101,
-                                                                             f0_pctile=10,
-                                                                             expected_baseline=0.2)
+        # session_summary, trials_df = srphot_anal.aggregate_data_pre_20230904(processed_phot_data, session_metadata,
+        #                                                                      trials_df,
+        #                                                                      smooth_window=101,
+        #                                                                      f0_pctile=10,
+        #                                                                      expected_baseline=0.2)
     else:
         analog_bin_file = navigation_utilities.find_analog_bin_file(parent_directories['dLight'], session_metadata)
         digital_bin_file = navigation_utilities.find_digital_bin_file(parent_directories['dLight'], session_metadata)
@@ -495,12 +495,12 @@ if __name__ == '__main__':
                       'digital_bin': digital_bin_file,
                       'metadata': metadata_file
                       }
-        session_summary, trials_df = srphot_anal.aggregate_data_post_20230904(data_files, parent_directories['dLight'],
-                                                                              session_metadata,
-                                                                              trials_df,
-                                                                              smooth_window=101,
-                                                                              f0_pctile=10,
-                                                                              expected_baseline=0.2)
+        # session_summary, trials_df = srphot_anal.aggregate_data_post_20230904(data_files, parent_directories['dLight'],
+        #                                                                       session_metadata,
+        #                                                                       trials_df,
+        #                                                                       smooth_window=101,
+        #                                                                       f0_pctile=10,
+        #                                                                       expected_baseline=0.2)
 
 
     rat_df = skilled_reaching_io.read_rat_db(parent_directories['dLight'], rat_db_fnames['dLight'])
@@ -543,12 +543,12 @@ if __name__ == '__main__':
         # calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
         calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
     #
-        crop_videos.crop_all_calibration_videos(parent_directories[expt],
-                                    calibration_metadata_df,
-                                    vidtype='.avi',
-                                    view_list=cam_names,
-                                    filtertype=filtertype,
-                                    rat_nums=rats_to_analyze)
+        # crop_videos.crop_all_calibration_videos(parent_directories[expt],
+        #                             calibration_metadata_df,
+        #                             vidtype='.avi',
+        #                             view_list=cam_names,
+        #                             filtertype=filtertype,
+        #                             rat_nums=rats_to_analyze)
     # #
     # #
     #     calibrate_all_sessions(parent_directories[expt],

@@ -17,7 +17,7 @@ import matplotlib
 matplotlib.use('Qt5Agg')
 
 
-def resample_photometry_to_video(photometry_signal, trigger_ts, Fs, trigger_frame=300, num_frames=1300, fps=300):
+def resample_photometry_to_video(photometry_signal, trigger_ts, Fs, trigger_frame=300, n_frames=1300, fps=300):
 
     if np.isnan(trigger_ts):
         # most likely, this video was recorded after the photometry recording completed but before the investigator could
@@ -26,14 +26,25 @@ def resample_photometry_to_video(photometry_signal, trigger_ts, Fs, trigger_fram
     num_points = len(photometry_signal)
     photometry_t = np.linspace(1/Fs, num_points/Fs, num_points)
 
-    phot_vidsignal = np.zeros(num_frames)
-    for i_frame in range(num_frames):
+    phot_vidsignal = np.zeros(n_frames)
 
-        frame_time = trigger_ts + (i_frame - trigger_frame) / fps
-        time_diffs = abs(frame_time - photometry_t)
+    frame_nums = np.array(range(n_frames))
+    frame_times = trigger_ts + (frame_nums - trigger_frame) / fps
 
-        t_idx = np.where(time_diffs == min(time_diffs))[0][0]
-        phot_vidsignal[i_frame] = photometry_signal[t_idx]
+    trial_phot_t = photometry_t[photometry_t >= frame_times[0]]
+    trial_photometry = photometry_signal[photometry_t >= frame_times[0]]
+    trial_photometry = trial_photometry[trial_phot_t <= frame_times[-1]]
+    trial_phot_t = trial_phot_t[trial_phot_t <= frame_times[-1]]
+
+    phot_vidsignal = np.interp(frame_times, trial_phot_t, trial_photometry)
+
+    # for i_frame in range(n_frames):
+    #
+    #     frame_time = trigger_ts + (i_frame - trigger_frame) / fps
+    #     time_diffs = abs(frame_time - photometry_t)
+    #
+    #     t_idx = np.where(time_diffs == min(time_diffs))[0][0]
+    #     phot_vidsignal[i_frame] = photometry_signal[t_idx]
 
     return phot_vidsignal
 
@@ -115,6 +126,43 @@ def extract_sr_event_ts(processed_phot_data, session_metadata, rat_srdf, perieve
     return rat_srdf, earlyreach_info
 
 
+def extract_sr_dig_event_ts(processed_phot_data, session_metadata, rat_srdf, ts_dict, perievent_window=(-3, 3), smooth_window=101, f0_pctile=10, expected_baseline=0.2):
+
+    # eventlist, event_ts = srphot_anal.get_photometry_events(processed_phot_data, session_metadata)
+    eventlist, event_ts = srphot_anal.get_photometry_events_from_tsdict(processed_phot_data, ts_dict, session_metadata)
+
+    Fs = processed_phot_data['Fs']
+    n_samples = len(processed_phot_data['t'])
+    session_duration = n_samples / Fs
+
+    # eventlist = list(ts_dict.keys())
+
+    act3_ts = ts_dict['Actuator3'][:, 0]
+
+
+    # collect all vidtrigger events
+    vidtrig_idx = eventlist.index('vid_trigger')
+    vidtrigger_ts = ts_dict['vid_trigger'][:, 0]
+
+    # assign actuator3 and vidtrigger events to valid recording intervals
+    act3_intervals = srphot_anal.identify_ts_intervals(act3_ts, processed_phot_data['analysis_intervals'], perievent_window, processed_phot_data['Fs'])
+    vidtrigger_intervals = srphot_anal.identify_ts_intervals(vidtrigger_ts, processed_phot_data['analysis_intervals'], perievent_window, processed_phot_data['Fs'])
+
+    sr_ts = {'act3': act3_ts, 'vidtrigger': vidtrigger_ts}
+    sr_intervals = {'act3': act3_intervals, 'vidtrigger': vidtrigger_intervals}
+    rat_srdf = add_trialdata_to_srdf(rat_srdf, session_metadata, sr_ts, sr_intervals, session_duration)
+
+    # find all early reaches
+    # earlyreach_ts = srphot_anal.find_early_reaches(eventlist, event_ts)
+    earlyreach_ts = srphot_anal.find_early_reaches_dig(eventlist, event_ts)
+    earlyreach_intervals = srphot_anal.identify_ts_intervals(earlyreach_ts, processed_phot_data['analysis_intervals'], perievent_window, processed_phot_data['Fs'])
+
+    earlyreach_info = {'earlyreach_ts': earlyreach_ts,
+                       'earlyreach_intervals': earlyreach_intervals}
+
+    return rat_srdf, earlyreach_info
+
+
 def aggregate_data_pre_20230904(processed_phot_data, session_metadata, rat_srdf, smooth_window=101, f0_pctile=10, expected_baseline=0.2, perievent_window=(-5, 5)):
 
     smoothed_data, detrended_data, session_dff, interval_popt, interval_exp2_fit_successful, baseline_used = srphot_anal.calc_segmented_dff(
@@ -147,7 +195,6 @@ def aggregate_data_post_20230904(data_files, parent_directories, session_metadat
     pickled_analog_processeddata_fname = navigation_utilities.get_pickled_analog_processeddata_fname(session_metadata, parent_directories)
     pickled_ts_fname = navigation_utilities.get_pickled_ts_fname(session_metadata, parent_directories)
 
-
     _, pickle_name = os.path.split(pickled_metadata_fname)
     print('{} already processed'.format(pickle_name))
     phot_metadata = skilled_reaching_io.read_pickle(pickled_metadata_fname)
@@ -166,10 +213,16 @@ def aggregate_data_post_20230904(data_files, parent_directories, session_metadat
     Fs = phot_metadata['Fs']
     n_samples = np.shape(processed_analog['dff'])[0]
     phot_metadata['t'] = np.linspace(1/Fs, n_samples/Fs, n_samples)
-    rat_srdf, session_earlyreach_info = extract_sr_event_ts(phot_metadata, session_metadata, rat_srdf,
+    # rat_srdf, session_earlyreach_info = extract_sr_event_ts(phot_metadata, session_metadata, rat_srdf,
+    #                                                         perievent_window=perievent_window,
+    #                                                         smooth_window=smooth_window, f0_pctile=f0_pctile,
+    #                                                         expected_baseline=expected_baseline)
+    rat_srdf, session_earlyreach_info = extract_sr_dig_event_ts(phot_metadata, session_metadata, rat_srdf, ts_dict,
                                                             perievent_window=perievent_window,
                                                             smooth_window=smooth_window, f0_pctile=f0_pctile,
                                                             expected_baseline=expected_baseline)
+
+
 
     session_summary = {'sr_dff1': processed_analog['dff'][:, 0],
                        'sr_zscores1': processed_analog['session_zscores'][:, 0],
@@ -1075,7 +1128,7 @@ def get_photometry_events_from_tsdict(phot_data, ts_dict, session_metadata):
         event_ts = list(event_ts)
 
     elif session_metadata['task'].lower() in ['sr', 'srchrim', 'srchrimpost']:
-        eventlist, event_ts = extract_sr_ts_from_phot_data(phot_data, session_metadata)
+        eventlist, event_ts = extract_sr_ts_from_phot_data_tsdict(phot_data, session_metadata, ts_dict)
 
     elif session_metadata['task'].lower() == 'chrimsontest':   # may be different versions of the crimson openfield
         eventlist, event_ts, _ = extract_chrimson_events(phot_data, session_metadata)
@@ -1492,6 +1545,37 @@ def extract_sr_ts_from_phot_data(phot_data, session_metadata, TTL_thresh_a=1., m
             final_pulse_on_idx = np.delete(pulse_on_idx, pulseon_to_remove)
 
         event_ts.append(final_pulse_on_idx / phot_data['Fs'])
+
+    return eventlist, event_ts
+
+
+def extract_sr_ts_from_phot_data_tsdict(phot_data, session_metadata, ts_dict, TTL_thresh_a=1., min_pw=5):
+    '''
+
+    :param phot_data:
+    :return:
+    '''
+    '''
+    AI lines on NIDAQ
+    AI0 - photometry signal
+    AI1 - FED (IR back if before 4/27/2022)
+    AI2 - paw through slot
+    AI3 - actuator 3
+    AI4 - actuator 2
+    AI5 - IR back
+    AI6 - video trigger (not early reach)
+    AI7 - frame trigger
+    '''
+    eventlist = ['paw_through_slot', 'Actuator3', 'Actuator2', 'IR_back', 'vid_trigger', 'frame_trigger']
+    # eventlist = ['rear_photobeam', 'paw_through_slot', 'actuator3', 'actuator2', 'vid_trigger']
+    num_events = len(eventlist)
+    event_ts = []
+    for i_event, eventname in enumerate(eventlist):
+
+        if eventname in ts_dict.keys():
+            event_ts.append(ts_dict[eventname][:, 0])
+        elif eventname == 'frame_trigger':
+            event_ts.append(ts_dict['RPi_frame_trigger'][:, 0])
 
     return eventlist, event_ts
 
@@ -2436,6 +2520,62 @@ def find_early_reaches(eventlist, event_ts):
     early_reach_ts = non_vt_ts[np.logical_not(multi_reach_mask)]
 
     return early_reach_ts
+
+
+def find_early_reaches_dig(eventlist, event_ts):
+
+    time_tolerance = 0.001   # not sure if we need this, but will assume anything less than time_tolerance (in sec) apart is the same event
+    multiple_reach_time = 5.   # reaches within 5 seconds of a video trigger excluded from "early reach" category
+
+    # eventlist, event_ts = get_photometry_events(phot_data, session_metadata)
+
+    # eventlist = ['paw_through_slot', 'Actuator3', 'Actuator2', 'IR_back', 'vid_trigger', 'frame_trigger']
+
+    # an early reach would be a paw_through_slot event after Actuator 2 but before Actuator 3
+
+    pts_idx = eventlist.index('paw_through_slot')
+    pts_ts = event_ts[pts_idx]    # should be a numpy array of timestamps
+    if not isinstance(pts_ts, np.ndarray):
+        pts_ts = np.array([pts_ts])
+
+    vt_idx = eventlist.index('vid_trigger')
+    vt_ts = event_ts[vt_idx]
+    if not isinstance(vt_ts, np.ndarray):
+        vt_ts = np.array([vt_ts])
+
+    a2_idx = eventlist.index('Actuator2')
+    a3_idx = eventlist.index('Actuator3')
+    a2_ts = event_ts[a2_idx]
+    a3_ts = event_ts[a3_idx]
+    if not isinstance(a2_ts, np.ndarray):
+        a2_ts = np.array([a2_ts])
+    if not isinstance(a3_ts, np.ndarray):
+        a3_ts = np.array([a3_ts])
+
+    IRback_idx = eventlist.index('IR_back')
+    IRback_ts = event_ts[IRback_idx]
+    if not isinstance(IRback_ts, np.ndarray):
+        IRback_ts = np.array([IRback_ts])
+    # if only a single event occurred, need to turn it into an array with the right dimensions for subsequent processing
+
+    # first, eliminate any paw_through_slot events that triggered a video
+    # find all elements of pts_ts that are not within time_tolerance of any events in vt_ts
+    non_vt_ts = np.array([ts for ts in pts_ts if not any(abs(ts - vt_ts) < time_tolerance)])
+
+    # now find all paw_through_slot events that occurred after Actuator2 but before IR back (or Actuator3, but not recording that right now)
+    # or better to look for paw_through_slot events that did not trigger video and occur more than X seconds (maybe 5?)
+
+    # loop through each video trigger timestamp, classify any non-video-trigger timestamps as a multi-reach if they occurred too soon
+    multi_reach_mask = np.zeros(len(non_vt_ts), dtype=bool)
+    for vidtrig_ts in vt_ts:
+
+        trial_mask = np.asarray(np.logical_and(non_vt_ts > vidtrig_ts, non_vt_ts < vidtrig_ts + multiple_reach_time))
+        multi_reach_mask = np.logical_or(multi_reach_mask, trial_mask)
+
+    early_reach_ts = non_vt_ts[np.logical_not(multi_reach_mask)]
+
+    return early_reach_ts
+
 
 
 def extract_perievent_data(phot_signal, processed_phot_data, session_metadata, perievent_window = (-3, 3), baseline_window=(-10, 10)):

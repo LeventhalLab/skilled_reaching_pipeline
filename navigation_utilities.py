@@ -624,12 +624,15 @@ def trajectory_folder(trajectories_parent, ratID, session_name):
     return traj_folder
 
 
-def find_orig_rat_video(video_metadata, video_root_folder, vidtype='.avi'):
+def find_orig_rat_video(video_metadata, video_root_folder, vidtype='.avi', use_already_cropped=True):
 
     # directory structure:
     #  video_root_folder --> ratID --> ratID_sessiondateX
 
-    rat_folder = os.path.join(video_root_folder, video_metadata['ratID'])
+    if use_already_cropped:
+        rat_folder = os.path.join(video_root_folder, 'already_cropped', video_metadata['ratID'])
+    else:
+        rat_folder = os.path.join(video_root_folder, video_metadata['ratID'])
     datestring = date_to_string_for_fname(video_metadata['triggertime'])
     date_folder_test = os.path.join(rat_folder, video_metadata['ratID'] + '_' + datestring + '*')
     date_folder_list = glob.glob(date_folder_test)
@@ -1638,7 +1641,10 @@ def create_cam_cal_pickle_name(cam_cal_vid_name, parent_directories):
 
     cal_metadata = parse_camera_calibration_video_name(cam_cal_vid_name)
 
-    _, vid_name = os.path.split(cam_cal_vid_name)
+    try:
+        _, vid_name = os.path.split(cam_cal_vid_name)
+    except:
+        pass
     vid_name, _ = os.path.splitext(vid_name)
     pickle_name = vid_name + '.pickle'
 
@@ -2140,10 +2146,14 @@ def fname_datestring_from_datetime(dtime, formatstring='%Y%m%d'):
     return datestring
 
 
-def find_session_folder(parent_directories, session_metadata):
+def find_session_folder(parent_directories, session_metadata, search_already_cropped=True):
 
     ratID = session_metadata['ratID']
-    rat_folder = os.path.join(parent_directories['videos_root_folder'], ratID)
+
+    if search_already_cropped:
+        rat_folder = os.path.join(parent_directories['videos_root_folder'], 'already_cropped', ratID)
+    else:
+        rat_folder = os.path.join(parent_directories['videos_root_folder'], ratID)
 
     formatstring = date_formatstring()
     if 'date' in session_metadata.keys():
@@ -3165,7 +3175,7 @@ def find_analog_bin_file(parent_directory, session_metadata):
     return analog_name
 
 
-def find_digital_bin_file(parent_directory, session_metadata):
+def find_digital_bin_file(parent_directory, session_metadata, search_already_cropped=True):
 
     session_folder = find_session_folder(parent_directory, session_metadata)
     ratID = session_metadata['ratID']

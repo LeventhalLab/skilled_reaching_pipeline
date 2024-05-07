@@ -366,23 +366,23 @@ def perform_calibrations(parent_directories, cam_names=('dir', 'lm', 'rm'),
 if __name__ == '__main__':
 
 
-    # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
+    experiment_list = ['dLight', 'GRABAch-rDA', 'sr6OHDA']
     # experiment_list = ['dLight', 'sr6OHDA', 'GRABAch-rDA']
-    experiment_list = ['sr6OHDA', 'dLight']
+    # experiment_list = ['sr6OHDA', 'dLight']
     # experiment_list = ['dLight', 'sr6OHDA']
     rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
     session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
     create_marked_vids = True
 
-    label_videos = True
+    label_videos = False
 
-    rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514, 519, 520, 521, 522, 526, 528, 529, 532, 533, 534, 535, 536, 537]
+    rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514, 519, 520, 521, 522, 526, 528, 529, 530, 532, 533, 534, 535, 536, 537, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557]
 
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
     skipmirrorlabel = False
 
-    gputouse = 3
+    gputouse = 0
 
     cam_names = ('dir', 'lm', 'rm')
     n_cams = len(cam_names)
@@ -536,6 +536,7 @@ if __name__ == '__main__':
     #                             cw=cw,
     #                             lim_3d=lim_3d)
 
+    '''UNCOMMENT TO CROP CALIBRATION VIDEOS AND PERFORM CALIBRATION'''
     for expt in experiment_list:
 
         # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
@@ -543,20 +544,21 @@ if __name__ == '__main__':
         # calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
         calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
     #
-        # crop_videos.crop_all_calibration_videos(parent_directories[expt],
-        #                             calibration_metadata_df,
-        #                             vidtype='.avi',
-        #                             view_list=cam_names,
-        #                             filtertype=filtertype,
-        #                             rat_nums=rats_to_analyze)
-    # #
-    # #
-    #     calibrate_all_sessions(parent_directories[expt],
-    #                            calibration_metadata_df,
-    #                            cam_names,
-    #                            filtertype=filtertype,
-    #                            rat_nums=rats_to_analyze)
+        crop_videos.crop_all_calibration_videos(parent_directories[expt],
+                                    calibration_metadata_df,
+                                    vidtype='.avi',
+                                    view_list=cam_names,
+                                    filtertype=filtertype,
+                                    rat_nums=rats_to_analyze)
+    #
+    #
+        calibrate_all_sessions(parent_directories[expt],
+                               calibration_metadata_df,
+                               cam_names,
+                               filtertype=filtertype,
+                               rat_nums=rats_to_analyze)
 
+    '''UNCOMMENT TO CROP VIDEOS'''
     for expt in experiment_list:
         # crop_params_csv_path = os.path.join(video_root_folders[expt], 'SR_video_crop_regions.csv')
         # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
@@ -606,7 +608,7 @@ if __name__ == '__main__':
         # ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453', 'R0468', 'R0469', 'R0472', 'R0473']]
         # ftr = [folder for folder in folders_to_reconstruct if folder['ratID'] in ['R0472']]
         # ftr = folders_to_reconstruct
-        for ratID in ['R0487']:
+        for ratID in ['R0526', 'R0528', 'R0529']:
             reconstruct_3d.reconstruct_folders_anipose(ratID, parent_directories[expt], expt, rat_df, anipose_config, cam_names=cam_names, filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)

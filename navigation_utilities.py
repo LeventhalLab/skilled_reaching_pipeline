@@ -1340,6 +1340,10 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
 
 
 def scorername_from_cropped_folder(analysis_folder, cropped_vid_type='.avi'):
+    _, folder_name = os.path.split(analysis_folder)
+    fname_parts = folder_name.split('_')
+    ratID = fname_parts[0]
+
     cropped_video_list = glob.glob(os.path.join(analysis_folder, '{}_*'.format(ratID) + cropped_vid_type))
 
     cv_path, vid_name = os.path.split(cropped_video_list[0])
@@ -1353,18 +1357,6 @@ def scorername_from_cropped_folder(analysis_folder, cropped_vid_type='.avi'):
     scorername = scorername_from_fname(test_pickle_list[0])
 
     return scorername
-
-    # vids_to_analyze = []
-    # for cropped_vid in cropped_video_list:
-    #     cv_path, vid_name = os.path.split(cropped_vid)
-    #     vid_name, vid_ext = os.path.splitext(vid_name)
-    #
-    #     test_pickle_name = os.path.join(cv_path, vid_name + 'DLC*.pickle')
-    #
-    #     # have pickle files already been created for this video?
-    #     test_pickle_list = glob.glob(test_pickle_name)
-
-
 
 
 

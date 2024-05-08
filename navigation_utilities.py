@@ -896,7 +896,7 @@ def find_optitrack_folders_to_analyze(parent_directories, cam_list=(1, 2)):
     return folders_to_analyze
 
 
-def parse_cropped_video_name(cropped_video_name):
+def parse_cropped_video_name_legacy(cropped_video_name):
     """
     extract metadata information from the video name
     :param cropped_video_name: video name with expected format RXXXX_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
@@ -1358,6 +1358,58 @@ def scorername_from_cropped_folder(analysis_folder, cropped_vid_type='.avi'):
 
     return scorername
 
+
+def match_pickle_to_cropped_vid(cropped_vid_name):
+
+    cv_metadata = parse_cropped_vid_name(cropped_vid_name)
+
+    crop_string = '_'.join(cv_metadata[crop_window])
+    test_pickle = '_'.join((cv_metadata['ratID'],
+                            'b{:2d}'.format(cv_metadata['box_num']),
+                            datetime_to_string_for_fname(cv_metadata['triggertime']),
+                            crop_string + '*',   # '*' is for the scorername
+                            'full.pickle'))
+
+    return test_pickle
+
+
+def parse_cropped_vid_name(cropped_vid_name):
+
+    cropped_vid_metadata = {
+        'ratID': '',
+        'rat_num': 0,
+        'box_num': 99,
+        'triggertime': datetime(1,1,1),
+        'vid_num': 0,
+        'view': '',
+        'vid_type': '',
+        'crop_window': [],
+        'cropped_video_name': ''
+    }
+
+    _, fname = os.path.split(cropped_vid_name)
+    fname, vid_type = os.path.splitext(fname)
+
+    fname_parts = fname.split('_')
+
+    cropped_vid_metadata['ratID'] = fname_parts[0]
+    num_string = ''.join(filter(lambda i: i.isdigit(), cropped_vid_metadata['ratID']))
+    cropped_vid_metadata['rat_num'] = int(num_string)
+    cropped_vid_metadata['box_num'] = int(fname_parts[1][1:])
+    datestr = fname_parts[2]
+    timestr = fname_parts[3]
+
+    triggertime = fname_string_to_datetime(datestr + '_' + timestr)
+
+    cropped_vid_metadata['vid_num'] = int(fname_parts[4])
+    cropped_vid_metadata['vid_type'] = vid_type
+
+    cropped_vid_metadata['view'] = metadata_list[fname_parts[5]]
+
+    left, right, top, bottom = list(map(int, fname_parts[6].split('-')))
+    cropped_vid_metadata['crop_window'].extend(left, right, top, bottom)
+
+    return cropped_vid_metadata
 
 
 def scorername_from_fname(fname):

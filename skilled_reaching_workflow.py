@@ -172,6 +172,10 @@ def label_videos_in_cropped_folder(folder_to_mark, rat_db, view_config_paths, cr
     # scorername = navigation_utilities.scorername_from_cropped_folder(folder_to_mark, cropped_vid_type=cropped_vid_type)
     cropped_video_list = glob.glob(os.path.join(folder_to_mark, '*' + cropped_vid_type))
 
+    # eliminate videos for which there isn't a pickle file
+    for cropped_vid in cropped_video_list:
+        test_pickle = navigation_utilities.match_pickle_to_cropped_vid(cropped_vid)
+
     deeplabcut.create_video_with_all_detections(dlc_config, cropped_video_list)
 
 

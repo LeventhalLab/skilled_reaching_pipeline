@@ -1363,13 +1363,15 @@ def match_pickle_to_cropped_vid(cropped_vid_name):
 
     cv_metadata = parse_cropped_vid_name(cropped_vid_name)
 
-    crop_string = '_'.join(cv_metadata['crop_window'])
+    cp_strings = [str(int(cp)) for cp in cv_metadata['crop_window']]
+    crop_string = '-'.join(cp_strings)
     test_pickle = '_'.join((cv_metadata['ratID'],
-                            'b{:2d}'.format(cv_metadata['box_num']),
+                            'b{:02d}'.format(cv_metadata['box_num']),
                             datetime_to_string_for_fname(cv_metadata['triggertime']),
+                            '{:03d}'.format(cv_metadata['vid_num']),
+                            cv_metadata['view'],
                             crop_string + '*',   # '*' is for the scorername
                             'full.pickle'))
-
     return test_pickle
 
 
@@ -1399,7 +1401,7 @@ def parse_cropped_vid_name(cropped_vid_name):
     datestr = fname_parts[2]
     timestr = fname_parts[3]
 
-    triggertime = fname_string_to_datetime(datestr + '_' + timestr)
+    cropped_vid_metadata['triggertime'] = fname_string_to_datetime(datestr + '_' + timestr)
 
     cropped_vid_metadata['vid_num'] = int(fname_parts[4])
     cropped_vid_metadata['vid_type'] = vid_type

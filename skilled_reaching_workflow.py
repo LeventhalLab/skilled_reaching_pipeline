@@ -614,8 +614,8 @@ if __name__ == '__main__':
     if analysis_params['analyses_to_perform'][0] == 'all' or 'calibrate_videos' in analysis_params['analyses_to_perform']:
         for expt in experiment_list:
 
-            video_root_folder = analysis_params['parent_directories'][expt]['videos_root_folder']
-            session_metadata_xlsx_path = os.path.join(video_root_folder, analysis_params['session_md_fnames'][expt])
+            videos_root_folder = analysis_params['parent_directories'][expt]['videos_root_folder']
+            session_metadata_xlsx_path = os.path.join(videos_root_folder, analysis_params['session_md_fnames'][expt])
             calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
 
             calibrate_all_sessions(analysis_params['parent_directories'][expt],
@@ -629,8 +629,8 @@ if __name__ == '__main__':
         for expt in experiment_list:
 
             crop_filtertype = analysis_params['crop_filtertype']  # currently choices are 'h264' or 'mjpeg2jpeg'. Python based vid conversion (vs labview) should use h264
-            session_metadata_xlsx_path = analysis_params['session_md_fnames'][expt]
             videos_root_folder = analysis_params['parent_directories'][expt]['videos_root_folder']
+            session_metadata_xlsx_path = os.path.join(videos_root_folder, analysis_params['session_md_fnames'][expt])
             cropped_videos_parent = analysis_params['parent_directories'][expt]['cropped_videos_parent']
             calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
             rats_to_analyze = analysis_params['rats_to_analyze']

@@ -654,7 +654,7 @@ if __name__ == '__main__':
             for view in folders_to_analyze.keys():
                 for crop_folder in folders_to_analyze[view]:
 
-                    label_videos_in_cropped_folder(crop_folder, rat_db, view_config_paths)
+                    label_videos_in_cropped_folder(crop_folder, rat_db, analysis_params['view_config_paths'])
 
 
     # step 3: make sure calibration has been run for these sessions

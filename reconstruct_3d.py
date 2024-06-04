@@ -256,8 +256,9 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
     # now find matching files from each view
     for h5_file in h5_list[0]:
         h5_vid_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)
-        if (h5_vid_metadata['ratID'] != 'R0526') or not(h5_vid_metadata['video_number'] in [20]) or (h5_vid_metadata['triggertime'].date() != datetime(2024, 2, 29).date()):
-            continue
+        # comment in line below to look at a specific video
+        # if (h5_vid_metadata['ratID'] != 'R0526') or not(h5_vid_metadata['video_number'] in [20]) or (h5_vid_metadata['triggertime'].date() != datetime(2024, 2, 29).date()):
+        #     continue
         h5_file_group = [h5_file]
         for cam_name in cams[1:]:
             cam_folder_name = os.path.join(cropped_session_folder, '_'.join((session_folder_name, cam_name)))

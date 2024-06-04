@@ -198,8 +198,10 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         h5_list.append(cam_h5s)
 
     h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_list[0][0])
-    if h5_metadata['triggertime'].date() != datetime(2024, 2, 29).date():
-        return
+
+    # comment back in statement below if trying to look at data from a single date
+    # if h5_metadata['triggertime'].date() != datetime(2024, 2, 29).date():
+    #     return
 
     cgroup_name = '_'.join((h5_metadata['ratID'],
                             h5_metadata['triggertime'].strftime('%Y%m%d'),

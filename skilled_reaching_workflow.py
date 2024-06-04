@@ -480,7 +480,8 @@ def initialize_analysis_params(experiment_list = ('dLight', 'GRABAch-rDA', 'sr6O
                        'view_config_paths': view_config_paths,
                        'parent_directories': parent_directories,
                        'view_keys': view_keys,
-                       'crop_filtertype': crop_filtertype
+                       'crop_filtertype': crop_filtertype,
+                       'DLC_folder_names': DLC_folder_names
     }
 
     return analysis_params
@@ -495,13 +496,15 @@ if __name__ == '__main__':
 
     gputouse = 0
 
-    analyses_to_perform = ['crop_calibration_vids',
-                           'calibrate_videos',
-                           'crop_sr_vids',
-                           # 'analyze_sr_vids',
-                           'create_marked_vids',
-                           'reconstruct_3d'
-                           ]
+    # analyses_to_perform = ['crop_calibration_vids',
+    #                        'calibrate_videos',
+    #                        'crop_sr_vids',
+    #                        # 'analyze_sr_vids',
+    #                        'create_marked_vids',
+    #                        'reconstruct_3d'
+    #                        ]
+
+    analyses_to_perform = ['reconstruct_3d']
 
     analysis_params = initialize_analysis_params(experiment_list=experiment_list,
                                                  gputouse=gputouse,
@@ -512,12 +515,14 @@ if __name__ == '__main__':
 
 
     # use the code below to write a charuco board to a file
-    # ncols = 10
-    # nrows = 7
-    # square_length = 16
-    # marker_length = 12
-    # board = skilled_reaching_calibration.create_charuco(nrows, ncols, square_length, marker_length)
-    # skilled_reaching_calibration.write_charuco_image(board, 600, calibration_vids_parents['dLight'])
+    ncols = 7
+    nrows = 10
+    square_length = 16
+    marker_length = 12
+    board = skilled_reaching_calibration.create_charuco(nrows, ncols, square_length, marker_length)
+    expt = 'dLight'
+    calib_folder = analysis_params['parent_directories'][expt]['calibration_vids_parent']
+    skilled_reaching_calibration.write_charuco_image(board, 600, calib_folder)
 
     # test_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0452\R0452_20230329_sr_ses01'
     # # analyze_3d_recons.analyze_trajectories(test_folder, anipose_config)
@@ -665,18 +670,23 @@ if __name__ == '__main__':
     # LOOP TO RECONSTRUCT 3D TRAJECTORIES
     if analysis_params['analyses_to_perform'][0] == 'all' or 'reconstruct_3d' in analysis_params['analyses_to_perform']:
         for expt in experiment_list:
-            rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
-            # folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(parent_directories[expt]['cropped_videos_parent'], cam_names)
+            rat_db_fname = analysis_params['rat_db_fnames'][expt]
+            rat_df = skilled_reaching_io.read_rat_db(analysis_params['parent_directories'][expt], rat_db_fname)
+            # folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(analysis_params['parent_directories'][expt]['cropped_videos_parent'], analysis_params['cam_names'])
 
-            DLC_folder_keys = DLC_folder_names.keys()
+            DLC_folder_keys = analysis_params['DLC_folder_names'].keys()
+
+            # below is left over from trying to use the anipose autoencoder, which didn't seem to work for us very well
             # for DLC_key in DLC_folder_keys:
             #     train_autoencoder.train_autoencoder(anipose_config, DLC_folder_names[DLC_key])
             # ftr = [folder for folder in folders_to_reconstruct if ((folder['ratID'] == 'R0486') and (folder['date'] == datetime(2023, 9, 8)))]
             # ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453', 'R0468', 'R0469', 'R0472', 'R0473']]
             # ftr = [folder for folder in folders_to_reconstruct if folder['ratID'] in ['R0472']]
             # ftr = folders_to_reconstruct
-            for ratID in ['R0526', 'R0528', 'R0529']:
-                reconstruct_3d.reconstruct_folders_anipose(ratID, parent_directories[expt], expt, rat_df, anipose_config, cam_names=cam_names, filtered=False)
+            all_rats = navigation_utilities.get_ratIDs(analysis_params['parent_directories'][expt]['cropped_videos_parent'])
+            for ratID in all_rats:
+                reconstruct_3d.reconstruct_folders_anipose(ratID, analysis_params['parent_directories'][expt], expt, rat_df, anipose_config,
+                                                           cam_names=analysis_params['cam_names'], filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)
 

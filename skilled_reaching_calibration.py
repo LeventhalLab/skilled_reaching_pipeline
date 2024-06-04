@@ -1133,14 +1133,10 @@ def crop_calibration_video(calib_vid,
 
     session_date = cc_metadata['time'].date()
 
-    # todo: calibrate the camera and undistort the videos prior to cropping, then don't allow calculation of distortion
-    # coefficients, etc. during calibration with anipose
     crop_params_dict = crop_params_dict_from_sessionrow(session_row, view_list=view_list)
 
     if crop_params_dict is None:
         return None
-
-    # crop_params_dict = crop_videos.crop_params_dict_from_df(calibration_metadata_df, session_date, cc_metadata['boxnum'])
 
     cropped_vid_names = []
     if crop_params_dict:
@@ -2277,7 +2273,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     # return cgroup, error
 
 
-def test_anipose_calibration(session_row, parent_directories):
+def         test_anipose_calibration(session_row, parent_directories):
 
     calibration_vids_parent = parent_directories['calibration_vids_parent']
     calibration_files_parent = parent_directories['calibration_files_parent']

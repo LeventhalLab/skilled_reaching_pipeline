@@ -1776,6 +1776,29 @@ def cal_frames_folder_from_cal_vids_name(cal_vid_name):
     return cal_frames_folder
 
 
+def get_ratIDs(parent_directory):
+    '''
+    assumes that subfolders are formatted as RXXXX where XXXX is the rat number
+    :param parent_directory:
+    :return:
+    '''
+
+    subfolders = glob.glob(os.path.join(parent_directory, 'R*'))
+
+    valid_folders = [sf for sf in subfolders if os.path.isdir(sf)]
+
+    folder_names = []
+    for vf in valid_folders:
+        _, folder_name = os.path.split(vf)
+        folder_names.append(folder_name)
+
+    ratIDs = [fn[:5] for fn in folder_names if fn[1:5].isdigit()]
+
+    unique_ratIDs = sorted(list(set(ratIDs)))
+
+    return unique_ratIDs
+
+
 def find_mirror_calibration_video(mirror_cal_vid_name, parent_directories):
 
     cal_metadata = parse_camera_calibration_video_name(mirror_cal_vid_name)
@@ -1787,7 +1810,11 @@ def find_mirror_calibration_video(mirror_cal_vid_name, parent_directories):
     full_mirror_cal_vid_name = os.path.join(month_folder, mirror_cal_vid_name)
 
     if not os.path.exists(full_mirror_cal_vid_name):
-        return None
+        # check if it's in an 'already_cropped' folder
+        full_mirror_cal_vid_name = os.path.join(month_folder, 'already_cropped', mirror_cal_vid_name)
+
+        if not os.path.exists(full_mirror_cal_vid_name):
+            return None
 
     return full_mirror_cal_vid_name
 

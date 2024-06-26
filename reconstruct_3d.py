@@ -357,7 +357,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     scores = np.zeros((n_cams, n_frames, n_joints))
     cam_vit_pts = []
     cam_vit_scores = []
-    # todo: how different is "points" from "all_points" and points in the "el.h5" file?
+
     for i_cam, cam_name in enumerate(cam_names):
         # for input to the anipose 2d filtering code, the "points" should be given as an n_frames x n_joints x n_possible x 3 array
         cam_points = d['all_points'][i_cam, :, :, :, :]

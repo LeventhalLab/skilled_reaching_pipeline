@@ -406,7 +406,7 @@ def perform_calibrations(parent_directories, cam_names=('dir', 'lm', 'rm'),
     return calibration_metadata_df
 
 
-def initialize_analysis_params(experiment_list = ('dLight', 'GRABAch-rDA', 'sr6OHDA'),
+def initialize_analysis_params(experiment_list=('dLight', 'GRABAch-rDA', 'sr6OHDA'),
                                cam_names=('dir', 'lm', 'rm'),
                                rats_to_analyze=[],
                                analyses_to_perform='all',
@@ -489,22 +489,23 @@ def initialize_analysis_params(experiment_list = ('dLight', 'GRABAch-rDA', 'sr6O
 
 if __name__ == '__main__':
 
-    experiment_list = ['dLight', 'GRABAch-rDA', 'sr6OHDA']
+    experiment_list = ['sr6OHDA', 'DYT1', 'dLight', 'GRABAch-rDA']
     rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514,
                        519, 520, 521, 522, 526, 528, 529, 530, 532, 533, 534, 535, 536, 537, 548, 549, 550, 551, 552,
-                       553, 554, 555, 556, 557]
+                       553, 554, 555, 556, 557, 558, 561, 562, 565, 568, 575, 576, 577, 578, 579, 580, 581, 582]
 
     gputouse = 0
 
-    # analyses_to_perform = ['crop_calibration_vids',
-    #                        'calibrate_videos',
-    #                        'crop_sr_vids',
-    #                        # 'analyze_sr_vids',
-    #                        'create_marked_vids',
-    #                        'reconstruct_3d'
-    #                        ]
+    analyses_to_perform = [
+                           'crop_calibration_vids',
+                           # 'calibrate_videos',
+                           'crop_sr_vids',
+                           # 'analyze_sr_vids',
+                           'create_marked_vids',
+                           'reconstruct_3d'
+                           ]
 
-    analyses_to_perform = ['reconstruct_3d']
+    # analyses_to_perform = ['reconstruct_3d']
 
     analysis_params = initialize_analysis_params(experiment_list=experiment_list,
                                                  gputouse=gputouse,
@@ -513,10 +514,9 @@ if __name__ == '__main__':
 
     anipose_config = toml.load(analysis_params['anipose_config_path'])
 
-
     # use the code below to write a charuco board to a file
-    ncols = 7
-    nrows = 10
+    ncols = 10
+    nrows = 8
     square_length = 16
     marker_length = 12
     board = skilled_reaching_calibration.create_charuco(nrows, ncols, square_length, marker_length)
@@ -672,6 +672,9 @@ if __name__ == '__main__':
         for expt in experiment_list:
             rat_db_fname = analysis_params['rat_db_fnames'][expt]
             rat_df = skilled_reaching_io.read_rat_db(analysis_params['parent_directories'][expt], rat_db_fname)
+
+            anipose_config = toml.load(analysis_params['anipose_config_path'])
+
             # folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(analysis_params['parent_directories'][expt]['cropped_videos_parent'], analysis_params['cam_names'])
 
             DLC_folder_keys = analysis_params['DLC_folder_names'].keys()

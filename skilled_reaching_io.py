@@ -24,9 +24,16 @@ def read_rat_db(parent_directories, rat_db_fname):
 
     # convert strings in "date" column into datetime objects
     if 'birthdate' in rat_df.columns:
-        rat_df['birthdate'] = pd.to_datetime(rat_df['birthdate'], format='%m/%d/%Y').dt.date
+        try:
+            rat_df['birthdate'] = pd.to_datetime(rat_df['birthdate'], format='%m/%d/%Y').dt.date
+        except:
+            pass
     if 'virusdate' in rat_df.columns:
-        rat_df['virusdate'] = pd.to_datetime(rat_df['virusdate'], format='%m/%d/%Y').dt.date
+        try:
+            rat_df['virusdate'] = pd.to_datetime(rat_df['virusdate'], format='%m/%d/%Y').dt.date
+        except:
+            # if it can't convert from the excel file with the above command, date may have been entered in excel as a date format instead of general text
+            pass
     if 'fiberdate' in rat_df.columns:
         rat_df['fiberdate'] = pd.to_datetime(rat_df['fiberdate'], format='%m/%d/%Y').dt.date
 

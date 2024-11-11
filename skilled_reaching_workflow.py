@@ -152,8 +152,10 @@ def label_videos_in_cropped_folder(folder_to_mark, rat_db, view_config_paths, cr
     ratID = fname_parts[0]
     view = fname_parts[-1]
 
-    paw_pref = rat_db[rat_db['ratid']==ratID]['pawpref'].values[0]
-
+    try:
+        paw_pref = rat_db[rat_db['ratid']==ratID]['pawpref'].values[0]
+    except:
+        pass
     if view == 'rm':
         if paw_pref.lower() == 'right':
             dlc_name = 'farpaw'
@@ -328,7 +330,7 @@ def calibrate_all_sessions(parent_directories,
                 session_row,
                 filtertype=filtertype)
             print('calibrating {}'.format(mirror_calib_vid_name))
-            cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, session_row, calibration_pickle_name)
+            cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, session_row, calibration_pickle_name, full_calib_vid_name=full_calib_vid_name)
             # note that calibrate_mirror_views writes a pickle file with updated calibration parameters including cgroup
 
 
@@ -489,20 +491,23 @@ def initialize_analysis_params(experiment_list=('dLight', 'GRABAch-rDA', 'sr6OHD
 
 if __name__ == '__main__':
 
-    experiment_list = ['sr6OHDA', 'DYT1', 'dLight', 'GRABAch-rDA']
-    rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514,
+    experiment_list = ['sr6OHDA', 'dLight', 'Pavcamotorflex', 'DYT1', 'GRABAch-rDA']
+    rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 514,
                        519, 520, 521, 522, 526, 528, 529, 530, 532, 533, 534, 535, 536, 537, 548, 549, 550, 551, 552,
-                       553, 554, 555, 556, 557, 558, 561, 562, 565, 568, 575, 576, 577, 578, 579, 580, 581, 582]
+                       553, 554, 555, 556, 557, 558, 561, 562, 565, 568, 575, 576, 577, 578, 579, 580, 581, 582, 585,
+                       586, 587, 588, 589, 590, 591, 592, 595, 596, 597, 598, 599, 600, 601, 602, 611, 612, 613, 614,
+                       615, 616, 617, 618, 603, 604, 605, 607, 608, 619, 620, 621, 622, 623, 624, 625, 626]
 
+    rats_to_analyze = [577]
     gputouse = 0
 
     analyses_to_perform = [
-                           'crop_calibration_vids',
-                           # 'calibrate_videos',
-                           'crop_sr_vids',
+                           # 'crop_calibration_vids',
+                           'calibrate_videos',
+                           # 'crop_sr_vids',
                            # 'analyze_sr_vids',
-                           'create_marked_vids',
-                           'reconstruct_3d'
+                           # 'create_marked_vids',
+                           # 'reconstruct_3d'
                            ]
 
     # analyses_to_perform = ['reconstruct_3d']
@@ -515,14 +520,14 @@ if __name__ == '__main__':
     anipose_config = toml.load(analysis_params['anipose_config_path'])
 
     # use the code below to write a charuco board to a file
-    ncols = 10
-    nrows = 8
-    square_length = 16
-    marker_length = 12
-    board = skilled_reaching_calibration.create_charuco(nrows, ncols, square_length, marker_length)
-    expt = 'dLight'
-    calib_folder = analysis_params['parent_directories'][expt]['calibration_vids_parent']
-    skilled_reaching_calibration.write_charuco_image(board, 600, calib_folder)
+    # ncols = 5
+    # nrows = 4
+    # square_length = 16
+    # marker_length = 12
+    # board = skilled_reaching_calibration.create_charuco(nrows, ncols, square_length, marker_length)
+    # expt = 'dLight'
+    # calib_folder = analysis_params['parent_directories'][expt]['calibration_vids_parent']
+    # skilled_reaching_calibration.write_charuco_image(board, 600, calib_folder)
 
     # test_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0452\R0452_20230329_sr_ses01'
     # # analyze_3d_recons.analyze_trajectories(test_folder, anipose_config)

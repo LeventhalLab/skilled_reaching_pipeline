@@ -1805,16 +1805,19 @@ def find_mirror_calibration_video(mirror_cal_vid_name, parent_directories):
     if cal_metadata is None:
         return None
     month_folder = 'calibration_videos_{}'.format(cal_metadata['time'].strftime('%Y%m'))
-    month_folder = os.path.join(parent_directories['calibration_vids_parent'], month_folder)
+    full_month_folder = os.path.join(parent_directories['calibration_vids_parent'], month_folder)
 
-    full_mirror_cal_vid_name = os.path.join(month_folder, mirror_cal_vid_name)
+    full_mirror_cal_vid_name = os.path.join(full_month_folder, mirror_cal_vid_name)
 
     if not os.path.exists(full_mirror_cal_vid_name):
         # check if it's in an 'already_cropped' folder
-        full_mirror_cal_vid_name = os.path.join(month_folder, 'already_cropped', mirror_cal_vid_name)
+        full_mirror_cal_vid_name = os.path.join(full_month_folder, month_folder + '_already_cropped', mirror_cal_vid_name)
 
         if not os.path.exists(full_mirror_cal_vid_name):
-            return None
+            full_mirror_cal_vid_name = os.path.join(full_month_folder, month_folder + '_alreadycropped', mirror_cal_vid_name)
+
+            if not os.path.exists(full_mirror_cal_vid_name):
+                return None
 
     return full_mirror_cal_vid_name
 

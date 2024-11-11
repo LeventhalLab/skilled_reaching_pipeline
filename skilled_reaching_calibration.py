@@ -1038,11 +1038,14 @@ def mirror_board_from_df(session_row):
 
 def create_charuco(squaresX, squaresY, square_length, marker_length, marker_bits=4, dict_size=50, aruco_dict=None, manually_verify=False):
 
-    board = CharucoBoard(int(squaresX), int(squaresY), square_length, marker_length,
-                         marker_bits=marker_bits,
-                         dict_size=dict_size,
-                         aruco_dict=aruco_dict,
-                         manually_verify=manually_verify)
+    try:
+        board = CharucoBoard(int(squaresX), int(squaresY), square_length, marker_length,
+                             marker_bits=marker_bits,
+                             dict_size=dict_size,
+                             aruco_dict=aruco_dict,
+                             manually_verify=manually_verify)
+    except:
+        pass
 
     return board
 
@@ -2066,7 +2069,7 @@ def test_board_reconstruction(pts1, pts2, mtx, rot, t, board):
 
 
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, session_row, calibration_pickle_name,
-                           view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, verbose=True):
+                           full_calib_vid_name=None, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
     if os.path.exists(calibration_pickle_name):
@@ -2094,7 +2097,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     #  2. undistort points in the full original reference frame, then move them back into the cropped
     #      video, then flip them left-right if in a mirror view
     if 'all_rows' not in calibration_data.keys():
-        all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, mirror_board, parent_directories)
+        all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, mirror_board, parent_directories, full_calib_vid_name=full_calib_vid_name)
         for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
             # need to make sure the cameras are in the right order; this should have been checked in the code above
             all_rows[i] = mirror_board.estimate_pose_rows(cam, row)
@@ -2273,7 +2276,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     # return cgroup, error
 
 
-def         test_anipose_calibration(session_row, parent_directories):
+def test_anipose_calibration(session_row, parent_directories):
 
     calibration_vids_parent = parent_directories['calibration_vids_parent']
     calibration_files_parent = parent_directories['calibration_files_parent']
@@ -2402,12 +2405,49 @@ def test_fundamental_matrix(full_calib_vid_name, merged, frame_num, calibration_
     return
 
 
-def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories):
+def check_detections(board, all_rows, cropped_vids, full_calib_vid_name, cam_intrinsics):
+
+    cv_cap = cv2.VideoCapture(full_calib_vid_name)
+    i_frame = 51
+
+    cv_cap.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
+    res, img = cv_cap.read()
+
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    ax.imshow(img)
+
+    # overlay points
+    row_idx = [0, 0, 0]
+    for i_view, rows in enumerate(all_rows):
+        frame_nums = np.array([(i_row, row['framenum']) for i_row, row in enumerate(rows)])
+        try:
+            frame_row_idx = frame_nums[frame_nums[:,1]==i_frame,0][0]
+        except:
+            # there aren't data for this frame
+            frame_row_idx = None
+        row_idx[i_view] = frame_row_idx
+
+    for i_view, rows in enumerate(all_rows):
+        if not row_idx[i_view] is None:
+            frame_row = rows[row_idx[i_view]]
+            for ii, id in enumerate(frame_row['ids']):
+                plt.text(frame_row['corners'][ii, 0, 0], frame_row['corners'][ii, 0, 1],
+                         '{:d}'.format(id[0]), c='r')
+
+
+    plt.show()
+    pass
+
+def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories, skip=20, full_calib_vid_name=None):
 
     all_rows = []
     for cropped_vid in cropped_vids:
         # rows_cam = []
-        rows, size = detect_video_pts(cropped_vid, board)
+
+        # if 'rm' in cropped_vid:
+        #     skip = 1
+        rows, size = detect_video_pts(cropped_vid, board, skip=skip)
 
         cropped_vid_metadata = navigation_utilities.parse_cropped_calibration_video_name(cropped_vid)
         # undistort the points in the rows list
@@ -2450,6 +2490,9 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
             # rows_cam.extend(rows)
 
         all_rows.append(rows)
+
+    # put in a catch here if the number of points detected is too low
+    # check_detections(board, all_rows, cropped_vids, full_calib_vid_name, cam_intrinsics)
 
     return all_rows
 
@@ -3003,10 +3046,10 @@ def detect_markers(image, board, camera=None, refine=True):
     params.adaptiveThreshWinSizeMin = 100
     params.adaptiveThreshWinSizeMax = 700
     params.adaptiveThreshWinSizeStep = 50
-    params.adaptiveThreshConstant = 0
+    params.adaptiveThreshConstant = 5
 
     ch_detector = aruco.CharucoDetector(board.board)
-    ar_detector = aruco.ArucoDetector(board.board.getDictionary())
+    ar_detector = aruco.ArucoDetector(board.board.getDictionary(), detectorParams=params)
 
     markerCorners, markerIds, rejectedImgPoints = ar_detector.detectMarkers(gray)
 
@@ -3022,10 +3065,23 @@ def detect_markers(image, board, camera=None, refine=True):
     else:
         detectedCorners, detectedIds = markerCorners, markerIds
 
-    charucoCorners, charucoIds, markerCorners, markerIds  = ch_detector.detectBoard(gray, markerCorners=markerCorners, markerIds=markerIds)
+    charucoCorners, charucoIds, markerCorners, markerIds  = ch_detector.detectBoard(gray, markerCorners=detectedCorners, markerIds=detectedIds)
     # charuco_img = aruco.drawDetectedCornersCharuco(gray, charucoCorners, charucoIds, (255, 0, 0))
 
     # todo: do we need to refine the detected corners?
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
+    #
+    # fig2 = plt.figure()
+    # ax2 = fig2.add_subplot()
+    #
+    # detect_markers_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    # detect_markers_img = aruco.drawDetectedMarkers(detect_markers_img, detectedCorners, detectedIds)
+    # ax2.imshow(detect_markers_img)
+    #
+    # detect_charuco_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    # detect_charuco_img = aruco.drawDetectedCornersCharuco(detect_charuco_img, charucoCorners, charucoIds)
+    # ax.imshow(detect_charuco_img)
 
     return charucoCorners, charucoIds, markerCorners, markerIds
 

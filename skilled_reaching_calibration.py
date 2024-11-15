@@ -1047,6 +1047,15 @@ def create_charuco(squaresX, squaresY, square_length, marker_length, marker_bits
     except:
         pass
 
+    # just to test that the board really looks like the board used for calibration
+    # img = board.board.generateImage((600, 600))
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
+    # ax.imshow(img)
+    # plt.show()
+
+
+
     return board
 
 
@@ -1544,10 +1553,20 @@ def create_cal_frame_figure(width, height, ax3d=None, scale=1.0, dpi=100, nrows=
     return fig, axs
 
 
-def calibrate_single_camera(cal_vid, board, num_frames2use=20):
+def calibrate_single_camera(cal_vid, board, num_frames2use=20, min_pts_per_frame=10):
+    '''
+
+    :param cal_vid:
+    :param board:
+    :param num_frames2use:
+    :param min_pts_per_frame: minimum number of identified charuco points needed in each frame for calibration.
+        8 or more should be adequate, but I think if they're colinear the algorithm collapses. Made default 10 and that
+        seemed to fix the error (DL, 11/14/2024)
+    :return:
+    '''
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO
 
-    rows, size = detect_video_pts(cal_vid, board)
+    rows, size = detect_video_pts(cal_vid, board, skip=1)
     # size is (w, h)
     # rows = board.detect_video(cal_vid, prefix=None, skip=skip, progress=True)
 
@@ -1556,17 +1575,21 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
     skip = int(len(objp) / num_frames2use)
 
     #
-    mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= 7]
-    valid_frames = [ii for ii, o in enumerate(objp) if len(o) >= 7]
+    mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= min_pts_per_frame]
+    valid_frames = [ii for ii, o in enumerate(objp) if len(o) >= min_pts_per_frame]
 
     objp, imgp = zip(*mixed)
 
     # matrix = cv2.initCameraMatrix2D(objp, imgp, tuple(size))
     num_frames = len(objp)
+    n_charuco_pts_per_frame = np.array([len(row['ids']) for row in rows])
     frames_to_use = list(range(0, num_frames, skip))
     objp_to_use = [objp[ii] for ii in frames_to_use]
     imgp_to_use = [imgp[ii] for ii in frames_to_use]
-    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp_to_use, imgp_to_use, size, None, None, flags=CALIBRATION_FLAGS)
+    try:
+        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp_to_use, imgp_to_use, size, None, None, flags=CALIBRATION_FLAGS)
+    except:
+        pass
 
     cam_intrinsic_data = {'ret': ret,
                           'mtx': mtx,
@@ -3046,14 +3069,13 @@ def detect_markers(image, board, camera=None, refine=True):
     params.adaptiveThreshWinSizeMin = 100
     params.adaptiveThreshWinSizeMax = 700
     params.adaptiveThreshWinSizeStep = 50
-    params.adaptiveThreshConstant = 5
+    # params.minMarkerPerimeterRate = 0.05
+    params.adaptiveThreshConstant = 0
 
     ch_detector = aruco.CharucoDetector(board.board)
     ar_detector = aruco.ArucoDetector(board.board.getDictionary(), detectorParams=params)
 
     markerCorners, markerIds, rejectedImgPoints = ar_detector.detectMarkers(gray)
-
-    # marker_img = aruco.drawDetectedMarkers(gray, markerCorners, markerIds)
 
     if refine:
         # detectedCorners, detectedIds, rejectedCorners, recoveredIdxs = \
@@ -3069,22 +3091,22 @@ def detect_markers(image, board, camera=None, refine=True):
     # charuco_img = aruco.drawDetectedCornersCharuco(gray, charucoCorners, charucoIds, (255, 0, 0))
 
     # todo: do we need to refine the detected corners?
-    # fig = plt.figure()
-    # ax = fig.add_subplot()
+    # if np.shape(charucoCorners)[0] < 30:
+    #     fig = plt.figure()
+    #     ax = fig.add_subplot()
     #
-    # fig2 = plt.figure()
-    # ax2 = fig2.add_subplot()
+    #     fig2 = plt.figure()
+    #     ax2 = fig2.add_subplot()
     #
-    # detect_markers_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    # detect_markers_img = aruco.drawDetectedMarkers(detect_markers_img, detectedCorners, detectedIds)
-    # ax2.imshow(detect_markers_img)
+    #     detect_markers_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    #     detect_markers_img = aruco.drawDetectedMarkers(detect_markers_img, detectedCorners, detectedIds)
+    #     ax2.imshow(detect_markers_img)
     #
-    # detect_charuco_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    # detect_charuco_img = aruco.drawDetectedCornersCharuco(detect_charuco_img, charucoCorners, charucoIds)
-    # ax.imshow(detect_charuco_img)
+    #     detect_charuco_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    #     detect_charuco_img = aruco.drawDetectedCornersCharuco(detect_charuco_img, charucoCorners, charucoIds)
+    #     ax.imshow(detect_charuco_img)
 
     return charucoCorners, charucoIds, markerCorners, markerIds
-
 
 
 def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directories, num_frames_for_intrinsics=50, min_frames_for_intrinsics=10, num_frames_for_stereo=20, min_frames_for_stereo=5, use_undistorted_pts_for_stereo_cal=True):

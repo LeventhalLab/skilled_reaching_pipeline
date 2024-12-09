@@ -2120,7 +2120,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     #  2. undistort points in the full original reference frame, then move them back into the cropped
     #      video, then flip them left-right if in a mirror view
     if 'all_rows' not in calibration_data.keys():
-        all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, mirror_board, parent_directories, full_calib_vid_name=full_calib_vid_name)
+        all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, mirror_board, parent_directories, cgroup, full_calib_vid_name=full_calib_vid_name)
         for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
             # need to make sure the cameras are in the right order; this should have been checked in the code above
             all_rows[i] = mirror_board.estimate_pose_rows(cam, row)
@@ -2462,15 +2462,19 @@ def check_detections(board, all_rows, cropped_vids, full_calib_vid_name, cam_int
     plt.show()
     pass
 
-def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories, skip=20, full_calib_vid_name=None):
 
+def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories, cgroup, skip=20, full_calib_vid_name=None):
+
+    # check to see if there is a folder with individual images and a .csv file with points marked in fiji
+    navigation_utilities.check_for_calibration_csvs(cropped_vids[0], parent_directories)
     all_rows = []
-    for cropped_vid in cropped_vids:
+    for i_vid, cropped_vid in enumerate(cropped_vids):
         # rows_cam = []
 
         # if 'rm' in cropped_vid:
         #     skip = 1
-        rows, size = detect_video_pts(cropped_vid, board, skip=skip)
+        camera = cgroup.cameras[i_vid]
+        rows, size = detect_video_pts(cropped_vid, board, camera, skip=skip)
 
         cropped_vid_metadata = navigation_utilities.parse_cropped_calibration_video_name(cropped_vid)
         # undistort the points in the rows list
@@ -2758,7 +2762,7 @@ def match_mirror_points(mirrors_corner, direct_corner, direct_ids):
 
     pass
 
-def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=True, min_rows_detected=20):
+def detect_video_pts(calibration_video, board, camera, prefix=None, skip=20, progress=True, min_rows_detected=20):
     # adapted from anipose
     cap = cv2.VideoCapture(calibration_video)
 
@@ -2791,6 +2795,7 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
         if framenum % skip != 0 and go <= 0:
             continue
 
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         if isinstance(board, CharucoBoard):
             if 'rm' in cvid_name or 'lm' in cvid_name or 'mirror' in cvid_name:
                 ismirrorview = True
@@ -2800,7 +2805,7 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
                 # aruco markers are flipped left-right in the mirror, so need to flip the frame image to detect them
                 orig_frame = np.copy(frame)
                 frame = cv2.flip(frame, 1)
-            charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame, board)
+            charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame, board, camera=camera)
 
             if ismirrorview and charucoCorners is not None and len(charucoCorners) > 0:
                 # now need to flip the identified points left-right to match in the original image
@@ -3056,6 +3061,19 @@ def CharucoBoardObject_from_AniposeBoard(board):
     return ch_board
 
 
+def unsharp_mask(image, kernel_size=(5, 5), sigma=1.0, amount=1.0, threshold=0):
+    """Return a sharpened version of the image, using an unsharp mask."""
+    blurred = cv2.GaussianBlur(image, kernel_size, sigma)
+    sharpened = float(amount + 1) * image - float(amount) * blurred
+    sharpened = np.maximum(sharpened, np.zeros(sharpened.shape))
+    sharpened = np.minimum(sharpened, 255 * np.ones(sharpened.shape))
+    sharpened = sharpened.round().astype(np.uint8)
+    if threshold > 0:
+        low_contrast_mask = np.absolute(image - blurred) < threshold
+        np.copyto(sharpened, image, where=low_contrast_mask)
+    return sharpened
+
+
 def detect_markers(image, board, camera=None, refine=True):
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -3076,6 +3094,8 @@ def detect_markers(image, board, camera=None, refine=True):
     ar_detector = aruco.ArucoDetector(board.board.getDictionary(), detectorParams=params)
 
     markerCorners, markerIds, rejectedImgPoints = ar_detector.detectMarkers(gray)
+    temp = unsharp_mask(gray, sigma=1., amount=4.)
+    # a,b,c = ar_detector.detectMarkers(temp)
 
     if refine:
         # detectedCorners, detectedIds, rejectedCorners, recoveredIdxs = \
@@ -3084,6 +3104,7 @@ def detect_markers(image, board, camera=None, refine=True):
         #                                 K, D,
         #                                 parameters=params)
         detectedCorners, detectedIds, rejectedCorners, recoveredIdxs = ar_detector.refineDetectedMarkers(gray, board.board, markerCorners, markerIds, rejectedImgPoints)
+        # d,e,f,g = ar_detector.refineDetectedMarkers(temp, board.board, a, b, c)
     else:
         detectedCorners, detectedIds = markerCorners, markerIds
 

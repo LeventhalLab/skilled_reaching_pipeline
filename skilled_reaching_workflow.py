@@ -491,8 +491,8 @@ def initialize_analysis_params(experiment_list=('dLight', 'GRABAch-rDA', 'sr6OHD
 
 if __name__ == '__main__':
 
-    experiment_list = ['dLight', 'sr6OHDA', 'dLight', 'Pavcamotorflex', 'DYT1', 'GRABAch-rDA']
-    rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 514,
+    experiment_list = ['sr6OHDA', 'dLight', 'Pavcamotorflex', 'DYT1', 'GRABAch-rDA']
+    rats_to_analyze = [600, 468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 514,
                        519, 520, 521, 522, 526, 528, 529, 530, 532, 533, 534, 535, 536, 537, 548, 549, 550, 551, 552,
                        553, 554, 555, 556, 557, 558, 561, 562, 565, 568, 575, 576, 577, 578, 579, 580, 581, 582, 585,
                        586, 587, 588, 589, 590, 591, 592, 595, 596, 597, 598, 599, 600, 601, 602, 611, 612, 613, 614,

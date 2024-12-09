@@ -3061,10 +3061,41 @@ def parse_cropped_calibration_video_name(cropped_calibration_vid_name):
     return cropped_cal_vid_metadata
 
 
+def find_calibration_vid_folder(vid_params, parent_directories):
+
+    calibration_vids_parent = parent_directories['calibration_vids_parent']
+    vid_month_name = 'calibration_videos_{}'.format(vid_params['time'].strftime('%Y%m'))
+    month_folder = os.path.join(calibration_vids_parent, vid_month_name)
+
+    return month_folder
+
+
+def check_for_calibration_csvs(cropped_vid_name, parent_directories):
+
+    vid_params = parse_cropped_calibration_video_name(cropped_vid_name)
+    calibration_vid_folder = find_calibration_vid_folder(vid_params, parent_directories)
+
+    time_string = vid_params['time'].strftime('%Y%m%d_%H-%M-%S')
+    test_folder_name = '_'.join(('GridCalibration',
+                                 'b{:02d}'.format(vid_params['boxnum']),
+                                 time_string))
+
+    test_folder = os.path.join(calibration_vid_folder, test_folder_name)
+
+    if os.path.exists(test_folder):
+        # check for csv's, WORKING HERE...
+        pass
+    else:
+        return None
+
+
 def create_calibration_file_path(calibration_files_parent, calib_metadata):
 
     # year_str = calib_metadata['time'].strftime('%Y')
-    month_str = calib_metadata['time'].strftime('%Y%m')
+    try:
+        month_str = calib_metadata['time'].strftime('%Y%m')
+    except:
+        pass
     # year_folder = os.path.join(calibration_files_parent, 'calibration_files_' + year_str)
     month_folder = os.path.join(calibration_files_parent, 'calibration_files_' + month_str)
     # box_folder = os.path.join(month_folder, 'calibration_files_' + month_str + '_box{:02d}'.format(calib_metadata['boxnum']))

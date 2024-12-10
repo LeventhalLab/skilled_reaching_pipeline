@@ -2463,60 +2463,78 @@ def check_detections(board, all_rows, cropped_vids, full_calib_vid_name, cam_int
     pass
 
 
+def rows_from_csvs(csv_list, board, n_views=3):
+    board_size = board.get_size()
+    pts_per_view = np.prod(board_size)
+
+    all_rows = [[] for i_view in range(n_views)]
+    for csv_file in csv_list:
+        csv_metadata = navigation_utilities.parse_frame_csv_name(csv_file)
+        csv_table = pd.read_csv(csv_file)
+
+        all_corners = np.array((csv_table['X'], csv_table['Y'])).T
+
+        row = {'framenum': csv_metadata['framenum'], 'corners': corners, 'ids': ids}
+        pass
+
+
 def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories, cgroup, skip=20, full_calib_vid_name=None):
-
-    # check to see if there is a folder with individual images and a .csv file with points marked in fiji
-    navigation_utilities.check_for_calibration_csvs(cropped_vids[0], parent_directories)
     all_rows = []
-    for i_vid, cropped_vid in enumerate(cropped_vids):
-        # rows_cam = []
+    # check to see if there is a folder with individual images and a .csv file with points marked in fiji
+    csv_list = navigation_utilities.check_for_calibration_csvs(cropped_vids[0], parent_directories)
+    n_views = len(cropped_vids)
+    if len(csv_list) > 0:
+        all_rows, size = rows_from_csvs(csv_list, board, n_views=n_views)
+    else:
+        for i_vid, cropped_vid in enumerate(cropped_vids):
+            # rows_cam = []
 
-        # if 'rm' in cropped_vid:
-        #     skip = 1
-        camera = cgroup.cameras[i_vid]
-        rows, size = detect_video_pts(cropped_vid, board, camera, skip=skip)
+            # if 'rm' in cropped_vid:
+            #     skip = 1
+            camera = cgroup.cameras[i_vid]
+            rows, size = detect_video_pts(cropped_vid, board, camera, skip=skip)
 
-        cropped_vid_metadata = navigation_utilities.parse_cropped_calibration_video_name(cropped_vid)
-        # undistort the points in the rows list
-        # translate points back to full frame, then undistort and unnormalize
-        for i_row, row in enumerate(rows):
-            orig_coord_x = row['corners'][:,:,0] + cropped_vid_metadata['crop_params'][0]
-            orig_coord_y = row['corners'][:,:,1] + cropped_vid_metadata['crop_params'][2]
-            orig_coord = np.hstack((orig_coord_x, orig_coord_y))
+            cropped_vid_metadata = navigation_utilities.parse_cropped_calibration_video_name(cropped_vid)
+            # undistort the points in the rows list
+            # translate points back to full frame, then undistort and unnormalize
+            for i_row, row in enumerate(rows):
+                orig_coord_x = row['corners'][:,:,0] + cropped_vid_metadata['crop_params'][0]
+                orig_coord_y = row['corners'][:,:,1] + cropped_vid_metadata['crop_params'][2]
+                orig_coord = np.hstack((orig_coord_x, orig_coord_y))
 
-            # not sure what the difference is between 'filled' and 'corners' in each row dictionary, just trying to make
-            # this work with anipose
-            orig_filled_x = row['filled'][:, :, 0] + cropped_vid_metadata['crop_params'][0]
-            orig_filled_y = row['filled'][:, :, 1] + cropped_vid_metadata['crop_params'][2]
-            orig_filled = np.hstack((orig_filled_x, orig_filled_y))
+                # not sure what the difference is between 'filled' and 'corners' in each row dictionary, just trying to make
+                # this work with anipose
+                orig_filled_x = row['filled'][:, :, 0] + cropped_vid_metadata['crop_params'][0]
+                orig_filled_y = row['filled'][:, :, 1] + cropped_vid_metadata['crop_params'][2]
+                orig_filled = np.hstack((orig_filled_x, orig_filled_y))
 
-            orig_ud_norm = cv2.undistortPoints(orig_coord, cam_intrinsics['mtx'], cam_intrinsics['dist'])
-            corners_ud = cvb.unnormalize_points(orig_ud_norm, cam_intrinsics['mtx'])
+                orig_ud_norm = cv2.undistortPoints(orig_coord, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+                corners_ud = cvb.unnormalize_points(orig_ud_norm, cam_intrinsics['mtx'])
 
-            filled_ud_norm = cv2.undistortPoints(orig_filled, cam_intrinsics['mtx'], cam_intrinsics['dist'])
-            filled_ud = cvb.unnormalize_points(filled_ud_norm, cam_intrinsics['mtx'])
+                filled_ud_norm = cv2.undistortPoints(orig_filled, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+                filled_ud = cvb.unnormalize_points(filled_ud_norm, cam_intrinsics['mtx'])
 
-            if isinstance(board, Checkerboard):
-                # make sure the top left corner is always labeled first in the direct view and the labels go left->right across rows
-                # make sure the top right corner is labeled first in the mirror views and labels go right->left across rows
+                if isinstance(board, Checkerboard):
+                    # make sure the top left corner is always labeled first in the direct view and the labels go left->right across rows
+                    # make sure the top right corner is labeled first in the mirror views and labels go right->left across rows
 
-                fliplr = True
-                if 'dir' in cropped_vid:
-                    fliplr = False
+                    fliplr = True
+                    if 'dir' in cropped_vid:
+                        fliplr = False
 
-                oc = corners_ud
-                corners_ud = reorder_checkerboard_points(corners_ud, board.get_size(), fliplr)
-                filled_ud = reorder_checkerboard_points(filled_ud, board.get_size(), fliplr)
-            corners_ud = np.expand_dims(corners_ud, 1)
-            filled_ud = np.expand_dims(filled_ud, 1)
+                    oc = corners_ud
+                    corners_ud = reorder_checkerboard_points(corners_ud, board.get_size(), fliplr)
+                    filled_ud = reorder_checkerboard_points(filled_ud, board.get_size(), fliplr)
+                corners_ud = np.expand_dims(corners_ud, 1)
+                filled_ud = np.expand_dims(filled_ud, 1)
 
-            rows[i_row]['corners_distorted'] = row['corners']   # these are still in the cropped video reference frame
-            rows[i_row]['corners'] = corners_ud
-            rows[i_row]['filled'] = filled_ud
+                rows[i_row]['corners_distorted'] = row['corners']   # these are still in the cropped video reference frame
+                rows[i_row]['corners'] = corners_ud
+                rows[i_row]['filled'] = filled_ud
 
-            # rows_cam.extend(rows)
+                # rows_cam.extend(rows)
 
-        all_rows.append(rows)
+            all_rows.append(rows)
 
     # put in a catch here if the number of points detected is too low
     # check_detections(board, all_rows, cropped_vids, full_calib_vid_name, cam_intrinsics)

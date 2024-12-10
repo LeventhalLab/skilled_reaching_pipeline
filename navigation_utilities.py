@@ -3070,6 +3070,25 @@ def find_calibration_vid_folder(vid_params, parent_directories):
     return month_folder
 
 
+def parse_frame_csv_name(frame_csv_file):
+
+    _, csv_name = os.path.split(frame_csv_file)
+    csv_name, _ = os.path.splitext(csv_name)
+
+    csv_name_parts = csv_name.split('_')
+
+    box_num = int(csv_name_parts[1][1:])
+    csv_time = datetime_from_fname_string(csv_name_parts[2] + '_' + csv_name_parts[3])
+    framenum = int(csv_name_parts[-1])
+
+    csv_metadata = {'boxnum': box_num,
+                    'time': csv_time,
+                    'framenum': framenum - 1  # subtract one because Fiji indexes starting at 0 but opencv/ffmpeg start indexing at zero
+    }
+
+    return csv_metadata
+
+
 def check_for_calibration_csvs(cropped_vid_name, parent_directories):
 
     vid_params = parse_cropped_calibration_video_name(cropped_vid_name)
@@ -3083,10 +3102,14 @@ def check_for_calibration_csvs(cropped_vid_name, parent_directories):
     test_folder = os.path.join(calibration_vid_folder, test_folder_name)
 
     if os.path.exists(test_folder):
-        # check for csv's, WORKING HERE...
-        pass
+        # check for csv's
+        test_name = 'GridCalibration_*_frame_*.csv'
+        test_name = os.path.join(test_folder, test_name)
+        csv_list = glob.glob(test_name)
+
+        return csv_list
     else:
-        return None
+        return []
 
 
 def create_calibration_file_path(calibration_files_parent, calib_metadata):

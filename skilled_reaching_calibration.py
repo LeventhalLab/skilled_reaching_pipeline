@@ -2463,18 +2463,36 @@ def check_detections(board, all_rows, cropped_vids, full_calib_vid_name, cam_int
     pass
 
 
-def rows_from_csvs(csv_list, board, n_views=3):
-    board_size = board.get_size()
-    pts_per_view = np.prod(board_size)
+def rows_from_csvs(csv_list, board, cgroup, n_views=3):
+    board_size = np.array(board.get_size())
+    pts_per_view = np.prod(board_size-1)
 
     all_rows = [[] for i_view in range(n_views)]
     for csv_file in csv_list:
         csv_metadata = navigation_utilities.parse_frame_csv_name(csv_file)
         csv_table = pd.read_csv(csv_file)
 
-        all_corners = np.array((csv_table['X'], csv_table['Y'])).T
+        frame_corners = np.array((csv_table['X'], csv_table['Y'])).T
+        n_pts = np.shape(frame_corners)[0]
 
-        row = {'framenum': csv_metadata['framenum'], 'corners': corners, 'ids': ids}
+        n_views_with_pts = int(n_pts / pts_per_view)
+
+        # assume first pts_per_view points belong to the direct view
+        dir_corners = frame_corners[:pts_per_view, :]
+        mirr_corners = frame_corners[pts_per_view:, :]
+        # do the next points belong to the left mirror or right mirror view?
+        if frame_corners[pts_per_view + 1, 0] < frame_corners[pts_per_view, 0]:
+            # must be the left mirror
+            mirror_view_idx = 1
+        else:
+            mirror_view_idx = 2
+
+        dir_corners, mirr_corners, dir_ids, mirr_ids = match_mirror_points(mirr_corners, dir_corners)
+
+        dir_row = {'framenum': csv_metadata['framenum'], 'corners': dir_corners, 'ids': dir_ids}
+        all_rows[0].append(row)
+        mirrr_row = {'framenum': csv_metadata['framenum'], 'corners': mirr_corners, 'ids': mirr_ids}
+        all_rows[mirror_view_idx].append(row)
         pass
 
 
@@ -2484,7 +2502,7 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
     csv_list = navigation_utilities.check_for_calibration_csvs(cropped_vids[0], parent_directories)
     n_views = len(cropped_vids)
     if len(csv_list) > 0:
-        all_rows, size = rows_from_csvs(csv_list, board, n_views=n_views)
+        all_rows, size = rows_from_csvs(csv_list, board, cgroup, n_views=n_views)
     else:
         for i_vid, cropped_vid in enumerate(cropped_vids):
             # rows_cam = []
@@ -2776,8 +2794,10 @@ def get_rows_cropped_vids_anipose(cropped_vids, cam_intrinsics, board, parent_di
     # return all_rows
 
 
-def match_mirror_points(mirrors_corner, direct_corner, direct_ids):
+def match_mirror_points(mirr_corners, dir_corners):
+    # build this based on old matlab code
 
+    # dir_corners, mirr_corners, dir_ids, mirr_ids = match_mirror_points(mirr_corners, dir_corners)
     pass
 
 def detect_video_pts(calibration_video, board, camera, prefix=None, skip=20, progress=True, min_rows_detected=20):
@@ -3720,11 +3740,6 @@ def check_Rs(cal_data):
         T_ffmest[i_frame, :] = T_ffmest_frame
 
         pass
-    pass
-
-
-def match_cb_points(cb1, cb2):
-
     pass
 
 

@@ -2463,6 +2463,49 @@ def check_detections(board, all_rows, cropped_vids, full_calib_vid_name, cam_int
     pass
 
 
+def find_supporting_lines(pts1, pts2):
+
+    rounded_pts1 = pts1.astype(np.int)
+    rounded_pts2 = pts2.astype(np.int)
+    all_pts = np.vstack((rounded_pts1, rounded_pts2))
+
+    full_cvx_hull = np.squeeze(cv2.convexHull(all_pts))
+    full_cvx_hull = np.vstack((full_cvx_hull, full_cvx_hull[0, :]))
+    # wrap around so the last point is the same as the first point for processing purposes below
+
+    n_lines_found = 0
+    n_hullpts = np.shape(full_cvx_hull)[0]
+
+    cv_pts = np.empty((2, 2))
+    supporting_lines = np.zeros((2, 2, 2))
+    # each(:,:, p) array contains[x1, y1; x2, y2] coordinates that define the endpoints of a supporting line
+
+    for i_pt, hull_pt in enumerate(full_cvx_hull[:-1, :]):
+
+        cv_pts[0, :] = hull_pt
+        cv_pts[1, :] = full_cvx_hull[i_pt+1, :]
+
+        pts_set = np.zeros(2, dtype=np.int) - 1
+        # which sets (pts1 or pts2) do adjacent points in the convex hull belong to?
+        if np.any(np.all(rounded_pts1 == cv_pts[0, :], axis=1)):
+            # if there is a match between set 1 and the first test point on the convex hull
+            pts_set[0] = 1
+        elif np.any(np.all(rounded_pts1 == cv_pts[1, :], axis=1)):
+            # if there is a match between set 1 and the second test point on the convex hull
+            pts_set[1] = 1
+
+        if np.any(np.all(rounded_pts2 == cv_pts[0, :], axis=1)):
+            # if there is a match between set 2 and the first test point on the convex hull
+            pts_set[0] = 2
+        elif np.any(np.all(rounded_pts2 == cv_pts[1, :], axis=1)):
+            # if there is a match between set 2 and the second test point on the convex hull
+            pts_set[1] = 2
+
+        if pts_set[0] != pts_set[1]:
+            supporting_lines[:, :, n_lines_found] = cv_pts   # this needs to be redone so that we go back to the original points (not the integers)
+            n_lines_found += 1
+
+
 def rows_from_csvs(csv_list, board, cgroup, n_views=3):
     board_size = np.array(board.get_size())
     pts_per_view = np.prod(board_size-1)
@@ -2481,7 +2524,7 @@ def rows_from_csvs(csv_list, board, cgroup, n_views=3):
         dir_corners = frame_corners[:pts_per_view, :]
         mirr_corners = frame_corners[pts_per_view:, :]
         # do the next points belong to the left mirror or right mirror view?
-        if frame_corners[pts_per_view + 1, 0] < frame_corners[pts_per_view, 0]:
+        if frame_corners[pts_per_view, 0] < frame_corners[pts_per_view - 1, 0]:
             # must be the left mirror
             mirror_view_idx = 1
         else:
@@ -2798,6 +2841,26 @@ def match_mirror_points(mirr_corners, dir_corners):
     # build this based on old matlab code
 
     # dir_corners, mirr_corners, dir_ids, mirr_ids = match_mirror_points(mirr_corners, dir_corners)
+    remaining_dir_corners = np.copy(dir_corners)
+    remaining_mirr_corners = np.copy(mirr_corners)
+    n_matches = 0
+
+    while np.shape(remaining_dir_corners)[0] > 0:
+
+        if np.shape(remaining_dir_corners)[0] == 1:
+            # only one point left
+            dir_row = np.where((dir_corners == remaining_dir_corners).all(axis=1))
+            mir_row = np.where((mirr_corners == remaining_mirr_corners).all(axis=1))
+
+            match_idx[n_matches, 0] = dir_row
+            match_idx[n_matches, 1] = mir_row
+
+            remaining_dir_corners = np.array([])
+            remaining_mirr_corners = np.array([])
+
+        supporting_lines = find_supporting_lines(remaining_dir_corners, remaining_mirr_corners)
+
+
     pass
 
 def detect_video_pts(calibration_video, board, camera, prefix=None, skip=20, progress=True, min_rows_detected=20):

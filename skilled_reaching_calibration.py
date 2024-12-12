@@ -2477,38 +2477,76 @@ def find_supporting_lines(pts1, pts2):
     n_hullpts = np.shape(full_cvx_hull)[0]
 
     cv_pts = np.empty((2, 2))
+    cv_pts_round = np.zeros((2, 2), dtype=np.int)
     supporting_lines = np.zeros((2, 2, 2))
     # each(:,:, p) array contains[x1, y1; x2, y2] coordinates that define the endpoints of a supporting line
 
     for i_pt, hull_pt in enumerate(full_cvx_hull[:-1, :]):
 
-        cv_pts[0, :] = hull_pt
-        cv_pts[1, :] = full_cvx_hull[i_pt+1, :]
+        cv_pts_round[0, :] = hull_pt
+        cv_pts_round[1, :] = full_cvx_hull[i_pt+1, :]
+
+        cv_pts = np.empty((2, 2))
 
         pts_set = np.zeros(2, dtype=np.int) - 1
         # which sets (pts1 or pts2) do adjacent points in the convex hull belong to?
-        if np.any(np.all(rounded_pts1 == cv_pts[0, :], axis=1)):
+        pt_set_match = np.all(rounded_pts1 == cv_pts_round[0, :], axis=1)
+        if np.any(pt_set_match):
             # if there is a match between set 1 and the first test point on the convex hull
             pts_set[0] = 1
-        elif np.any(np.all(rounded_pts1 == cv_pts[1, :], axis=1)):
+            idx_in_set = np.where(pt_set_match)[0][0]
+            cv_pts[0, :] = pts1[idx_in_set, :]
+        else:
+            # there must be a match between set 2 and the first test point on the convex hull
+            pt_set_match = np.all(rounded_pts2 == cv_pts_round[0, :], axis=1)
+            pts_set[0] = 2
+            idx_in_set = np.where(pt_set_match)[0][0]
+            cv_pts[0, :] = pts2[idx_in_set, :]   # go back to the original point instead of the rounded point
+
+        pt_set_match = np.all(rounded_pts1 == cv_pts_round[1, :], axis=1)
+        if np.any(pt_set_match):
             # if there is a match between set 1 and the second test point on the convex hull
             pts_set[1] = 1
-
-        if np.any(np.all(rounded_pts2 == cv_pts[0, :], axis=1)):
-            # if there is a match between set 2 and the first test point on the convex hull
-            pts_set[0] = 2
-        elif np.any(np.all(rounded_pts2 == cv_pts[1, :], axis=1)):
-            # if there is a match between set 2 and the second test point on the convex hull
+            idx_in_set = np.where(pt_set_match)[0][0]
+            cv_pts[1, :] = pts1[idx_in_set, :]   # go back to the original point instead of the rounded point
+        else:
+            # there must be a match between set 2 and the second test point on the convex hull
+            pt_set_match = np.all(rounded_pts2 == cv_pts_round[1, :], axis=1)
             pts_set[1] = 2
+            idx_in_set = np.where(pt_set_match)[0][0]
+            cv_pts[1, :] = pts2[idx_in_set, :]   # go back to the original point instead of the rounded point
 
         if pts_set[0] != pts_set[1]:
-            supporting_lines[:, :, n_lines_found] = cv_pts   # this needs to be redone so that we go back to the original points (not the integers)
+            supporting_lines[n_lines_found, :, :] = cv_pts   # this needs to be redone so that we go back to the original points (not the integers)
             n_lines_found += 1
 
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
+    #
+    # ax.scatter(pts1[:, 0], pts1[:, 1])
+    # ax.scatter(pts2[:, 0], pts2[:, 1])
+    #
+    # ax.plot(supporting_lines[0, :, 0], supporting_lines[0, :, 1])
+    # ax.plot(supporting_lines[1, :, 0], supporting_lines[1, :, 1])
+    # ax.invert_yaxis()
+    # plt.show()
 
-def rows_from_csvs(csv_list, board, cgroup, n_views=3):
+    return supporting_lines
+
+
+def rows_from_csvs(csv_list, board, cam_intrinsics, n_views=3):
     board_size = np.array(board.get_size())
     pts_per_view = np.prod(board_size-1)
+
+    jpg_name = csv_list[0].replace('.csv', '.jpg')
+    # read in the jpeg to get the image size
+    if os.path.exists(jpg_name):
+        img = cv2.imread(jpg_name)
+        w = np.shape(img)[1]
+        h = np.shape(img)[0]
+        size = (w, h)
+    else:
+        size = (2040, 1024)   # hardcode default for now
 
     all_rows = [[] for i_view in range(n_views)]
     for csv_file in csv_list:
@@ -2530,13 +2568,15 @@ def rows_from_csvs(csv_list, board, cgroup, n_views=3):
         else:
             mirror_view_idx = 2
 
-        dir_corners, mirr_corners, dir_ids, mirr_ids = match_mirror_points(mirr_corners, dir_corners)
+        dir_corners, mirr_corners, dir_ids = match_mirror_points(dir_corners, mirr_corners)
+        # dir_ids and mirr_ids would be the same since the points have been matched
 
         dir_row = {'framenum': csv_metadata['framenum'], 'corners': dir_corners, 'ids': dir_ids}
-        all_rows[0].append(row)
-        mirrr_row = {'framenum': csv_metadata['framenum'], 'corners': mirr_corners, 'ids': mirr_ids}
-        all_rows[mirror_view_idx].append(row)
-        pass
+        all_rows[0].append(dir_row)
+        mirrr_row = {'framenum': csv_metadata['framenum'], 'corners': mirr_corners, 'ids': dir_ids}
+        all_rows[mirror_view_idx].append(mirrr_row)
+
+    return all_rows, size
 
 
 def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories, cgroup, skip=20, full_calib_vid_name=None):
@@ -2545,7 +2585,7 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
     csv_list = navigation_utilities.check_for_calibration_csvs(cropped_vids[0], parent_directories)
     n_views = len(cropped_vids)
     if len(csv_list) > 0:
-        all_rows, size = rows_from_csvs(csv_list, board, cgroup, n_views=n_views)
+        all_rows, size = rows_from_csvs(csv_list, board, cam_intrinsics, n_views=n_views)
     else:
         for i_vid, cropped_vid in enumerate(cropped_vids):
             # rows_cam = []
@@ -2837,13 +2877,13 @@ def get_rows_cropped_vids_anipose(cropped_vids, cam_intrinsics, board, parent_di
     # return all_rows
 
 
-def match_mirror_points(mirr_corners, dir_corners):
+def match_mirror_points(dir_corners, mirr_corners):
     # build this based on old matlab code
-
-    # dir_corners, mirr_corners, dir_ids, mirr_ids = match_mirror_points(mirr_corners, dir_corners)
+    n_points = np.shape(mirr_corners)[0]
     remaining_dir_corners = np.copy(dir_corners)
     remaining_mirr_corners = np.copy(mirr_corners)
     n_matches = 0
+    match_idx = np.zeros((n_points, 2), dtype=np.int)
 
     while np.shape(remaining_dir_corners)[0] > 0:
 
@@ -2860,8 +2900,56 @@ def match_mirror_points(mirr_corners, dir_corners):
 
         supporting_lines = find_supporting_lines(remaining_dir_corners, remaining_mirr_corners)
 
+        for i_line in range(2):
+            test_pt1 = np.squeeze(supporting_lines[i_line, 0, :])
+            test_pt2 = np.squeeze(supporting_lines[i_line, 1, :])
+
+            # is test_pt1 in the direct or mirror view?
+            test_is_dir_pt = np.any(np.all(dir_corners == test_pt1, axis=1))
+            if test_is_dir_pt:
+                # test_pt1 is in the direct view, test_pt2 is in the mirror view
+                dir_row = np.where(np.all(dir_corners == test_pt1, axis=1))[0][0]
+                mir_row = np.where(np.all(mirr_corners == test_pt2, axis=1))[0][0]
+
+                remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt1, axis=1))[0][0]
+                remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt2, axis=1))[0][0]
+            else:
+                # test_pt2 is in the direct view, test_pt1 is in the mirror view
+                mir_row = np.where(np.all(mirr_corners == test_pt1, axis=1))[0][0]
+                dir_row = np.where(np.all(dir_corners == test_pt2, axis=1))[0][0]
+
+                remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt2, axis=1))[0][0]
+                remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt1, axis=1))[0][0]
+
+            match_idx[n_matches, 0] = dir_row
+            match_idx[n_matches, 1] = mir_row
+            n_matches += 1
+
+            # remove the rows that were just matched
+            remaining_dir_corners = np.delete(remaining_dir_corners, remaining_dir_row, axis=0)
+            remaining_mirr_corners = np.delete(remaining_mirr_corners, remaining_mirr_row, axis=0)
+
+    # dir_corners, mirr_corners, dir_ids, mirr_ids = match_mirror_points(mirr_corners, dir_corners)
+    matched_dir_corners = dir_corners[match_idx[:, 0], :]
+    matched_mirr_corners = mirr_corners[match_idx[:, 1], :]
+
+    dir_ids = find_pt_ids(matched_dir_corners)
+    # since the direct and mirror points should be matched, the points order will be the same for both
+
+    return matched_dir_corners, matched_mirr_corners, dir_ids
+
+
+def find_pt_ids(corners):
+    # top left of the direct view is point 0, bottom right is the last point. I think that will work?
+    n_pts = np.shape(corners)[0]
+
+    full_cvx_hull = np.squeeze(cv2.convexHull(corners.astype(np.int)))
+    ctr, rect_size, rot_angle = cv2.minAreaRect(corners)
+
+
 
     pass
+
 
 def detect_video_pts(calibration_video, board, camera, prefix=None, skip=20, progress=True, min_rows_detected=20):
     # adapted from anipose

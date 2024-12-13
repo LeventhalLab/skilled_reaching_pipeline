@@ -2568,12 +2568,38 @@ def rows_from_csvs(csv_list, board, cam_intrinsics, n_views=3):
         else:
             mirror_view_idx = 2
 
-        dir_corners, mirr_corners, dir_ids = match_mirror_points(dir_corners, mirr_corners, board)
+        dir_corners, mirr_corners, matched_ids = match_mirror_points(dir_corners, mirr_corners, board)
         # dir_ids and mirr_ids would be the same since the points have been matched
+        # rearrange the matched points so that they go left to right, top to bottom in the direct view; right to left and top to bottom in the mirror
+        # then the ids should just be 0 to pts_per_view-1
+        sorted_dir_corners = np.zeros((pts_per_view, 2))
+        sorted_mirr_corners = np.zeros((pts_per_view, 2))
+        for i_pt in range(pts_per_view):
+            sorted_dir_corners[i_pt, :] = dir_corners[matched_ids == i_pt, :]
+            sorted_mirr_corners[i_pt, :] = mirr_corners[matched_ids == i_pt, :]
 
-        dir_row = {'framenum': csv_metadata['framenum'], 'corners': dir_corners, 'ids': dir_ids}
+        dir_corners_ud_norm = cv2.undistortPoints(sorted_dir_corners, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+        dir_corners_ud = cvb.unnormalize_points(dir_corners_ud_norm, cam_intrinsics['mtx'])
+        dir_corners_ud = np.expand_dims(dir_corners_ud, 1)
+
+        mirr_corners_ud_norm = cv2.undistortPoints(sorted_mirr_corners, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+        mirr_corners_ud = cvb.unnormalize_points(mirr_corners_ud_norm, cam_intrinsics['mtx'])
+        mirr_corners_ud = np.expand_dims(mirr_corners_ud, 1)
+
+        dir_filled_ud = dir_corners_ud    # not sure what "filled" is, but it seems to work with anipose
+        mirr_filled_ud = mirr_corners_ud
+        ids = np.arange(pts_per_view)
+        dir_row = {'framenum': csv_metadata['framenum'],
+                   'corners': dir_corners_ud,
+                   'corners_distorted': dir_corners,
+                   'filled': dir_filled_ud,
+                   'ids': ids}
         all_rows[0].append(dir_row)
-        mirrr_row = {'framenum': csv_metadata['framenum'], 'corners': mirr_corners, 'ids': dir_ids}
+        mirrr_row = {'framenum': csv_metadata['framenum'],
+                     'corners': mirr_corners_ud,
+                     'corners_distorted': mirr_corners,
+                     'filled': mirr_corners_ud,
+                     'ids': ids}
         all_rows[mirror_view_idx].append(mirrr_row)
 
     return all_rows, size
@@ -2967,27 +2993,29 @@ def find_pt_ids(corners, board):
     pt_ids = np.zeros(n_pts, dtype=np.int)
 
     # board_size = (width, height) in numbers of squares, so the size of the interior points is (width-1, height-1)
-    corners_int = corners.astype(np.int)
-    center, rect_size, rot_angle = cv2.minAreaRect(corners_int)
+    # corners_int = corners.astype(np.int)
+    # center, rect_size, rot_angle = cv2.minAreaRect(corners_int)
 
     # find the top left corner
     top_left, top_left_idx = find_top_left_corner(corners)
 
     # find the bottom right corner
-    bottom_right, bottom_right_idx = find_bottom_right_corner(corners)
+    # bottom_right, bottom_right_idx = find_bottom_right_corner(corners)
 
     remaining_corners = np.copy(corners)
-    if rot_angle < 45:
-        # I'm pretty sure this means rectangle is tilted down to the right (clockwise from vertical)
+    if top_left[1] == min(corners[:, 1]):
+        # I'm pretty sure this means rectangle is tilted down to the right (clockwise from vertical). I suppose it's possible
+        # for a nearly horizontal orientation to cause problems due to noise in individual corner locations, but that should be rare
         n_remaining_corners = n_pts
         cur_pt = top_left
         top_left_idx = np.where(np.all(corners == top_left, axis=1))[0][0]
         pt_ids[top_left_idx] = 0
         pt_id_idx = 1
-        while n_remaining_corners > 0:
+        while n_remaining_corners > 1:
             # remove the point that already was allocated
             remaining_cur_pt_idx = np.where(np.all(remaining_corners == cur_pt, axis=1))[0][0]
             remaining_corners = np.delete(remaining_corners, remaining_cur_pt_idx, axis=0)
+            n_remaining_corners -= 1
 
             # for this tilt, each successively lower point should be the next point in the list
             min_remaining_y_idx = remaining_corners[:, 1] == np.min(remaining_corners[:, 1])
@@ -2995,10 +3023,9 @@ def find_pt_ids(corners, board):
             cur_pt_idx = np.where(np.all(corners == cur_pt, axis=1))[0][0]
             pt_ids[cur_pt_idx] = pt_id_idx
             pt_id_idx += 1
-            n_remaining_corners -= 1
 
     else:
-        # I'm pretty sure this means rectangle is tilted up to the right (counterclockwise from vertical)
+        # I'm pretty sure this means rectangle is tilted up to the right
         # this means the other points in the top row will all be higher (lower y) than the top left point
         n_remaining_corners = n_pts
         cur_top_left = top_left
@@ -3032,6 +3059,7 @@ def find_pt_ids(corners, board):
             if n_remaining_corners > 0:
                 cur_top_left, _ = find_top_left_corner(remaining_corners)
 
+    ## for testing whether the order came out right
     # fig = plt.figure()
     # ax = fig.add_subplot()
     # ax.scatter(corners[:, 0], corners[:, 1])
@@ -3040,19 +3068,6 @@ def find_pt_ids(corners, board):
     # ax.invert_yaxis()
 
     return pt_ids
-
-    # # bottom left point is the starting point
-    # n_pts = np.shape(corners)[0]
-    #
-    # # point with highest y
-    #
-    # corners_int = corners.astype(np.int)
-    # full_cvx_hull = np.squeeze(cv2.convexHull(corners_int))
-    # center, rect_size, rot_angle = cv2.minAreaRect(corners_int)
-    # # working here...
-    #
-    #
-    # pass
 
 
 def detect_video_pts(calibration_video, board, camera, prefix=None, skip=20, progress=True, min_rows_detected=20):

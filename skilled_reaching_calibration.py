@@ -2568,7 +2568,7 @@ def rows_from_csvs(csv_list, board, cam_intrinsics, n_views=3):
         else:
             mirror_view_idx = 2
 
-        dir_corners, mirr_corners, dir_ids = match_mirror_points(dir_corners, mirr_corners)
+        dir_corners, mirr_corners, dir_ids = match_mirror_points(dir_corners, mirr_corners, board)
         # dir_ids and mirr_ids would be the same since the points have been matched
 
         dir_row = {'framenum': csv_metadata['framenum'], 'corners': dir_corners, 'ids': dir_ids}
@@ -2877,7 +2877,7 @@ def get_rows_cropped_vids_anipose(cropped_vids, cam_intrinsics, board, parent_di
     # return all_rows
 
 
-def match_mirror_points(dir_corners, mirr_corners):
+def match_mirror_points(dir_corners, mirr_corners, board):
     # build this based on old matlab code
     n_points = np.shape(mirr_corners)[0]
     remaining_dir_corners = np.copy(dir_corners)
@@ -2933,22 +2933,126 @@ def match_mirror_points(dir_corners, mirr_corners):
     matched_dir_corners = dir_corners[match_idx[:, 0], :]
     matched_mirr_corners = mirr_corners[match_idx[:, 1], :]
 
-    dir_ids = find_pt_ids(matched_dir_corners)
+    dir_ids = find_pt_ids(matched_dir_corners, board)
     # since the direct and mirror points should be matched, the points order will be the same for both
 
     return matched_dir_corners, matched_mirr_corners, dir_ids
 
 
-def find_pt_ids(corners):
-    # top left of the direct view is point 0, bottom right is the last point. I think that will work?
+def find_top_left_corner(corners):
+    top_left_pt = corners[0, :]
+    top_left_idx = 0
+    for i_corner, corner in enumerate(corners):
+        if np.sum(corner) < np.sum(top_left_pt):
+            top_left_pt = corner
+            top_left_idx = i_corner
+
+    return top_left_pt, top_left_idx
+
+
+def find_bottom_right_corner(corners):
+    botom_right_pt = corners[0, :]
+    bottom_right_idx = 0
+    for i_corner, corner in enumerate(corners):
+        if np.sum(corner) > np.sum(botom_right_pt):
+            botom_right_pt = corner
+            bottom_right_idx = i_corner
+
+    return botom_right_pt, bottom_right_idx
+
+
+def find_pt_ids(corners, board):
+    board_size = np.array(board.get_size()) - 1
     n_pts = np.shape(corners)[0]
+    pt_ids = np.zeros(n_pts, dtype=np.int)
 
-    full_cvx_hull = np.squeeze(cv2.convexHull(corners.astype(np.int)))
-    ctr, rect_size, rot_angle = cv2.minAreaRect(corners)
+    # board_size = (width, height) in numbers of squares, so the size of the interior points is (width-1, height-1)
+    corners_int = corners.astype(np.int)
+    center, rect_size, rot_angle = cv2.minAreaRect(corners_int)
 
+    # find the top left corner
+    top_left, top_left_idx = find_top_left_corner(corners)
 
+    # find the bottom right corner
+    bottom_right, bottom_right_idx = find_bottom_right_corner(corners)
 
-    pass
+    remaining_corners = np.copy(corners)
+    if rot_angle < 45:
+        # I'm pretty sure this means rectangle is tilted down to the right (clockwise from vertical)
+        n_remaining_corners = n_pts
+        cur_pt = top_left
+        top_left_idx = np.where(np.all(corners == top_left, axis=1))[0][0]
+        pt_ids[top_left_idx] = 0
+        pt_id_idx = 1
+        while n_remaining_corners > 0:
+            # remove the point that already was allocated
+            remaining_cur_pt_idx = np.where(np.all(remaining_corners == cur_pt, axis=1))[0][0]
+            remaining_corners = np.delete(remaining_corners, remaining_cur_pt_idx, axis=0)
+
+            # for this tilt, each successively lower point should be the next point in the list
+            min_remaining_y_idx = remaining_corners[:, 1] == np.min(remaining_corners[:, 1])
+            cur_pt = remaining_corners[min_remaining_y_idx, :]
+            cur_pt_idx = np.where(np.all(corners == cur_pt, axis=1))[0][0]
+            pt_ids[cur_pt_idx] = pt_id_idx
+            pt_id_idx += 1
+            n_remaining_corners -= 1
+
+    else:
+        # I'm pretty sure this means rectangle is tilted up to the right (counterclockwise from vertical)
+        # this means the other points in the top row will all be higher (lower y) than the top left point
+        n_remaining_corners = n_pts
+        cur_top_left = top_left
+        pt_id_idx = 0
+        while n_remaining_corners > 0:
+            # assign the top left point index into the pt_ids vector
+            top_left_idx = np.where(np.all(corners == cur_top_left, axis=1))[0][0]
+            pt_ids[top_left_idx] = pt_id_idx
+            pt_id_idx += 1
+
+            # remove the top left point from the remaining points
+            cur_top_left_idx = np.where(np.all(remaining_corners == cur_top_left, axis=1))[0][0]
+            remaining_corners = np.delete(remaining_corners, cur_top_left_idx, axis=0)
+
+            # find points among the ones that are left that are higher than the current leftmost point
+            row_pts_bool = remaining_corners[:, 1] < cur_top_left[1]
+            cur_row_pts = remaining_corners[row_pts_bool, :]
+            cur_row_idx = np.where(row_pts_bool)[0]
+
+            # find the indices of these points in the original corners array
+            corners_row_idxs = [np.where(np.all(corners == cur_row_pt, axis=1))[0][0] for cur_row_pt in cur_row_pts]
+            cur_pt_order = np.argsort(corners[corners_row_idxs, 0])
+
+            for row_pt in cur_pt_order:
+                pt_ids[corners_row_idxs[row_pt]] = pt_id_idx
+                pt_id_idx += 1
+
+            # remove points we've already sorted into rows
+            remaining_corners = np.delete(remaining_corners, cur_row_idx, axis=0)
+            n_remaining_corners = np.shape(remaining_corners)[0]
+            if n_remaining_corners > 0:
+                cur_top_left, _ = find_top_left_corner(remaining_corners)
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
+    # ax.scatter(corners[:, 0], corners[:, 1])
+    # for i_corner, corner in enumerate(corners):
+    #     ax.text(corner[0], corner[1], '{:d}'.format(pt_ids[i_corner]))
+    # ax.invert_yaxis()
+
+    return pt_ids
+
+    # # bottom left point is the starting point
+    # n_pts = np.shape(corners)[0]
+    #
+    # # point with highest y
+    #
+    # corners_int = corners.astype(np.int)
+    # full_cvx_hull = np.squeeze(cv2.convexHull(corners_int))
+    # center, rect_size, rot_angle = cv2.minAreaRect(corners_int)
+    # # working here...
+    #
+    #
+    # pass
 
 
 def detect_video_pts(calibration_video, board, camera, prefix=None, skip=20, progress=True, min_rows_detected=20):

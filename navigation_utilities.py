@@ -3083,7 +3083,7 @@ def parse_frame_csv_name(frame_csv_file):
 
     csv_metadata = {'boxnum': box_num,
                     'time': csv_time,
-                    'framenum': framenum - 1  # subtract one because Fiji indexes starting at 0 but opencv/ffmpeg start indexing at zero
+                    'framenum': framenum - 1  # subtract one because Fiji indexes starting at 1 but opencv/ffmpeg start indexing at zero
     }
 
     return csv_metadata

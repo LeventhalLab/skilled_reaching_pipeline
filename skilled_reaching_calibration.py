@@ -2575,7 +2575,10 @@ def rows_from_csvs(csv_list, board, cam_intrinsics, n_views=3):
         sorted_dir_corners = np.zeros((pts_per_view, 2))
         sorted_mirr_corners = np.zeros((pts_per_view, 2))
         for i_pt in range(pts_per_view):
-            sorted_dir_corners[i_pt, :] = dir_corners[matched_ids == i_pt, :]
+            try:
+                sorted_dir_corners[i_pt, :] = dir_corners[matched_ids == i_pt, :]
+            except:
+                pass
             sorted_mirr_corners[i_pt, :] = mirr_corners[matched_ids == i_pt, :]
 
         dir_corners_ud_norm = cv2.undistortPoints(sorted_dir_corners, cam_intrinsics['mtx'], cam_intrinsics['dist'])
@@ -2903,7 +2906,37 @@ def get_rows_cropped_vids_anipose(cropped_vids, cam_intrinsics, board, parent_di
     # return all_rows
 
 
-def match_mirror_points(dir_corners, mirr_corners, board):
+def point_to_line_distance(line_pts, test_pt):
+    '''
+
+    :param line_pts: 2 x 2 or 2 x 3 matrix where each row is a point that defines the line
+    :param test_pt: the point to which we are trying to find the distance
+    :return:
+    '''
+
+    if np.shape(line_pts)[1] == 2:
+        d = calc2Ddistance(line_pts[0, :], line_pts[1, :], test_pt)
+    elif np.shape(line_pts)[1] == 3:
+        d = calc3Ddistance(line_pts[0, :], line_pts[1, :], test_pt)
+
+    return d
+
+
+def calc2Ddistance(Q1, Q2, test_pt):
+    d = abs(np.linalg.det(np.vstack((Q2 - Q1, test_pt - Q1)))) / np.linalg.norm(Q2 - Q1)
+
+    return d
+
+
+def calc3Ddistance(Q1, Q2, test_pt):
+
+    # hasn't been tested
+    d = np.linalg.norm(np.cross(Q2 - Q1, test_pt - Q1)) / np.linalg.norm(Q2 - Q1)
+
+    return d
+
+
+def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line=5, mirr_max_dist_from_line=3):
     # build this based on old matlab code
     n_points = np.shape(mirr_corners)[0]
     remaining_dir_corners = np.copy(dir_corners)
@@ -2947,9 +2980,55 @@ def match_mirror_points(dir_corners, mirr_corners, board):
                 remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt2, axis=1))[0][0]
                 remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt1, axis=1))[0][0]
 
+            # have potential matches - is it possible that there is a better match that lies along the same line (hidden
+            # by noise in how accurately points were marked/identifed)?
+            n_remaining_points = np.shape(remaining_dir_corners)[0]
+            mirr_dist_from_line = np.empty(n_remaining_points)
+            dir_dist_from_line = np.empty(n_remaining_points)
+            mirr_dist_from_line[:] = np.nan
+            dir_dist_from_line[:] = np.nan
+            supporting_line = np.squeeze(supporting_lines[i_line, :, :])
+            for i_corner in range(n_remaining_points):
+                mirr_dist_from_line[i_corner] = point_to_line_distance(supporting_line, remaining_mirr_corners[i_corner, :])
+                dir_dist_from_line[i_corner] = point_to_line_distance(supporting_line,
+                                                                       remaining_dir_corners[i_corner, :])
+
+            mirr_candidates = np.where(mirr_dist_from_line < mirr_max_dist_from_line)[0]
+            dir_candidates = np.where(dir_dist_from_line < dir_max_dist_from_line)[0]
+
+            if len(mirr_candidates) != len(dir_candidates) or len(mirr_candidates) == 1:
+                # only one candidate point in each view or there are mutliple candidates in one view but only one in the other view?
+                # I don't think this is quite right, but it seems to work well enough
+                match_idx[n_matches, 0] = dir_row
+                match_idx[n_matches, 1] = mir_row
+                n_matches += 1
+
+                # remove the rows that were just matched
+                remaining_dir_corners = np.delete(remaining_dir_corners, remaining_dir_row, axis=0)
+                remaining_mirr_corners = np.delete(remaining_mirr_corners, remaining_mirr_row, axis=0)
+                continue
+
+            # multiple candidate matches along the supporting line
+            mirr_dir_distance = np.zeros((len(mirr_candidates), len(mirr_candidates)))
+            for i_dirpt in range(len(mirr_candidates)):
+                for i_mirrpt in range(len(mirr_candidates)):
+                    mirr_dir_distance[i_dirpt, i_mirrpt] = np.linalg.norm(remaining_dir_corners[dir_candidates[i_dirpt], :] -
+                                                                          remaining_mirr_corners[mirr_candidates[i_mirrpt], :])
+
+            # which direct/mirror points are closest together? (they're a match due to mirror symmetry)
+            m, n = (mirr_dir_distance == np.min(mirr_dir_distance)).nonzero()  # m is the row, n the column where the minimum is
+            cur_dirpt = remaining_dir_corners[dir_candidates[m], :]
+            cur_mirrpt = remaining_mirr_corners[mirr_candidates[n], :]
+
+            mir_row = np.where(np.all(mirr_corners == cur_mirrpt, axis=1))[0][0]
+            dir_row = np.where(np.all(dir_corners == cur_dirpt, axis=1))[0][0]
+
             match_idx[n_matches, 0] = dir_row
             match_idx[n_matches, 1] = mir_row
             n_matches += 1
+
+            remaining_dir_row = np.where(np.all(remaining_dir_corners == cur_dirpt, axis=1))[0][0]
+            remaining_mirr_row = np.where(np.all(remaining_mirr_corners == cur_mirrpt, axis=1))[0][0]
 
             # remove the rows that were just matched
             remaining_dir_corners = np.delete(remaining_dir_corners, remaining_dir_row, axis=0)
@@ -2989,75 +3068,111 @@ def find_bottom_right_corner(corners):
 
 def find_pt_ids(corners, board):
     board_size = np.array(board.get_size()) - 1
+    n_rows = board_size[1]
+    n_cols = board_size[0]
+    # I suppose the above could be wrong if the geometry changes, but I think this is safe for now, at least for the mirror calibration -DL 12/17/2024
+
     n_pts = np.shape(corners)[0]
     pt_ids = np.zeros(n_pts, dtype=np.int)
 
-    # board_size = (width, height) in numbers of squares, so the size of the interior points is (width-1, height-1)
-    # corners_int = corners.astype(np.int)
-    # center, rect_size, rot_angle = cv2.minAreaRect(corners_int)
-
-    # find the top left corner
-    top_left, top_left_idx = find_top_left_corner(corners)
-
-    # find the bottom right corner
-    # bottom_right, bottom_right_idx = find_bottom_right_corner(corners)
-
     remaining_corners = np.copy(corners)
-    if top_left[1] == min(corners[:, 1]):
-        # I'm pretty sure this means rectangle is tilted down to the right (clockwise from vertical). I suppose it's possible
-        # for a nearly horizontal orientation to cause problems due to noise in individual corner locations, but that should be rare
-        n_remaining_corners = n_pts
+    pt_id_idx = 0
+    for i_row in range(n_rows):
+        # find the top left corner
+        if i_row < n_rows - 1:
+            top_left, top_left_idx = find_top_left_corner(remaining_corners)
+        else:
+            # if we're on the last row, the algorithm for finding the top left might fail if the row is angled upwards too steeply
+            # just take the left-most point
+            top_left = remaining_corners[remaining_corners[:, 0] == min(remaining_corners[:, 0]), :]
+
         cur_pt = top_left
         top_left_idx = np.where(np.all(corners == top_left, axis=1))[0][0]
-        pt_ids[top_left_idx] = 0
-        pt_id_idx = 1
-        while n_remaining_corners > 1:
-            # remove the point that already was allocated
-            remaining_cur_pt_idx = np.where(np.all(remaining_corners == cur_pt, axis=1))[0][0]
-            remaining_corners = np.delete(remaining_corners, remaining_cur_pt_idx, axis=0)
-            n_remaining_corners -= 1
+        pt_ids[top_left_idx] = pt_id_idx
+        pt_id_idx += 1
+        cur_remaining_corner_idx = np.where(np.all(remaining_corners == cur_pt, axis=1))[0][0]
+        remaining_corners = np.delete(remaining_corners, cur_remaining_corner_idx, axis=0)
+        for i_col in range(1, n_cols):   # start with 1 because we already captured the first point in the row
+            # the next point will be the closest point to the right. Maybe there's some weird geometry where that isn't true, but should be good enough
+            pts_to_right = remaining_corners[remaining_corners[:, 0] > cur_pt[0], :]
 
-            # for this tilt, each successively lower point should be the next point in the list
-            min_remaining_y_idx = remaining_corners[:, 1] == np.min(remaining_corners[:, 1])
-            cur_pt = remaining_corners[min_remaining_y_idx, :]
-            cur_pt_idx = np.where(np.all(corners == cur_pt, axis=1))[0][0]
-            pt_ids[cur_pt_idx] = pt_id_idx
+            # calculate distance to each of the other points to the right of this one
+            d_right = np.linalg.norm(pts_to_right - cur_pt, axis=1)
+            cur_pt = np.squeeze(pts_to_right[d_right == np.min(d_right), :])
+            cur_corner_idx = np.where(np.all(corners == cur_pt, axis=1))[0][0]
+
+            pt_ids[cur_corner_idx] = pt_id_idx
             pt_id_idx += 1
 
-    else:
-        # I'm pretty sure this means rectangle is tilted up to the right
-        # this means the other points in the top row will all be higher (lower y) than the top left point
-        n_remaining_corners = n_pts
-        cur_top_left = top_left
-        pt_id_idx = 0
-        while n_remaining_corners > 0:
-            # assign the top left point index into the pt_ids vector
-            top_left_idx = np.where(np.all(corners == cur_top_left, axis=1))[0][0]
-            pt_ids[top_left_idx] = pt_id_idx
-            pt_id_idx += 1
+            cur_remaining_corner_idx = np.where(np.all(remaining_corners == cur_pt, axis=1))[0][0]
+            remaining_corners = np.delete(remaining_corners, cur_remaining_corner_idx, axis=0)
 
-            # remove the top left point from the remaining points
-            cur_top_left_idx = np.where(np.all(remaining_corners == cur_top_left, axis=1))[0][0]
-            remaining_corners = np.delete(remaining_corners, cur_top_left_idx, axis=0)
 
-            # find points among the ones that are left that are higher than the current leftmost point
-            row_pts_bool = remaining_corners[:, 1] < cur_top_left[1]
-            cur_row_pts = remaining_corners[row_pts_bool, :]
-            cur_row_idx = np.where(row_pts_bool)[0]
 
-            # find the indices of these points in the original corners array
-            corners_row_idxs = [np.where(np.all(corners == cur_row_pt, axis=1))[0][0] for cur_row_pt in cur_row_pts]
-            cur_pt_order = np.argsort(corners[corners_row_idxs, 0])
-
-            for row_pt in cur_pt_order:
-                pt_ids[corners_row_idxs[row_pt]] = pt_id_idx
-                pt_id_idx += 1
-
-            # remove points we've already sorted into rows
-            remaining_corners = np.delete(remaining_corners, cur_row_idx, axis=0)
-            n_remaining_corners = np.shape(remaining_corners)[0]
-            if n_remaining_corners > 0:
-                cur_top_left, _ = find_top_left_corner(remaining_corners)
+    # if top_left[1] == min(corners[:, 1]):
+    #     # the top left corner is the highest point in the top row
+    #     n_remaining_corners = n_pts
+    #     cur_pt = top_left
+    #     top_left_idx = np.where(np.all(corners == top_left, axis=1))[0][0]
+    #     pt_ids[top_left_idx] = 0
+    #     pt_id_idx = 1
+    #     for i_row in range(board_size[1]):
+    #         # the next board_size[0] - 1 points should be the two points
+    #         if top_left[1] == min(remaining_corners[:, 1]):
+    #             min_remaining_y_idx = remaining_corners[:, 1] == np.min(remaining_corners[:, 1])
+    #             cur_pt = remaining_corners[min_remaining_y_idx, :]
+    #
+    #
+    #     while n_remaining_corners > 1:
+    #         # remove the point that already was allocated
+    #         remaining_cur_pt_idx = np.where(np.all(remaining_corners == cur_pt, axis=1))[0][0]
+    #         remaining_corners = np.delete(remaining_corners, remaining_cur_pt_idx, axis=0)
+    #         n_remaining_corners -= 1
+    #
+    #         # for this tilt, each successively lower point should be the next point in the list
+    #         min_remaining_y_idx = remaining_corners[:, 1] == np.min(remaining_corners[:, 1])
+    #         cur_pt = remaining_corners[min_remaining_y_idx, :]
+    #         try:
+    #             cur_pt_idx = np.where(np.all(corners == cur_pt, axis=1))[0][0]
+    #         except:
+    #             pass
+    #         pt_ids[cur_pt_idx] = pt_id_idx
+    #         pt_id_idx += 1
+    #
+    # else:
+    #     # I'm pretty sure this means rectangle is tilted up to the right
+    #     # this means the other points in the top row will all be higher (lower y) than the top left point
+    #     n_remaining_corners = n_pts
+    #     cur_top_left = top_left
+    #     pt_id_idx = 0
+    #     while n_remaining_corners > 0:
+    #         # assign the top left point index into the pt_ids vector
+    #         top_left_idx = np.where(np.all(corners == cur_top_left, axis=1))[0][0]
+    #         pt_ids[top_left_idx] = pt_id_idx
+    #         pt_id_idx += 1
+    #
+    #         # remove the top left point from the remaining points
+    #         cur_top_left_idx = np.where(np.all(remaining_corners == cur_top_left, axis=1))[0][0]
+    #         remaining_corners = np.delete(remaining_corners, cur_top_left_idx, axis=0)
+    #
+    #         # find points among the ones that are left that are higher than the current leftmost point
+    #         row_pts_bool = remaining_corners[:, 1] < cur_top_left[1]
+    #         cur_row_pts = remaining_corners[row_pts_bool, :]
+    #         cur_row_idx = np.where(row_pts_bool)[0]
+    #
+    #         # find the indices of these points in the original corners array
+    #         corners_row_idxs = [np.where(np.all(corners == cur_row_pt, axis=1))[0][0] for cur_row_pt in cur_row_pts]
+    #         cur_pt_order = np.argsort(corners[corners_row_idxs, 0])
+    #
+    #         for row_pt in cur_pt_order:
+    #             pt_ids[corners_row_idxs[row_pt]] = pt_id_idx
+    #             pt_id_idx += 1
+    #
+    #         # remove points we've already sorted into rows
+    #         remaining_corners = np.delete(remaining_corners, cur_row_idx, axis=0)
+    #         n_remaining_corners = np.shape(remaining_corners)[0]
+    #         if n_remaining_corners > 0:
+    #             cur_top_left, _ = find_top_left_corner(remaining_corners)
 
     ## for testing whether the order came out right
     # fig = plt.figure()

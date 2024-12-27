@@ -2989,7 +2989,10 @@ def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line
             dir_dist_from_line[:] = np.nan
             supporting_line = np.squeeze(supporting_lines[i_line, :, :])
             for i_corner in range(n_remaining_points):
-                mirr_dist_from_line[i_corner] = point_to_line_distance(supporting_line, remaining_mirr_corners[i_corner, :])
+                try:
+                    mirr_dist_from_line[i_corner] = point_to_line_distance(supporting_line, remaining_mirr_corners[i_corner, :])
+                except:
+                    pass
                 dir_dist_from_line[i_corner] = point_to_line_distance(supporting_line,
                                                                        remaining_dir_corners[i_corner, :])
 
@@ -3045,12 +3048,18 @@ def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line
 
 
 def find_top_left_corner(corners):
-    top_left_pt = corners[0, :]
+    # have to manipulate x-values because sometimes vertical overwhelms the horizontal if the chessboard in angled too
+    # much away from the camera
+    stretched_corners = np.copy(corners)
+    stretched_corners[:, 0] = (corners[:, 0] - np.min(corners[:, 0])) * 1
+    top_left_stretched_pt = stretched_corners[0, :]
     top_left_idx = 0
-    for i_corner, corner in enumerate(corners):
-        if np.sum(corner) < np.sum(top_left_pt):
-            top_left_pt = corner
+    for i_corner, corner in enumerate(stretched_corners):
+        if np.sum(corner) < np.sum(top_left_stretched_pt):
+            top_left_stretched_pt = corner
             top_left_idx = i_corner
+
+    top_left_pt = corners[top_left_idx, :]
 
     return top_left_pt, top_left_idx
 
@@ -3098,7 +3107,10 @@ def find_pt_ids(corners, board):
 
             # calculate distance to each of the other points to the right of this one
             d_right = np.linalg.norm(pts_to_right - cur_pt, axis=1)
-            cur_pt = np.squeeze(pts_to_right[d_right == np.min(d_right), :])
+            try:
+                cur_pt = np.squeeze(pts_to_right[d_right == np.min(d_right), :])
+            except:
+                pass
             cur_corner_idx = np.where(np.all(corners == cur_pt, axis=1))[0][0]
 
             pt_ids[cur_corner_idx] = pt_id_idx

@@ -1611,7 +1611,11 @@ def collect_matched_mirror_points(merged, board):
     # first dictionary in this list is for the left mirror, second dictionary is for the right mirror
     matched_points_metadata = [{'framenumbers': [],'ptids': []}, {'framenumbers': [],'ptids': []}]
     if type(board) is Checkerboard:
-        pts_per_frame = np.shape(merged[0]['dir']['corners'])[0]
+        # find the first element of merged that has a 'dir' view entry
+        for merged_row in merged:
+            if 'dir' in list(merged_row.keys()):
+                pts_per_frame = np.shape(merged_row['dir']['corners'])[0]
+                break
         # count up all merged rows that contain leftmirror points
         leftmirror_rows = [mr for mr in merged if 'lm' in mr.keys() and 'dir' in mr.keys()]
         rightmirror_rows = [mr for mr in merged if 'rm' in mr.keys() and 'dir' in mr.keys()]
@@ -2970,7 +2974,10 @@ def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line
                 dir_row = np.where(np.all(dir_corners == test_pt1, axis=1))[0][0]
                 mir_row = np.where(np.all(mirr_corners == test_pt2, axis=1))[0][0]
 
-                remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt1, axis=1))[0][0]
+                try:
+                    remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt1, axis=1))[0][0]
+                except:
+                    pass
                 remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt2, axis=1))[0][0]
             else:
                 # test_pt2 is in the direct view, test_pt1 is in the mirror view

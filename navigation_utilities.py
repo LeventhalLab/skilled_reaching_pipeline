@@ -822,7 +822,7 @@ def test_dlc_h5_name_from_h5_metadata(h5_metadata, suffix=''):
 def match_dlc_h5_views(session_metadata):
     pass
 
-def find_folders_to_analyze(cropped_videos_parent, view_list=None):
+def find_folders_to_analyze(cropped_videos_parent, rat_list=['all'], view_list=None):
     """
     get the full list of directories containing cropped videos in the videos_to_analyze folder
     :param cropped_videos_parent: parent directory with subfolders direct_view and mirror_views, which have subfolders
@@ -839,19 +839,21 @@ def find_folders_to_analyze(cropped_videos_parent, view_list=None):
 
     rat_folder_list = glob.glob(os.path.join(cropped_videos_parent, 'R*'))
     for rat_folder in rat_folder_list:
-        if os.path.isdir(rat_folder):
-            # assume the rat_folder directory name is the same as ratID (i.e., form of RXXXX)
-            _, ratID = os.path.split(rat_folder)
-            session_name = ratID + '_*'
-            session_dir_list = glob.glob(rat_folder + '/' + session_name)
-            # make sure we only include directories (just in case there are some stray files with the right names)
-            session_dir_list = [session_dir for session_dir in session_dir_list if os.path.isdir(session_dir)]
-            for session_dir in session_dir_list:
-                _, cur_session = os.path.split(session_dir)
-                for view in view_list:
-                    view_folder = os.path.join(session_dir, cur_session + '_' + view)
-                    if os.path.isdir(view_folder):
-                        folders_to_analyze[view].extend([view_folder])
+        _, current_ratID = os.path.split(rat_folder)
+        if 'all' in rat_list or current_ratID in rat_list:
+            if os.path.isdir(rat_folder):
+                # assume the rat_folder directory name is the same as ratID (i.e., form of RXXXX)
+                _, ratID = os.path.split(rat_folder)
+                session_name = ratID + '_*'
+                session_dir_list = glob.glob(rat_folder + '/' + session_name)
+                # make sure we only include directories (just in case there are some stray files with the right names)
+                session_dir_list = [session_dir for session_dir in session_dir_list if os.path.isdir(session_dir)]
+                for session_dir in session_dir_list:
+                    _, cur_session = os.path.split(session_dir)
+                    for view in view_list:
+                        view_folder = os.path.join(session_dir, cur_session + '_' + view)
+                        if os.path.isdir(view_folder):
+                            folders_to_analyze[view].extend([view_folder])
 
     return folders_to_analyze
 

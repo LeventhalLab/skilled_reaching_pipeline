@@ -45,6 +45,8 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
         #     print(view + ' does not contain the keyword "direct" or "mirror"')
         #     continue
 
+        if view != 'rm':
+            continue
 
         current_view_folders = folders_to_analyze[view]
 
@@ -53,9 +55,10 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
 
             # find the row of the rat dataframe for this ratID, extract a paw preference series, take the first element as this rat's paw preference
             paw_pref = rat_df['pawpref'][rat_df['ratid'] == ratID].values[0]
-            if 'direct' in view:
+
+            if 'dir' in view:
                 dlc_network = 'direct'
-            elif 'leftmirror' in view:
+            elif 'lm' in view:
                 if paw_pref.lower() in ('r', 'right'):
                     # left mirror view is the near paw view for a right-pawed rat
                     dlc_network = 'nearpaw'
@@ -96,10 +99,13 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
                                           vids_to_analyze,
                                           videotype=cropped_vid_type,
                                           gputouse=gputouse,
+                                          auto_track=False,
                                           save_as_csv=save_as_csv)
                 # might want to add additional options to these commands
                 deeplabcut.convert_detections2tracklets(config_path, vids_to_analyze, videotype=cropped_vid_type)
                 deeplabcut.filterpredictions(config_path, vids_to_analyze, videotype=cropped_vid_type)
+                # deeplabcut.convert_detections2tracklets(config_path, vids_to_analyze, videotype=cropped_vid_type)
+                # deeplabcut.filterpredictions(config_path, vids_to_analyze, videotype=cropped_vid_type)
             else:
                 scorername = navigation_utilities.scorername_from_fname(test_pickle_list[0])
 
@@ -130,8 +136,6 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
                     if len(marked_vids) == 0:
                         # the marked video hasn't been made yet
                         vids_to_mark.append(cropped_vid)
-
-                deeplabcut.create_labeled_video(config_path, vids_to_mark, color_by='bodypart', filtered=True, videotype=cropped_vid_type)
                 # deeplabcut.create_video_with_all_detections(config_path, vids_to_mark, videotype=cropped_vid_type)
 
                 test_marked_name = os.path.join(current_folder, '{}_*{}_labeled.mp4'.format(ratID, scorername))
@@ -432,6 +436,7 @@ def initialize_analysis_params(experiment_list=('dLight', 'GRABAch-rDA', 'sr6OHD
         # lambda computer
         if DLC_top_folder == None:
             DLC_top_folder = '/home/dleventh/Documents/DLC_projects'
+            DLC_top_folder = '/home/dleventh/Documents/deeplabcut_projects'
         if data_root_folder == None:
             data_root_folder = '/home/dleventh/SharedX/Neuro-Leventhal/data/sr'
 
@@ -503,9 +508,9 @@ if __name__ == '__main__':
 
     analyses_to_perform = [
                            # 'crop_calibration_vids',
-                           'calibrate_videos',
+                           # 'calibrate_videos',
                            # 'crop_sr_vids',
-                           # 'o',
+                           'analyze_sr_vids',
                            # 'create_marked_vids',
                            # 'reconstruct_3d'
                            ]
@@ -649,6 +654,24 @@ if __name__ == '__main__':
             video_folder_list = navigation_utilities.get_video_folders_to_crop(videos_root_folder, rats_to_analyze=rats_to_analyze)
             cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, calibration_metadata_df, cam_names,
                                                                       vidtype='avi', filtertype=crop_filtertype)
+    # LOOP TO RUN DLC ON CROPPED VIDEOS
+    if analysis_params['analyses_to_perform'][0] == 'all' or 'analyze_sr_vids' in analysis_params['analyses_to_perform']:
+        for expt in experiment_list:
+            parent_directories = analysis_params['parent_directories'][expt]
+            cropped_videos_parent = parent_directories['cropped_videos_parent']
+            rat_db_fname = analysis_params['rat_db_fnames'][expt]
+            rat_db = skilled_reaching_io.read_rat_db(parent_directories, rat_db_fname)
+            folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent,
+                                                                              rat_list=ratIDs_to_analyze,
+                                                                              view_list=analysis_params['cam_names'])
+            view_config_paths = analysis_params['view_config_paths']
+            expt_parent_dirs = analysis_params['parent_directories'][expt]
+
+            analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_dirs, rat_db,
+                                   cropped_vid_type='.avi',
+                                   gputouse=gputouse,
+                                   save_as_csv=True,
+                                   create_marked_vids=False)
 
 
     # LOOP TO CREATE LABELED VIDEOS FROM VIDEOS THAT HAVE ALREADY BEEN ANALYZED
@@ -658,7 +681,8 @@ if __name__ == '__main__':
             cropped_videos_parent = parent_directories['cropped_videos_parent']
             rat_db_fname = analysis_params['rat_db_fnames'][expt]
             rat_db = skilled_reaching_io.read_rat_db(parent_directories, rat_db_fname)
-            folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent, view_list=analysis_params['cam_names'])
+            folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent, rat_list=ratIDs_to_analyze,
+                                                                              view_list=analysis_params['cam_names'])
 
             # folders_to_analyze is a dictionary whose keys are the views ('dir', 'lm', 'rm')
             for view in folders_to_analyze.keys():

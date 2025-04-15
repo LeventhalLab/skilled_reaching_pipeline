@@ -2095,12 +2095,78 @@ def test_board_reconstruction(pts1, pts2, mtx, rot, t, board):
     pass
 
 
+def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name):
+
+    vid_folder, vid_name = os.path.split(full_calib_vid_name)
+    labeledvids_folder = os.path.join(vid_folder, 'labeled_vids')
+    if not os.path.exists(labeledvids_folder):
+        os.makedirs(labeledvids_folder)
+    labeled_vid_name = vid_name.replace('.avi', '_labeled.avi')
+    labeled_vid_name = os.path.join(labeledvids_folder, labeled_vid_name)
+    if os.path.exists(labeled_vid_name):
+        return
+
+    all_rows = calibration_data['all_rows']
+    n_cams = len(all_rows)
+    cv_cap = cv2.VideoCapture(full_calib_vid_name)
+    n_frames = int(cv_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    w = int(cv_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cv_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cv_cap.get(cv2.CAP_PROP_FPS)
+
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    cv_out = cv2.VideoWriter(labeled_vid_name, fourcc, fps, (w, h))
+    mtx = calibration_data['cam_intrinsics']['mtx']
+    dist = calibration_data['cam_intrinsics']['dist']
+
+    for i_frame in range(n_frames):
+        # overlay points
+        row_idx = [0, 0, 0]
+        ret, img = cv_cap.read()
+        if not ret:
+            break
+        img_ud = cv2.undistort(img, mtx, dist)
+        fig = plt.figure()
+        ax = fig.add_subplot()
+        # ax.imshow(img_ud)
+
+        for i_view, rows in enumerate(all_rows):
+            frame_nums = np.array([(i_row, row['framenum']) for i_row, row in enumerate(rows)])
+            try:
+                frame_row_idx = frame_nums[frame_nums[:,1]==i_frame,0][0]
+            except:
+                # there aren't data for this frame
+                frame_row_idx = None
+            row_idx[i_view] = frame_row_idx
+
+        for i_view, rows in enumerate(all_rows):
+            if not row_idx[i_view] is None:
+                frame_row = rows[row_idx[i_view]]
+                for ii, id in enumerate(frame_row['ids']):
+                    plt.text(frame_row['corners'][ii, 0, 0], frame_row['corners'][ii, 0, 1],
+                             '{:d}'.format(id), c='r', fontsize='small')
+                    text_loc = (int(frame_row['corners'][ii, 0, 0]), int(frame_row['corners'][ii, 0, 1]))
+                    cv2.putText(img_ud, '{:d}'.format(id), text_loc, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=0.8, color=(0, 0, 255))
+
+        cv_out.write(img_ud)
+        # frame_name = '{:04d}.jpg'.format(i_frame)
+        # frame_name = os.path.join(temp_folder, frame_name)
+
+        # plt.savefig(frame_name)
+        plt.close(fig)
+
+    # check_detections()
+    cv_cap.release()
+    cv_out.release()
+
+
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, session_row, calibration_pickle_name,
                            full_calib_vid_name=None, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
-    if os.path.exists(calibration_pickle_name):
+    if not os.path.exists(calibration_pickle_name):
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
+        # overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name)
         cgroup = calibration_data['cgroup']
         return cgroup, None
     else:
@@ -2129,7 +2195,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
             # need to make sure the cameras are in the right order; this should have been checked in the code above
             all_rows[i] = mirror_board.estimate_pose_rows(cam, row)
         calibration_data['all_rows'] = all_rows
-        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+        # skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
     else:
         all_rows = calibration_data['all_rows']
         for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
@@ -2176,8 +2242,8 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
         # if one of the views couldn't be calibrated, skip bundle adjustment for now
     if not np.isnan(calibration_data['E']).any():
         # error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
-        error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, extra, verbose=verbose)
-
+        # error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, extra, verbose=verbose)
+        error = cgroup.bundle_adjust_fixed_intrinsics_and_cam0(imgp, extra, verbose=verbose)
         calibration_data['cgroup'] = cgroup
         calibration_data['error'] = error
         calibration_data['bundle_adjust_completed'] = True

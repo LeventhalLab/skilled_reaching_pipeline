@@ -2164,7 +2164,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
                            full_calib_vid_name=None, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
-    if not os.path.exists(calibration_pickle_name):
+    if os.path.exists(calibration_pickle_name):
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
         # overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name)
         cgroup = calibration_data['cgroup']

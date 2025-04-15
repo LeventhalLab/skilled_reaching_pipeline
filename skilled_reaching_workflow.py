@@ -508,9 +508,9 @@ if __name__ == '__main__':
 
     analyses_to_perform = [
                            # 'crop_calibration_vids',
-                           # 'calibrate_videos',
+                           'calibrate_videos',
                            # 'crop_sr_vids',
-                           'analyze_sr_vids',
+                           # 'analyze_sr_vids',
                            # 'create_marked_vids',
                            # 'reconstruct_3d'
                            ]

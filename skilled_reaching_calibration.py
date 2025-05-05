@@ -1850,7 +1850,7 @@ def select_correct_E_mirror(R1, R2, T, pts1, pts2, mtx):
     return c_rot, c_t, correct
 
 
-def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']]):
+def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], max_dist_from_epiline=5):
 
     view_keys = list(stereo_cal_points.keys())
     for view_key in view_keys:
@@ -1866,12 +1866,15 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
     if stereo_cal_points[lm_key] is None:
         F[:, :, 0].fill(np.nan)
     else:
-        F[:, :, 0] = cvb.fund_matrix_mirror(stereo_cal_points['directleft'], stereo_cal_points['leftmirror'])
+        Finit = cvb.fund_matrix_mirror(stereo_cal_points['directleft'], stereo_cal_points['leftmirror'])
+        F[:, :, 0], inliers_left = cvb.refine_fundamental_matrix(Finit, stereo_cal_points['directleft'], stereo_cal_points['leftmirror'], max_dist_from_epiline=max_dist_from_epiline)
 
     if stereo_cal_points[rm_key] is None:
         F[:, :, 1].fill(np.nan)
     else:
-        F[:, :, 1] = cvb.fund_matrix_mirror(stereo_cal_points['directright'], stereo_cal_points['rightmirror'])
+        Finit = cvb.fund_matrix_mirror(stereo_cal_points['directright'], stereo_cal_points['rightmirror'])
+        F[:, :, 1], inliers_right = cvb.refine_fundamental_matrix(Finit, stereo_cal_points['directright'],
+                                                            stereo_cal_points['rightmirror'], max_dist_from_epiline=max_dist_from_epiline)
 
     # calculate essential matrices
     E = np.empty((3, 3, 2))
@@ -1903,7 +1906,7 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
             t_mat = np.expand_dims(c_t[:, i_view], 1)
         # P2[:, :, i_view] = np.hstack((c_rot[:, :, i_view], t_mat))
 
-    return E, F, c_rot, c_t
+    return E, F, c_rot, c_t, inliers_left, inliers_right
 
 
 def calc_3d_gridspacing_checkerboard(pts3d, board_size):
@@ -2147,6 +2150,7 @@ def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name):
                              '{:d}'.format(id), c='r', fontsize='small')
                     text_loc = (int(frame_row['corners'][ii, 0, 0]), int(frame_row['corners'][ii, 0, 1]))
                     cv2.putText(img_ud, '{:d}'.format(id), text_loc, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=0.8, color=(0, 0, 255))
+                    cv2.circle(img_ud, (int(frame_row['corners'][ii, 0, 0]), int(frame_row['corners'][ii, 0, 1])), radius=1, color=(0, 0, 255), thickness=-1)
 
         cv_out.write(img_ud)
         # frame_name = '{:04d}.jpg'.format(i_frame)
@@ -2160,13 +2164,33 @@ def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name):
     cv_out.release()
 
 
+def remove_outlier_imgp(imgp, F, max_dist_from_epiline=5):
+
+    # first look at all points visible in the direct view and left mirror
+    lm_dist_from_epilines = cvb.dist_from_epilines(F[:, :, 0], imgp[0, :, :], imgp[1, :, :])
+    rm_dist_from_epilines = cvb.dist_from_epilines(F[:, :, 1], imgp[0, :, :], imgp[2, :, :])
+
+    lm_outliers = lm_dist_from_epilines > max_dist_from_epiline
+    rm_outliers = rm_dist_from_epilines > max_dist_from_epiline
+    imgp[1, lm_outliers, :] = np.nan
+    imgp[2, rm_outliers, :] = np.nan
+
+    # eliminate any imgp with only one valid point
+    n_valid_pts_per_match = np.sum(~np.isnan(imgp[:,:,0]), axis=0)
+    valid_combos = n_valid_pts_per_match > 1
+
+    new_imgp = imgp[:, valid_combos, :]
+
+    return new_imgp, valid_combos
+
+
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, session_row, calibration_pickle_name,
-                           full_calib_vid_name=None, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, verbose=True):
+                           full_calib_vid_name=None, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, max_dist_from_epiline=5, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
     if os.path.exists(calibration_pickle_name):
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
-        # overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name)
+        overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name)
         cgroup = calibration_data['cgroup']
         return cgroup, None
     else:
@@ -2210,7 +2234,9 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     merged = merge_rows(all_rows, cam_names=cam_names)
     stereo_cal_points, matched_points_metadata = collect_matched_mirror_points(merged, mirror_board)
     # if calibration_data['E'] is None:
-    E, F, rot, t = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
+    # stereo_cal_points are undistorted (this occurs in get_rows_cropped_vids)
+    E, F, rot, t, inliers_left, inliers_right = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names,
+                                                                  max_dist_from_epiline=max_dist_from_epiline)
 
     calibration_data['E'] = E
     calibration_data['F'] = F
@@ -2236,7 +2262,14 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     calibration_data['extrinsics_initialized'] = True
 
     cgroup_old = copy.deepcopy(cgroup)
+
+    # need to modify extract_points so that outlier points are excluded from bundle adjustment
     imgp, extra = extract_points(merged, mirror_board, cam_names=cam_names, min_cameras=2)
+    imgp, valid_matches = remove_outlier_imgp(imgp, F, max_dist_from_epiline=max_dist_from_epiline)
+    extra['objp'] = extra['objp'][valid_matches, :]
+    extra['ids'] = extra['ids'][valid_matches]
+    extra['rvecs'] = extra['rvecs'][:, valid_matches, :]
+    extra['tvecs'] = extra['tvecs'][:, valid_matches, :]
 
     # if not calibration_data['bundle_adjust_completed']:
         # if one of the views couldn't be calibrated, skip bundle adjustment for now
@@ -2245,6 +2278,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
         # error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, extra, verbose=verbose)
         error = cgroup.bundle_adjust_fixed_intrinsics_and_cam0(imgp, extra, verbose=verbose)
         calibration_data['cgroup'] = cgroup
+        calibration_data['cgroup_old'] = cgroup_old
         calibration_data['error'] = error
         calibration_data['bundle_adjust_completed'] = True
     else:

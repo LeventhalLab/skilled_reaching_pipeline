@@ -37,6 +37,7 @@ def fund_matrix_mirror(x1, x2, min_points=10):
 
     # solve the linear system of equations A * [f12, f13, f23]' = 0
     _, _, VH = np.linalg.svd(A, full_matrices=False)
+
     vA = VH.T.conj()
     F = np.zeros((3, 3))
     fvec = vA[:, -1]
@@ -49,8 +50,66 @@ def fund_matrix_mirror(x1, x2, min_points=10):
     F[2, 0] = -F[0, 2]
     F[2, 1] = -F[1, 2]
 
+    # F_RANSAC = cv2.findFundamentalMat(x1, x2, cv2.FM_RANSAC, 3, 0.99)
+    # Fbasic = cv2.findFundamentalMat(x1, x2, cv2.FM_8POINT)
+    # x2_dist_from_epilines = dist_from_epilines(F, x1, x2)
+
     return F
 
+
+def refine_fundamental_matrix(F, x1, x2, max_dist_from_epiline=5):
+
+    x2_dist_from_epilines = dist_from_epilines(F, x1, x2)
+    iteration_max_dist = max(x2_dist_from_epilines)
+    inliers_bool = x2_dist_from_epilines < max_dist_from_epiline
+
+    if iteration_max_dist < max_dist_from_epiline:
+        # already no outliers, just return the original inputs
+        return F, inliers_bool
+
+    outliers_bool = np.logical_not(inliers_bool)
+    new_x1 = np.copy(x1)
+    new_x2 = np.copy(x2)
+
+
+    while iteration_max_dist > max_dist_from_epiline:
+        new_x1[outliers_bool, :] = np.nan
+        new_x2[outliers_bool, :] = np.nan
+
+        x1_inliers = x1[inliers_bool, :]
+        x2_inliers = x2[inliers_bool, :]
+
+        Fnew = fund_matrix_mirror(x1_inliers, x2_inliers)
+
+        x2_dist_from_epilines = dist_from_epilines(F, new_x1, new_x2)
+        inliers_bool = x2_dist_from_epilines < max_dist_from_epiline
+        outliers_bool = np.logical_not(inliers_bool)
+
+        iteration_max_dist = np.nanmax(x2_dist_from_epilines)
+
+    return Fnew, inliers_bool
+
+
+def dist_from_epilines(F, x1, x2):
+    '''
+
+    :param F: 3 x 3 fundamental matrix
+    :param x2: matched points
+    :return:
+    '''
+
+    epi_lines = cv2.computeCorrespondEpilines(x1, 1, F)
+    epi_lines = np.squeeze(epi_lines)
+
+    n_pts = np.shape(x2)[0]
+
+    x2_dist_from_epilines = np.zeros(n_pts)
+    # x1_dist_from_epilines = np.zeros(n_pts)
+    for i_line, epi_line in enumerate(epi_lines):
+        x2_dist_from_epilines[i_line] = point_line_dist(epi_line, x2[i_line, :])
+        # x1_dist_from_epilines[i_line] = point_line_dist(epi_line, x1[i_line, :])   # sanity check, should be all zeros
+
+    return x2_dist_from_epilines
 
 def project_points(world_points, proj_matrix, mtx):
 
@@ -622,6 +681,21 @@ def find_nearest_neighbor(x, y, num_neighbors=1):
     # return sorted_dist[:num_neighbors], sorted_dist_idx[:num_neighbors]
 
     return nn_dist, near_y
+
+
+def point_line_dist(line_coeffs, pts):
+
+    denominator = np.linalg.norm(line_coeffs[:2])
+    pts = np.squeeze(pts)
+
+    if pts.ndim == 1:
+        numerator = np.abs(pts[0] * line_coeffs[0] + pts[1] * line_coeffs[1] + line_coeffs[2])
+    else:
+        numerator = np.abs(pts[:, 0] * line_coeffs[0] + pts[:,1] * line_coeffs[1] + line_coeffs[2])
+
+    d = numerator / denominator
+
+    return d
 
 
 def find_nearest_point_on_line(line_pts, pts):

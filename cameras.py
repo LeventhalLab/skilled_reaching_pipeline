@@ -1183,7 +1183,7 @@ class CameraGroup:
                       verbose=True):
         """Given an CxNx2 array of 2D points,
         where N is the number of points and C is the number of cameras,
-        this performs bundle adjustsment to fine-tune the parameters of the cameras"""
+        this performs bundle adjustment to fine-tune the camera parameters"""
 
         assert p2ds.shape[0] == len(self.cameras), \
             "Invalid points shape, first dim should be equal to" \

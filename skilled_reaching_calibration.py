@@ -40,7 +40,7 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_list[0][0])
     print('refining calibration for {}, {}, session {:d}'.format(h5_metadata['ratID'], h5_metadata['triggertime'].strftime('%m/%d/%Y'), h5_metadata['session_num']))
 
-    cgroup = calibration_data['cgroup']
+    cgroup = copy.deepcopy(calibration_data['cgroup'])
     cam_names = cgroup.get_names()
     calibration_data['original_cgroup'] = copy.deepcopy(cgroup)
 
@@ -51,7 +51,8 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     # cam_intrinsics = calibration_data['cam_intrinsics']
     # E, F, rot, t = mirror_stereo_cal(imgp_dict, cam_intrinsics, view_names=cam_names)
     # error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra=None, verbose=verbose)
-    error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, undistort=False, extra=None, verbose=verbose)
+    # error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, undistort=False, extra=None, verbose=verbose)
+    error = cgroup.bundle_adjust_iter_fixed_intrinsics_and_cam0(imgp, undistort=False, extra=None, verbose=verbose)
 
 
     # cgroup was modified by the bundle_adjust_iter_fixed_intrinsics function
@@ -1566,7 +1567,7 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20, min_pts_per_frame
     '''
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO
 
-    rows, size = detect_video_pts(cal_vid, board, skip=1)
+    rows, size = detect_video_pts(cal_vid, board, camera=None, skip=1)
     # size is (w, h)
     # rows = board.detect_video(cal_vid, prefix=None, skip=skip, progress=True)
 
@@ -2106,8 +2107,8 @@ def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name):
         os.makedirs(labeledvids_folder)
     labeled_vid_name = vid_name.replace('.avi', '_labeled.avi')
     labeled_vid_name = os.path.join(labeledvids_folder, labeled_vid_name)
-    if os.path.exists(labeled_vid_name):
-        return
+    # if os.path.exists(labeled_vid_name):
+    #     return
 
     all_rows = calibration_data['all_rows']
     n_cams = len(all_rows)
@@ -2121,6 +2122,8 @@ def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name):
     cv_out = cv2.VideoWriter(labeled_vid_name, fourcc, fps, (w, h))
     mtx = calibration_data['cam_intrinsics']['mtx']
     dist = calibration_data['cam_intrinsics']['dist']
+    cam_names = calibration_data['cgroup'].get_names()
+    merged = merge_rows(all_rows, cam_names=cam_names)
 
     for i_frame in range(n_frames):
         # overlay points
@@ -2129,9 +2132,8 @@ def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name):
         if not ret:
             break
         img_ud = cv2.undistort(img, mtx, dist)
-        fig = plt.figure()
-        ax = fig.add_subplot()
-        # ax.imshow(img_ud)
+        # fig = plt.figure()
+        # ax = fig.add_subplot()
 
         for i_view, rows in enumerate(all_rows):
             frame_nums = np.array([(i_row, row['framenum']) for i_row, row in enumerate(rows)])
@@ -2142,26 +2144,61 @@ def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name):
                 frame_row_idx = None
             row_idx[i_view] = frame_row_idx
 
+        try:
+            merged_row = next(filter(lambda x: x['dir']['framenum'] == i_frame, merged), None)
+            merged_pts = match_2d_merged_pts(merged_row, cam_names, pt_type='corners')
+            pts3d = calibration_data['cgroup2'].triangulate(merged_pts, undistort=False, progress=False)
+            projected_pts = calibration_data['cgroup2'].project(pts3d)
+        except:
+            projected_pts = None
+
         for i_view, rows in enumerate(all_rows):
             if not row_idx[i_view] is None:
                 frame_row = rows[row_idx[i_view]]
-                for ii, id in enumerate(frame_row['ids']):
-                    plt.text(frame_row['corners'][ii, 0, 0], frame_row['corners'][ii, 0, 1],
-                             '{:d}'.format(id), c='r', fontsize='small')
+                for ii, id in enumerate(np.squeeze(frame_row['ids'])):
+                    try:
+                        plt.text(frame_row['corners'][ii, 0, 0], frame_row['corners'][ii, 0, 1],
+                                 '{:d}'.format(id), c='r', fontsize='small')
+                    except:
+                        pass
                     text_loc = (int(frame_row['corners'][ii, 0, 0]), int(frame_row['corners'][ii, 0, 1]))
                     cv2.putText(img_ud, '{:d}'.format(id), text_loc, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=0.8, color=(0, 0, 255))
                     cv2.circle(img_ud, (int(frame_row['corners'][ii, 0, 0]), int(frame_row['corners'][ii, 0, 1])), radius=1, color=(0, 0, 255), thickness=-1)
-
-        cv_out.write(img_ud)
+            if projected_pts is not None:
+                for ii in range(np.shape(projected_pts)[1]):
+                    if not np.isnan(projected_pts[i_view, ii, 0]):
+                        cv2.circle(img_ud, (int(projected_pts[i_view, ii, 0]), int(projected_pts[i_view, ii, 1])),
+                                   radius=3, color=(255, 0, 0), thickness=-1)
+        try:
+            cv_out.write(img_ud)
+        except:
+            pass
         # frame_name = '{:04d}.jpg'.format(i_frame)
         # frame_name = os.path.join(temp_folder, frame_name)
 
         # plt.savefig(frame_name)
-        plt.close(fig)
+        # ax.imshow(img_ud)
+        # plt.close(fig)
 
     # check_detections()
     cv_cap.release()
     cv_out.release()
+
+
+def match_2d_merged_pts(merged_row, cam_names, pt_type='corners'):
+
+    n_cams = len(cam_names)
+    row_keys = list(merged_row.keys())
+    max_pts = max([len(merged_row[key]['ids']) for key in row_keys])
+
+    frame_pts = np.empty((n_cams, max_pts, 2))
+    frame_pts[:] = np.nan
+
+    for i_cam, cam_name in enumerate(cam_names):
+        if cam_name in row_keys:
+            frame_pts[i_cam, merged_row[cam_name]['ids'], :] = merged_row[cam_name][pt_type][merged_row[cam_name]['ids'], 0, :]
+
+    return frame_pts
 
 
 def remove_outlier_imgp(imgp, F, max_dist_from_epiline=5):
@@ -2188,8 +2225,10 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
                            full_calib_vid_name=None, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, max_dist_from_epiline=5, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
+    crop_videos.write_video_frames(full_calib_vid_name, img_type='.jpg')
     if os.path.exists(calibration_pickle_name):
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
+        # working here... check to see if there is a .csv file with points in it for all 3 views; if so, load them and use them for bundle adjustment
         overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name)
         cgroup = calibration_data['cgroup']
         return cgroup, None
@@ -2235,8 +2274,11 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     stereo_cal_points, matched_points_metadata = collect_matched_mirror_points(merged, mirror_board)
     # if calibration_data['E'] is None:
     # stereo_cal_points are undistorted (this occurs in get_rows_cropped_vids)
-    E, F, rot, t, inliers_left, inliers_right = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names,
-                                                                  max_dist_from_epiline=max_dist_from_epiline)
+    try:
+        E, F, rot, t, inliers_left, inliers_right = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names,
+                                                                      max_dist_from_epiline=max_dist_from_epiline)
+    except:
+        pass
 
     calibration_data['E'] = E
     calibration_data['F'] = F
@@ -2245,6 +2287,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     rvecs = [[0., 0., 0.]]
     cam_t = [[0., 0., 0.]]
     scale_factors = np.zeros(2)
+
     for i_view in range(2):
         cam_rvec, _ = cv2.Rodrigues(rot[:, :, i_view])
         rvecs.append(cam_rvec)
@@ -2259,9 +2302,13 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     cgroup.set_rotations(rvecs)
     cgroup.set_translations(cam_t)
 
+    calibration_data['cgroup'] = cgroup
     calibration_data['extrinsics_initialized'] = True
 
+    pts_3view = collect_3view_pts(full_calib_vid_name, calibration_data)
+
     cgroup_old = copy.deepcopy(cgroup)
+    cgroup2 = copy.deepcopy(cgroup)
 
     # need to modify extract_points so that outlier points are excluded from bundle adjustment
     imgp, extra = extract_points(merged, mirror_board, cam_names=cam_names, min_cameras=2)
@@ -2276,17 +2323,19 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     if not np.isnan(calibration_data['E']).any():
         # error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
         # error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, extra, verbose=verbose)
-        error = cgroup.bundle_adjust_fixed_intrinsics_and_cam0(imgp, extra, verbose=verbose)
-        calibration_data['cgroup'] = cgroup
+        error = cgroup.bundle_adjust_iter_fixed_intrinsics_and_cam0(imgp, extra, verbose=verbose)
+        error2 = cgroup2.bundle_adjust_iter_fixed_intrinsics(imgp, extra, verbose=verbose)
+        calibration_data['cgroup2'] = cgroup2
         calibration_data['cgroup_old'] = cgroup_old
         calibration_data['error'] = error
+        calibration_data['error2'] = error2
         calibration_data['bundle_adjust_completed'] = True
     else:
         # todo: manually calibrate if automatic detection didn't work
         error = None
 
     skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
-
+    overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name)
     # else:
     #     cgroup = calibration_data['cgroup']
     #     error = calibration_data['error']
@@ -2401,6 +2450,55 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     #     error = calibration_data['error']
     #
     # return cgroup, error
+
+
+def collect_3view_pts(full_calib_vid_name, calibration_data):
+
+    vid_path, vid_name = os.path.split(full_calib_vid_name)
+    calib_metadata = navigation_utilities.parse_camera_calibration_video_name(full_calib_vid_name)
+    frames_3view_folder = navigation_utilities.find_3dframes_folder(calib_metadata)
+    frames_3view_folder = os.path.join(vid_path, frames_3view_folder)
+
+    if os.path.exists(frames_3view_folder):
+
+        # find .csv files
+        csv_test_string = os.path.join(frames_3view_folder, '*.csv')
+        csv_list = glob.glob(csv_test_string)
+
+        for csv_file in csv_list:
+            csv_metadata = navigation_utilities.parse_frame_csv_name(csv_file)
+            csv_table = pd.read_csv(csv_file)
+            pts_3view = sort_3view_pts(csv_table, calibration_data, lm_xlim=500, rm_xlim=1500)
+            pass
+        pass
+
+
+
+
+    pass
+    # Calibration3views_b01_20240408_12 - 14 - 57
+# \\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\calibration_videos\calibration_videos_202404
+
+
+def sort_3view_pts(csv_3view_table, calibration_data, lm_xlim=500, rm_xlim=1500):
+
+    X = csv_3view_table['X'].values
+    Y = csv_3view_table['Y'].values
+    pts = np.vstack((X, Y)).T
+
+    # undistort since points were marked on original calibration video
+    cam_intrinsics = calibration_data['cam_intrinsics']
+    pts_ud = cv2.undistortPoints(pts, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+    n_pts = np.shape(pts)[0]
+    lm_bool = X < lm_xlim
+    rm_bool = X > rm_xlim
+    mir_bool = np.logical_or(lm_bool, rm_bool)
+    dir_bool = ~np.logical_and(np.ones(n_pts, dtype=bool), mir_bool)
+
+    lm_pts = pts[X < lm_xlim, :]
+    rm_pts = pts[X > rm_xlim, :]
+    dir_pts = pts
+    pass
 
 
 def test_anipose_calibration(session_row, parent_directories):
@@ -2722,6 +2820,7 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
     else:
         for i_vid, cropped_vid in enumerate(cropped_vids):
             # rows_cam = []
+            orig_cal_vid = navigation_utilities.find_original_calibration_from_cropped_vid(cropped_vid, parent_directories)
 
             # if 'rm' in cropped_vid:
             #     skip = 1
@@ -2762,8 +2861,8 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
                 corners_ud = np.expand_dims(corners_ud, 1)
                 filled_ud = np.expand_dims(filled_ud, 1)
 
-                rows[i_row]['corners_distorted'] = row['corners']   # these are still in the cropped video reference frame
-                rows[i_row]['corners'] = corners_ud
+                rows[i_row]['corners_distorted'] = copy.deepcopy(orig_coord)   # these are still in the full video reference frame, but still distorted
+                rows[i_row]['corners'] = copy.deepcopy(corners_ud)
                 rows[i_row]['filled'] = filled_ud
 
                 # rows_cam.extend(rows)
@@ -2774,6 +2873,36 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
     # check_detections(board, all_rows, cropped_vids, full_calib_vid_name, cam_intrinsics)
 
     return all_rows
+
+
+def overlay_rows(rows, orig_cal_vid, cam_intrinsics):
+
+    cap = cv2.VideoCapture(orig_cal_vid)
+
+    # for i_row, row in enumerate(rows):
+    i_row = 0
+    row = rows[i_row]
+
+    cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
+    res, img = cap.read()
+
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    ax.imshow(img)
+
+    ax.scatter(row['corners_distorted'][:,0], row['corners_distorted'][:,1])
+
+    img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+
+    fig2 = plt.figure()
+    ax2 = fig2.add_subplot()
+    ax2.imshow(img_ud)
+
+    ax2.scatter(row['corners'][:, 0, 0], row['corners'][:, 0, 1])
+
+    cap.release()
+
+
 
     # mirror_calib_vid_name = navigation_utilities.calib_vid_name_from_cropped_calib_vid_name(cropped_vid)
     #

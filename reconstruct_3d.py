@@ -208,9 +208,11 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
                             'ses{:02d}'.format(h5_metadata['session_num']),
                             'cgroup'))
     # if calibration hasn't been refined by dlc points, refine it now, then write back to disk so we don't have to do it again
-    if not cgroup_name in calibration_data.keys():
-        calibration_data = skilled_reaching_calibration.refine_calibration(calibration_data, h5_list, parent_directories)
-        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+    # if not cgroup_name in calibration_data.keys():
+    calibration_data = skilled_reaching_calibration.refine_calibration(calibration_data, h5_list, parent_directories)
+    skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+
+    return
 
     trials_db_name = navigation_utilities.get_trialsdb_name(parent_directories, session_metadata['ratID'], 'sr')
     if os.path.exists(trials_db_name):

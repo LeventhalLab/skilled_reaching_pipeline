@@ -884,6 +884,116 @@ class CameraGroup:
         return error
 
 
+    def bundle_adjust_iter_fixed_intrinsics_and_cam0(self, p2ds, extra=None,
+                           n_iters=10, start_mu=15, end_mu=1,
+                           max_nfev=200, ftol=1e-4,
+                           n_samp_iter=100, n_samp_full=1000,
+                           error_threshold=0.3,
+                           undistort=False,
+                           verbose=False):
+        """Given an CxNx2 array of 2D points,
+        where N is the number of points and C is the number of cameras,
+        this performs iterative bundle adjustsment to fine-tune the parameters of the cameras.
+        That is, it performs bundle adjustment multiple times, adjusting the weights given to points
+        to reduce the influence of outliers.
+        This is inspired by the algorithm for Fast Global Registration by Zhou, Park, and Koltun
+        """
+
+        assert p2ds.shape[0] == len(self.cameras), \
+            "Invalid points shape, first dim should be equal to" \
+            " number of cameras ({}), but shape is {}".format(
+                len(self.cameras), p2ds.shape
+            )
+
+        p2ds_full = p2ds
+        extra_full = extra
+
+        p2ds, extra = resample_points(p2ds_full, extra_full,
+                                      n_samp=n_samp_full)
+        error = self.average_error(p2ds, median=True, undistort=undistort)
+
+        if verbose:
+            print('error: ', error)
+
+        mus = np.exp(np.linspace(np.log(start_mu), np.log(end_mu), num=n_iters))
+
+        if verbose:
+            print('n_samples: {}'.format(n_samp_iter))
+
+        for i in range(n_iters):
+            p2ds, extra = resample_points(p2ds_full, extra_full,
+                                          n_samp=n_samp_full)
+            p3ds = self.triangulate(p2ds, undistort=undistort)
+            errors_full = self.reprojection_error(p3ds, p2ds, mean=False)
+            errors_norm = self.reprojection_error(p3ds, p2ds, mean=True)
+
+            error_dict = get_error_dict(errors_full)
+            max_error = 0
+            min_error = 0
+            for k, v in error_dict.items():
+                num, percents = v
+                max_error = max(percents[-1], max_error)
+                min_error = max(percents[0], min_error)
+            mu = max(min(max_error, mus[i]), min_error)
+
+            good = errors_norm < mu
+            extra_good = subset_extra(extra, good)
+            p2ds_samp, extra_samp = resample_points(
+                p2ds[:, good], extra_good, n_samp=n_samp_iter)
+
+            error = np.median(errors_norm)
+
+            if error < error_threshold:
+                break
+
+            if verbose:
+                pprint(error_dict)
+                print('error: {:.2f}, mu: {:.1f}, ratio: {:.3f}'.format(error, mu, np.mean(good)))
+
+            self.bundle_adjust_fixed_intrinsics_and_cam0(p2ds_samp, extra_samp,
+                               loss='linear', ftol=ftol,
+                               max_nfev=max_nfev,
+                               verbose=verbose)
+
+
+        p2ds, extra = resample_points(p2ds_full, extra_full,
+                                      n_samp=n_samp_full)
+        p3ds = self.triangulate(p2ds, undistort=undistort)
+        errors_full = self.reprojection_error(p3ds, p2ds, mean=False)
+        errors_norm = self.reprojection_error(p3ds, p2ds, mean=True)
+        error_dict = get_error_dict(errors_full)
+        if verbose:
+            pprint(error_dict)
+
+        max_error = 0
+        min_error = 0
+        for k, v in error_dict.items():
+            num, percents = v
+            max_error = max(percents[-1], max_error)
+            min_error = max(percents[0], min_error)
+        mu = max(max(max_error, end_mu), min_error)
+
+        good = errors_norm < mu
+        extra_good = subset_extra(extra, good)
+        self.bundle_adjust_fixed_intrinsics_and_cam0(p2ds[:, good], extra_good,
+                           loss='linear',
+                           ftol=ftol, max_nfev=max(200, max_nfev),
+                           verbose=verbose)
+
+        error = self.average_error(p2ds, median=True)
+
+        p3ds = self.triangulate(p2ds, undistort=undistort)
+        errors_full = self.reprojection_error(p3ds, p2ds, mean=False)
+        error_dict = get_error_dict(errors_full)
+        if verbose:
+            pprint(error_dict)
+
+        if verbose:
+            print('error: ', error)
+
+        return error
+
+
     def bundle_adjust_iter_fixed_dist(self, p2ds, extra=None,
                            n_iters=10, start_mu=15, end_mu=1,
                            max_nfev=200, ftol=1e-4,
@@ -1498,10 +1608,9 @@ class CameraGroup:
             n_boards = 0
             total_board_params = 0
 
-        n_cams = p2ds.shape[0]
+        n_cams = p2ds.shape[0] - 1   # subtract one because not adjusting parameters for camera 0, so only need to include parameters for one fewer than the total number of cameras
         n_points = p2ds.shape[1]
-        total_params_reproj = (n_cams-1) * n_cam_params + n_points * 3
-        # use n_cams-1 because only adjusting parameters for cameras other than cam0
+        total_params_reproj = (n_cams) * n_cam_params + n_points * 3
         n_params = total_params_reproj + total_board_params
 
         n_good_values = np.sum(good)
@@ -1524,7 +1633,10 @@ class CameraGroup:
 
         ## update point position based on point error
         for i in range(3):
-            A_sparse[ix, n_cams * n_cam_params + point_indices_good * 3 + i] = 1
+            try:
+                A_sparse[ix, n_cams * n_cam_params + point_indices_good * 3 + i] = 1
+            except:
+                pass
 
         # -- match for the object points--
         if extra is not None:

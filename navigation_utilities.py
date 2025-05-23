@@ -251,9 +251,11 @@ def find_scores_xlsx(parent_directories, expt_name):
         return None
 
 
-def get_video_folders_to_crop(video_root_folder, rats_to_analyze='all'):
+def get_video_folders_to_crop(video_root_folder, rats_to_analyze='all', use_already_cropped=True):
 
     rat_folders = glob.glob(os.path.join(video_root_folder, 'R*'))
+    rat_alreadycropped_folders = glob.glob(os.path.join(video_root_folder, 'already_cropped', 'R*'))
+    rat_folders = rat_folders + rat_alreadycropped_folders
 
     vid_folders_to_crop = []
     for rf in rat_folders:
@@ -2075,6 +2077,15 @@ def create_trajectory_filename(video_metadata):
 #     return calibration_video_name
 
 
+def find_3dframes_folder(session_metadata):
+
+    folder_name = '_'.join(('Calibration3views',
+                            'b{:02d}'.format(session_metadata['boxnum']),
+                            datetime_to_string_for_fname(session_metadata['time'])))
+
+    return folder_name
+
+
 def parse_camera_calibration_video_name(calibration_video_name):
     """
 
@@ -2873,6 +2884,25 @@ def find_orig_movies_from_r3d_filename(r3d_file, parent_directories):
     video_root_folder = parent_directories['video_root_folder']
 
 
+def find_original_calibration_from_cropped_vid(cropped_vid, parent_directories):
+    cropped_vid_metadata = parse_cropped_calibration_video_name(cropped_vid)
+    cal_vids_parent = parent_directories['calibration_vids_parent']
+    orig_vid_name = '_'.join(('GridCalibration',
+                              'b{:02d}'.format(cropped_vid_metadata['boxnum']),
+                              datetime_to_string_for_fname(cropped_vid_metadata['time']) + '.avi'))
+    datestring = cropped_vid_metadata['time'].strftime('%Y%m')
+    month_folder = 'calibration_videos_' + datestring
+
+    test_name = os.path.join(cal_vids_parent, month_folder, orig_vid_name)
+    if os.path.exists(test_name):
+        return test_name
+
+    already_cropped_folder = month_folder + '_alreadycropped'
+    test_name = os.path.join(cal_vids_parent, month_folder, already_cropped_folder, orig_vid_name)
+    if os.path.exists(test_name):
+        return test_name
+
+    return None
 
 
 def get_Burgess_video_folders_to_crop(video_root_folder):

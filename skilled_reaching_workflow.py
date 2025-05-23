@@ -503,7 +503,8 @@ if __name__ == '__main__':
                        586, 587, 588, 589, 590, 591, 592, 595, 596, 597, 598, 599, 600, 601, 602, 611, 612, 613, 614,
                        615, 616, 617, 618, 603, 604, 605, 607, 608, 619, 620, 621, 622, 623, 624, 625, 626]
 
-    rats_to_analyze = [468, 469]
+    rats_to_analyze = [548]
+    ratIDs_to_analyze = ['R{:04d}'.format(rn) for rn in rats_to_analyze]
     gputouse = 0
 
     analyses_to_perform = [
@@ -523,6 +524,12 @@ if __name__ == '__main__':
                                                  rats_to_analyze=rats_to_analyze)
 
     anipose_config = toml.load(analysis_params['anipose_config_path'])
+
+    # rat_db_fname = analysis_params['rat_db_fnames']['dLight']
+    # rat_df = skilled_reaching_io.read_rat_db(analysis_params['parent_directories']['dLight'], rat_db_fname)
+    # reconstruct_3d.reconstruct_folders_anipose('R0468', analysis_params['parent_directories']['dLight'], 'dLight', rat_df,
+    #                                            anipose_config,
+    #                                            cam_names=analysis_params['cam_names'], filtered=False)
 
     # use the code below to write a charuco board to a file
     # ncols = 5
@@ -716,7 +723,8 @@ if __name__ == '__main__':
             # ftr = [folder for folder in folders_to_reconstruct if folder['ratID'] in ['R0472']]
             # ftr = folders_to_reconstruct
             all_rats = navigation_utilities.get_ratIDs(analysis_params['parent_directories'][expt]['cropped_videos_parent'])
-            for ratID in all_rats:
+            # ratIDs_to_analyze = all_rats
+            for ratID in ratIDs_to_analyze:
                 reconstruct_3d.reconstruct_folders_anipose(ratID, analysis_params['parent_directories'][expt], expt, rat_df, anipose_config,
                                                            cam_names=analysis_params['cam_names'], filtered=False)
 

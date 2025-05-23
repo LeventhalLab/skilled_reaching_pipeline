@@ -2465,10 +2465,15 @@ def collect_3view_pts(full_calib_vid_name, calibration_data):
         csv_test_string = os.path.join(frames_3view_folder, '*.csv')
         csv_list = glob.glob(csv_test_string)
 
-        for csv_file in csv_list:
+        for i_file, csv_file in enumerate(csv_list):
             csv_metadata = navigation_utilities.parse_frame_csv_name(csv_file)
             csv_table = pd.read_csv(csv_file)
-            pts_3view = sort_3view_pts(csv_table, calibration_data, lm_xlim=500, rm_xlim=1500)
+            pts_3view = sort_3view_pts(csv_table, calibration_data, dirview_lims=[500, 1500])
+
+            if i_file == 0:
+                all_pts_3view = pts_3view
+            else:
+                all_pts_3view = np.vstack(all_pts_3view, pts_3view)
             pass
         pass
 
@@ -2480,25 +2485,65 @@ def collect_3view_pts(full_calib_vid_name, calibration_data):
 # \\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\calibration_videos\calibration_videos_202404
 
 
-def sort_3view_pts(csv_3view_table, calibration_data, lm_xlim=500, rm_xlim=1500):
+def sort_3view_pts(csv_3view_table, calibration_data, dirview_lims=[500, 1500]):
+    '''
+
+    :param csv_3view_table:
+    :param calibration_data:
+    :param dirview_lims: 2-element vector containing the left and right edge x-values for the direct view
+    :return:
+    '''
 
     X = csv_3view_table['X'].values
     Y = csv_3view_table['Y'].values
     pts = np.vstack((X, Y)).T
 
+    cam_names = calibration_data['cgroup'].get_names()
+
     # undistort since points were marked on original calibration video
     cam_intrinsics = calibration_data['cam_intrinsics']
     pts_ud = cv2.undistortPoints(pts, cam_intrinsics['mtx'], cam_intrinsics['dist'])
-    n_pts = np.shape(pts)[0]
-    lm_bool = X < lm_xlim
-    rm_bool = X > rm_xlim
-    mir_bool = np.logical_or(lm_bool, rm_bool)
-    dir_bool = ~np.logical_and(np.ones(n_pts, dtype=bool), mir_bool)
+    pts_ud = cvb.unnormalize_points(pts_ud, cam_intrinsics['mtx'])
 
-    lm_pts = pts[X < lm_xlim, :]
-    rm_pts = pts[X > rm_xlim, :]
-    dir_pts = pts
-    pass
+    pts_3view = match_3view_pts(pts_ud, calibration_data, dirview_lims=dirview_lims)
+
+    return pts_3view
+
+
+def match_3view_pts(pts_ud, calibration_data, dirview_lims=[500, 1500]):
+    cam_names = calibration_data['cgroup'].get_names()
+    n_cams = len(cam_names)
+    p2ds_dict = dict.fromkeys(cam_names)
+    n_viewpts = np.zeros(n_cams)
+    for i_cam, cam in enumerate(cam_names):
+        if cam == 'dir':
+            view_bool = np.logical_and(pts_ud[:, 0] > dirview_lims[0], pts_ud[:, 0] < dirview_lims[1])
+        elif cam == 'lm':
+            view_bool = (pts_ud[:, 0] < dirview_lims[0])
+        elif cam == 'rm':
+            view_bool = (pts_ud[:, 0] > dirview_lims[1])
+
+        p2ds_dict[cam] = pts_ud[view_bool, :]
+        n_viewpts[i_cam] = np.sum(view_bool)
+
+    n_matchedpairs = int(min(n_viewpts))
+    p2ds_array = np.empty((n_cams, n_matchedpairs, 2))
+    p2ds_array[:] = np.nan
+    p2ds_array[0, :, :], p2ds_array[1, :, :], _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['lm'], board=None)
+    dir_pts, rm_pts, _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['rm'], board=None)
+
+    # match direct view points matched with right mirror view with the order for the left mirror view
+    row_idx = np.zeros(n_matchedpairs, dtype=int)
+    for i_dir_pt, dir_pt in enumerate(dir_pts):
+        for i_p2ds_dir, p2ds_dir in enumerate(p2ds_array[0,:,:]):
+            if np.array_equal(dir_pt, p2ds_dir):
+                row_idx[i_dir_pt] = int(i_p2ds_dir)
+
+    p2ds_array[2, : , :] = rm_pts[row_idx, :]
+
+    return p2ds_array
+
+
 
 
 def test_anipose_calibration(session_row, parent_directories):
@@ -3170,7 +3215,7 @@ def calc3Ddistance(Q1, Q2, test_pt):
 
 
 def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line=5, mirr_max_dist_from_line=3):
-    # build this based on old matlab code
+
     n_points = np.shape(mirr_corners)[0]
     remaining_dir_corners = np.copy(dir_corners)
     remaining_mirr_corners = np.copy(mirr_corners)
@@ -3277,8 +3322,11 @@ def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line
     matched_dir_corners = dir_corners[match_idx[:, 0], :]
     matched_mirr_corners = mirr_corners[match_idx[:, 1], :]
 
-    dir_ids = find_pt_ids(matched_dir_corners, board)
-    # since the direct and mirror points should be matched, the points order will be the same for both
+    if board is not None:
+        dir_ids = find_pt_ids(matched_dir_corners, board)
+        # since the direct and mirror points should be matched, the points order will be the same for both
+    else:
+        dir_ids = None
 
     return matched_dir_corners, matched_mirr_corners, dir_ids
 

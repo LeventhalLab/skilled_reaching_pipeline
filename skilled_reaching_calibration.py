@@ -2473,7 +2473,7 @@ def collect_3view_pts(full_calib_vid_name, calibration_data):
             if i_file == 0:
                 all_pts_3view = pts_3view
             else:
-                all_pts_3view = np.vstack(all_pts_3view, pts_3view)
+                all_pts_3view = np.vstack((all_pts_3view, pts_3view))
             pass
         pass
 

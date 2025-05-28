@@ -890,7 +890,8 @@ class CameraGroup:
                            n_samp_iter=100, n_samp_full=1000,
                            error_threshold=0.3,
                            undistort=False,
-                           verbose=False):
+                           verbose=False,
+                           use_jac_sparsity=False):
         """Given an CxNx2 array of 2D points,
         where N is the number of points and C is the number of cameras,
         this performs iterative bundle adjustsment to fine-tune the parameters of the cameras.
@@ -953,7 +954,8 @@ class CameraGroup:
             self.bundle_adjust_fixed_intrinsics_and_cam0(p2ds_samp, extra_samp,
                                loss='linear', ftol=ftol,
                                max_nfev=max_nfev,
-                               verbose=verbose)
+                               verbose=verbose,
+                               use_jac_sparsity=use_jac_sparsity)
 
 
         p2ds, extra = resample_points(p2ds_full, extra_full,
@@ -978,7 +980,8 @@ class CameraGroup:
         self.bundle_adjust_fixed_intrinsics_and_cam0(p2ds[:, good], extra_good,
                            loss='linear',
                            ftol=ftol, max_nfev=max(200, max_nfev),
-                           verbose=verbose)
+                           verbose=verbose,
+                           use_jac_sparsity=use_jac_sparsity)
 
         error = self.average_error(p2ds, median=True)
 
@@ -1290,7 +1293,8 @@ class CameraGroup:
                       max_nfev=1000,
                       weights=None,
                       start_params=None,
-                      verbose=True):
+                      verbose=True,
+                      use_jac_sparsity=False):
         """Given an CxNx2 array of 2D points,
         where N is the number of points and C is the number of cameras,
         this performs bundle adjustment to fine-tune the camera parameters"""
@@ -1313,12 +1317,14 @@ class CameraGroup:
         error_fun = self._error_fun_bundle_fixed_intrinsics_and_cam0
 
         # jac_sparse = self._jac_sparsity_bundle(p2ds, n_cam_params, extra)
-        jac_sparse = self._jac_sparsity_bundle_fixed_intrinsics_and_cam0(p2ds, n_cam_params, extra)
+        if use_jac_sparsity:
+            jac_sparse = self._jac_sparsity_bundle_fixed_intrinsics_and_cam0(p2ds, n_cam_params, extra)
+        else:
+            jac_sparse = None
         # n = x0.size   # this is the one that is off
         # m = f0.size
         f_scale = threshold
 
-        # this is the step where distortion coefficients get adjusted - how to fix them at zeros?
         opt = optimize.least_squares(error_fun,
                                      x0,
                                      jac_sparsity=jac_sparse,
@@ -1900,8 +1906,6 @@ class CameraGroup:
                     rvec, tvec = get_rtvec(M_board)
                     rvecs[board_num] = rvec
                     tvecs[board_num] = tvec
-
-
         else:
             total_board_params = 0
 

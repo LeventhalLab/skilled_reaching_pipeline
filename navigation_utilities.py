@@ -1772,6 +1772,11 @@ def cal_frames_folder_from_cal_vids_name(cal_vid_name):
 
     name_parts = cal_vid_name.split('_')
     cal_frames_foldername = '_'.join(name_parts[:5])
+
+
+    # comment the next line out if want the folder called "GridCalibration_..."
+    cal_frames_foldername = cal_frames_foldername.replace('GridCalibration', 'Calibration3views')
+
     cal_frames_folder = os.path.join(month_frames_dir, cal_frames_foldername)
 
     if not os.path.exists(cal_frames_folder):

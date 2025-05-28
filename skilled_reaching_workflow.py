@@ -334,6 +334,8 @@ def calibrate_all_sessions(parent_directories,
                 session_row,
                 filtertype=filtertype)
             print('calibrating {}'.format(mirror_calib_vid_name))
+            if mirror_calib_vid_name != "GridCalibration_b01_20240412_11-39-28.avi":
+                continue
             cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, session_row, calibration_pickle_name, full_calib_vid_name=full_calib_vid_name)
             # note that calibrate_mirror_views writes a pickle file with updated calibration parameters including cgroup
 

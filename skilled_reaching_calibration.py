@@ -2099,7 +2099,7 @@ def test_board_reconstruction(pts1, pts2, mtx, rot, t, board):
     pass
 
 
-def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name):
+def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, board):
 
     vid_folder, vid_name = os.path.split(full_calib_vid_name)
     labeledvids_folder = os.path.join(vid_folder, 'labeled_vids')
@@ -2122,7 +2122,7 @@ def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name):
     cv_out = cv2.VideoWriter(labeled_vid_name, fourcc, fps, (w, h))
     mtx = calibration_data['cam_intrinsics']['mtx']
     dist = calibration_data['cam_intrinsics']['dist']
-    cam_names = calibration_data['cgroup'].get_names()
+    cam_names = calibration_data['cgroup_3view'].get_names()
     merged = merge_rows(all_rows, cam_names=cam_names)
 
     for i_frame in range(n_frames):
@@ -2144,13 +2144,23 @@ def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name):
                 frame_row_idx = None
             row_idx[i_view] = frame_row_idx
 
-        try:
-            merged_row = next(filter(lambda x: x['dir']['framenum'] == i_frame, merged), None)
-            merged_pts = match_2d_merged_pts(merged_row, cam_names, pt_type='corners')
-            pts3d = calibration_data['cgroup2'].triangulate(merged_pts, undistort=False, progress=False)
-            projected_pts = calibration_data['cgroup2'].project(pts3d)
-        except:
+        # try:
+        merged_row = None
+        # merged_row = next(filter(lambda x: x['dir']['framenum'] == i_frame, merged), None)
+        for test_row in merged:
+            if 'dir' in list(test_row.keys()):
+                if test_row['dir']['framenum'] == i_frame:
+                    merged_row = test_row
+                    break
+        if merged_row is None:
             projected_pts = None
+        else:
+            merged_pts = match_2d_merged_pts(merged_row, cam_names, board=board, pt_type='corners')
+            pts3d = calibration_data['cgroup_3view'].triangulate(merged_pts, undistort=False, progress=False)
+            projected_pts = calibration_data['cgroup_3view'].project(pts3d)
+        # except:
+        #     # this should mean that there was no row with the current frame (i_frame) available in the direct view
+        #     projected_pts = None
 
         for i_view, rows in enumerate(all_rows):
             if not row_idx[i_view] is None:
@@ -2185,18 +2195,22 @@ def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name):
     cv_out.release()
 
 
-def match_2d_merged_pts(merged_row, cam_names, pt_type='corners'):
+def match_2d_merged_pts(merged_row, cam_names, board=None, pt_type='corners'):
 
     n_cams = len(cam_names)
     row_keys = list(merged_row.keys())
-    max_pts = max([len(merged_row[key]['ids']) for key in row_keys])
+    if board is None:
+        max_pts = max([merged_row[key]['ids'] for key in row_keys])
+    else:
+        max_pts = board.total_size
 
     frame_pts = np.empty((n_cams, max_pts, 2))
     frame_pts[:] = np.nan
 
     for i_cam, cam_name in enumerate(cam_names):
         if cam_name in row_keys:
-            frame_pts[i_cam, merged_row[cam_name]['ids'], :] = merged_row[cam_name][pt_type][merged_row[cam_name]['ids'], 0, :]
+            # frame_pts[i_cam, merged_row[cam_name]['ids'], :] = merged_row[cam_name][pt_type][merged_row[cam_name]['ids'], 0, :]
+            frame_pts[i_cam, merged_row[cam_name]['ids'], :] = merged_row[cam_name][pt_type]
 
     return frame_pts
 
@@ -2225,12 +2239,13 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
                            full_calib_vid_name=None, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, max_dist_from_epiline=5, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
-    crop_videos.write_video_frames(full_calib_vid_name, img_type='.jpg')
+    # crop_videos.write_video_frames(full_calib_vid_name, img_type='.jpg')
+    # return None, None
     if os.path.exists(calibration_pickle_name):
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
         # working here... check to see if there is a .csv file with points in it for all 3 views; if so, load them and use them for bundle adjustment
-        overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name)
-        cgroup = calibration_data['cgroup']
+        overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, board)
+        cgroup = calibration_data['cgroup_3view']
         return cgroup, None
     else:
         cgroup = CameraGroup.from_names(cam_names, fisheye=False)
@@ -2308,7 +2323,9 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     pts_3view = collect_3view_pts(full_calib_vid_name, calibration_data)
 
     cgroup_old = copy.deepcopy(cgroup)
-    cgroup2 = copy.deepcopy(cgroup)
+    # cgroup2 = copy.deepcopy(cgroup)
+    cgroup_3view = copy.deepcopy(cgroup)
+    # cgroup_3view2 = copy.deepcopy(cgroup)
 
     # need to modify extract_points so that outlier points are excluded from bundle adjustment
     imgp, extra = extract_points(merged, mirror_board, cam_names=cam_names, min_cameras=2)
@@ -2323,19 +2340,29 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     if not np.isnan(calibration_data['E']).any():
         # error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
         # error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, extra, verbose=verbose)
-        error = cgroup.bundle_adjust_iter_fixed_intrinsics_and_cam0(imgp, extra, verbose=verbose)
-        error2 = cgroup2.bundle_adjust_iter_fixed_intrinsics(imgp, extra, verbose=verbose)
-        calibration_data['cgroup2'] = cgroup2
+        error = cgroup.bundle_adjust_iter_fixed_intrinsics_and_cam0(imgp, extra, verbose=verbose, use_jac_sparsity=True)
+        # error2 = cgroup2.bundle_adjust_iter_fixed_intrinsics(imgp, extra, verbose=verbose)
+        # error_3view = cgroup_3view.bundle_adjust_iter_fixed_intrinsics_and_cam0(pts_3view, extra=None, verbose=verbose, use_jac_sparsity=True)
+        try:
+            error_3view = cgroup_3view.bundle_adjust_iter_fixed_intrinsics_and_cam0(pts_3view, extra=None, verbose=verbose, use_jac_sparsity=False)
+        except:
+            pass
+        # using the full Jacobian works better for points visible in all 3 views empirically, and doesn't make the
+        # computations too long because the number of points is small
+        calibration_data['cgroup'] = cgroup
+        calibration_data['cgroup_3view'] = cgroup_3view
+        # calibration_data['cgroup_3view_jsnone'] = cgroup_3view2
         calibration_data['cgroup_old'] = cgroup_old
         calibration_data['error'] = error
-        calibration_data['error2'] = error2
+        calibration_data['error_3view'] = error_3view
+        # calibration_data['error_3view_jsnone'] = error_3view_jsnone
         calibration_data['bundle_adjust_completed'] = True
     else:
         # todo: manually calibrate if automatic detection didn't work
         error = None
 
     skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
-    overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name)
+    overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, board)
     # else:
     #     cgroup = calibration_data['cgroup']
     #     error = calibration_data['error']
@@ -2465,27 +2492,21 @@ def collect_3view_pts(full_calib_vid_name, calibration_data):
         csv_test_string = os.path.join(frames_3view_folder, '*.csv')
         csv_list = glob.glob(csv_test_string)
 
+        pts_3view_list = []
         for i_file, csv_file in enumerate(csv_list):
             csv_metadata = navigation_utilities.parse_frame_csv_name(csv_file)
             csv_table = pd.read_csv(csv_file)
-            pts_3view = sort_3view_pts(csv_table, calibration_data, dirview_lims=[500, 1500])
+            pts_3view_list.append(sort_3view_pts(csv_table, calibration_data, dirview_lims=[450, 1600]))
 
-            if i_file == 0:
-                all_pts_3view = pts_3view
-            else:
-                all_pts_3view = np.vstack((all_pts_3view, pts_3view))
-            pass
-        pass
+        pts_3view = np.concatenate(pts_3view_list, axis=1)
 
+    else:
+        pts_3view = None
 
+    return pts_3view
 
 
-    pass
-    # Calibration3views_b01_20240408_12 - 14 - 57
-# \\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\calibration_videos\calibration_videos_202404
-
-
-def sort_3view_pts(csv_3view_table, calibration_data, dirview_lims=[500, 1500]):
+def sort_3view_pts(csv_3view_table, calibration_data, dirview_lims=[450, 1600]):
     '''
 
     :param csv_3view_table:
@@ -2510,7 +2531,7 @@ def sort_3view_pts(csv_3view_table, calibration_data, dirview_lims=[500, 1500]):
     return pts_3view
 
 
-def match_3view_pts(pts_ud, calibration_data, dirview_lims=[500, 1500]):
+def match_3view_pts(pts_ud, calibration_data, dirview_lims=[450, 1500]):
     cam_names = calibration_data['cgroup'].get_names()
     n_cams = len(cam_names)
     p2ds_dict = dict.fromkeys(cam_names)
@@ -2717,6 +2738,7 @@ def find_supporting_lines(pts1, pts2):
     all_pts = np.vstack((rounded_pts1, rounded_pts2))
 
     full_cvx_hull = np.squeeze(cv2.convexHull(all_pts))
+
     full_cvx_hull = np.vstack((full_cvx_hull, full_cvx_hull[0, :]))
     # wrap around so the last point is the same as the first point for processing purposes below
 
@@ -3227,7 +3249,14 @@ def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line
         if np.shape(remaining_dir_corners)[0] == 1:
             # only one point left
             dir_row = np.where((dir_corners == remaining_dir_corners).all(axis=1))
-            mir_row = np.where((mirr_corners == remaining_mirr_corners).all(axis=1))
+            if type(dir_row) is tuple:
+                dir_row = dir_row[0]
+            try:
+                mir_row = np.where((mirr_corners == remaining_mirr_corners).all(axis=1))
+            except:
+                pass
+            if type(mir_row) is tuple:
+                mir_row = mir_row[0]
 
             match_idx[n_matches, 0] = dir_row
             match_idx[n_matches, 1] = mir_row
@@ -3235,88 +3264,86 @@ def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line
             remaining_dir_corners = np.array([])
             remaining_mirr_corners = np.array([])
 
-        supporting_lines = find_supporting_lines(remaining_dir_corners, remaining_mirr_corners)
+        else:
+            supporting_lines = find_supporting_lines(remaining_dir_corners, remaining_mirr_corners)
 
-        for i_line in range(2):
-            test_pt1 = np.squeeze(supporting_lines[i_line, 0, :])
-            test_pt2 = np.squeeze(supporting_lines[i_line, 1, :])
+            for i_line in range(2):
+                test_pt1 = np.squeeze(supporting_lines[i_line, 0, :])
+                test_pt2 = np.squeeze(supporting_lines[i_line, 1, :])
 
-            # is test_pt1 in the direct or mirror view?
-            test_is_dir_pt = np.any(np.all(dir_corners == test_pt1, axis=1))
-            if test_is_dir_pt:
-                # test_pt1 is in the direct view, test_pt2 is in the mirror view
-                dir_row = np.where(np.all(dir_corners == test_pt1, axis=1))[0][0]
-                mir_row = np.where(np.all(mirr_corners == test_pt2, axis=1))[0][0]
+                # is test_pt1 in the direct or mirror view?
+                test_is_dir_pt = np.any(np.all(dir_corners == test_pt1, axis=1))
+                if test_is_dir_pt:
+                    # test_pt1 is in the direct view, test_pt2 is in the mirror view
+                    dir_row = np.where(np.all(dir_corners == test_pt1, axis=1))[0][0]
+                    mir_row = np.where(np.all(mirr_corners == test_pt2, axis=1))[0][0]
 
-                try:
                     remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt1, axis=1))[0][0]
-                except:
-                    pass
-                remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt2, axis=1))[0][0]
-            else:
-                # test_pt2 is in the direct view, test_pt1 is in the mirror view
-                mir_row = np.where(np.all(mirr_corners == test_pt1, axis=1))[0][0]
-                dir_row = np.where(np.all(dir_corners == test_pt2, axis=1))[0][0]
+                    remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt2, axis=1))[0][0]
+                else:
+                    # test_pt2 is in the direct view, test_pt1 is in the mirror view
+                    mir_row = np.where(np.all(mirr_corners == test_pt1, axis=1))[0][0]
+                    dir_row = np.where(np.all(dir_corners == test_pt2, axis=1))[0][0]
 
-                remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt2, axis=1))[0][0]
-                remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt1, axis=1))[0][0]
+                    remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt2, axis=1))[0][0]
+                    remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt1, axis=1))[0][0]
 
-            # have potential matches - is it possible that there is a better match that lies along the same line (hidden
-            # by noise in how accurately points were marked/identifed)?
-            n_remaining_points = np.shape(remaining_dir_corners)[0]
-            mirr_dist_from_line = np.empty(n_remaining_points)
-            dir_dist_from_line = np.empty(n_remaining_points)
-            mirr_dist_from_line[:] = np.nan
-            dir_dist_from_line[:] = np.nan
-            supporting_line = np.squeeze(supporting_lines[i_line, :, :])
-            for i_corner in range(n_remaining_points):
-                try:
-                    mirr_dist_from_line[i_corner] = point_to_line_distance(supporting_line, remaining_mirr_corners[i_corner, :])
-                except:
-                    pass
-                dir_dist_from_line[i_corner] = point_to_line_distance(supporting_line,
-                                                                       remaining_dir_corners[i_corner, :])
+                # have potential matches - is it possible that there is a better match that lies along the same line (hidden
+                # by noise in how accurately points were marked/identifed)?
+                n_remaining_points = np.shape(remaining_dir_corners)[0]
+                mirr_dist_from_line = np.empty(n_remaining_points)
+                dir_dist_from_line = np.empty(n_remaining_points)
+                mirr_dist_from_line[:] = np.nan
+                dir_dist_from_line[:] = np.nan
+                supporting_line = np.squeeze(supporting_lines[i_line, :, :])
+                for i_corner in range(n_remaining_points):
+                    try:
+                        mirr_dist_from_line[i_corner] = point_to_line_distance(supporting_line, remaining_mirr_corners[i_corner, :])
+                    except:
+                        pass
+                    dir_dist_from_line[i_corner] = point_to_line_distance(supporting_line,
+                                                                           remaining_dir_corners[i_corner, :])
 
-            mirr_candidates = np.where(mirr_dist_from_line < mirr_max_dist_from_line)[0]
-            dir_candidates = np.where(dir_dist_from_line < dir_max_dist_from_line)[0]
+                mirr_candidates = np.where(mirr_dist_from_line < mirr_max_dist_from_line)[0]
+                dir_candidates = np.where(dir_dist_from_line < dir_max_dist_from_line)[0]
 
-            if len(mirr_candidates) != len(dir_candidates) or len(mirr_candidates) == 1:
-                # only one candidate point in each view or there are mutliple candidates in one view but only one in the other view?
-                # I don't think this is quite right, but it seems to work well enough
+                if len(mirr_candidates) != len(dir_candidates) or len(mirr_candidates) == 1:
+                    # only one candidate point in each view or there are mutliple candidates in one view but only one in the other view?
+                    # I don't think this is quite right, but it seems to work well enough
+                    match_idx[n_matches, 0] = dir_row
+                    match_idx[n_matches, 1] = mir_row
+                    n_matches += 1
+
+                    # remove the rows that were just matched
+                    remaining_dir_corners = np.delete(remaining_dir_corners, remaining_dir_row, axis=0)
+                    remaining_mirr_corners = np.delete(remaining_mirr_corners, remaining_mirr_row, axis=0)
+                    continue
+
+                # multiple candidate matches along the supporting line
+                mirr_dir_distance = np.zeros((len(mirr_candidates), len(mirr_candidates)))
+                for i_dirpt in range(len(mirr_candidates)):
+                    for i_mirrpt in range(len(mirr_candidates)):
+                        mirr_dir_distance[i_dirpt, i_mirrpt] = np.linalg.norm(remaining_dir_corners[dir_candidates[i_dirpt], :] -
+                                                                              remaining_mirr_corners[mirr_candidates[i_mirrpt], :])
+
+                # which direct/mirror points are closest together? (they're a match due to mirror symmetry)
+                m, n = (mirr_dir_distance == np.min(mirr_dir_distance)).nonzero()  # m is the row, n the column where the minimum is
+                cur_dirpt = remaining_dir_corners[dir_candidates[m], :]
+                cur_mirrpt = remaining_mirr_corners[mirr_candidates[n], :]
+
+                mir_row = np.where(np.all(mirr_corners == cur_mirrpt, axis=1))[0][0]
+                dir_row = np.where(np.all(dir_corners == cur_dirpt, axis=1))[0][0]
+
                 match_idx[n_matches, 0] = dir_row
                 match_idx[n_matches, 1] = mir_row
                 n_matches += 1
 
+                remaining_dir_row = np.where(np.all(remaining_dir_corners == cur_dirpt, axis=1))[0][0]
+                remaining_mirr_row = np.where(np.all(remaining_mirr_corners == cur_mirrpt, axis=1))[0][0]
+
                 # remove the rows that were just matched
                 remaining_dir_corners = np.delete(remaining_dir_corners, remaining_dir_row, axis=0)
                 remaining_mirr_corners = np.delete(remaining_mirr_corners, remaining_mirr_row, axis=0)
-                continue
-
-            # multiple candidate matches along the supporting line
-            mirr_dir_distance = np.zeros((len(mirr_candidates), len(mirr_candidates)))
-            for i_dirpt in range(len(mirr_candidates)):
-                for i_mirrpt in range(len(mirr_candidates)):
-                    mirr_dir_distance[i_dirpt, i_mirrpt] = np.linalg.norm(remaining_dir_corners[dir_candidates[i_dirpt], :] -
-                                                                          remaining_mirr_corners[mirr_candidates[i_mirrpt], :])
-
-            # which direct/mirror points are closest together? (they're a match due to mirror symmetry)
-            m, n = (mirr_dir_distance == np.min(mirr_dir_distance)).nonzero()  # m is the row, n the column where the minimum is
-            cur_dirpt = remaining_dir_corners[dir_candidates[m], :]
-            cur_mirrpt = remaining_mirr_corners[mirr_candidates[n], :]
-
-            mir_row = np.where(np.all(mirr_corners == cur_mirrpt, axis=1))[0][0]
-            dir_row = np.where(np.all(dir_corners == cur_dirpt, axis=1))[0][0]
-
-            match_idx[n_matches, 0] = dir_row
-            match_idx[n_matches, 1] = mir_row
-            n_matches += 1
-
-            remaining_dir_row = np.where(np.all(remaining_dir_corners == cur_dirpt, axis=1))[0][0]
-            remaining_mirr_row = np.where(np.all(remaining_mirr_corners == cur_mirrpt, axis=1))[0][0]
-
-            # remove the rows that were just matched
-            remaining_dir_corners = np.delete(remaining_dir_corners, remaining_dir_row, axis=0)
-            remaining_mirr_corners = np.delete(remaining_mirr_corners, remaining_mirr_row, axis=0)
 
     # dir_corners, mirr_corners, dir_ids, mirr_ids = match_mirror_points(mirr_corners, dir_corners)
     matched_dir_corners = dir_corners[match_idx[:, 0], :]

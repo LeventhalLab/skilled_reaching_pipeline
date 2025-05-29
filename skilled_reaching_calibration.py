@@ -2496,7 +2496,7 @@ def collect_3view_pts(full_calib_vid_name, calibration_data):
         for i_file, csv_file in enumerate(csv_list):
             csv_metadata = navigation_utilities.parse_frame_csv_name(csv_file)
             csv_table = pd.read_csv(csv_file)
-            pts_3view_list.append(sort_3view_pts(csv_table, calibration_data, dirview_lims=[450, 1600]))
+            pts_3view_list.append(sort_3view_pts(csv_table, calibration_data, dirview_lims=[400, 1600]))
 
         pts_3view = np.concatenate(pts_3view_list, axis=1)
 
@@ -2506,7 +2506,7 @@ def collect_3view_pts(full_calib_vid_name, calibration_data):
     return pts_3view
 
 
-def sort_3view_pts(csv_3view_table, calibration_data, dirview_lims=[450, 1600]):
+def sort_3view_pts(csv_3view_table, calibration_data, dirview_lims=[400, 1600]):
     '''
 
     :param csv_3view_table:
@@ -2531,7 +2531,7 @@ def sort_3view_pts(csv_3view_table, calibration_data, dirview_lims=[450, 1600]):
     return pts_3view
 
 
-def match_3view_pts(pts_ud, calibration_data, dirview_lims=[450, 1500]):
+def match_3view_pts(pts_ud, calibration_data, dirview_lims=[400, 1500]):
     cam_names = calibration_data['cgroup'].get_names()
     n_cams = len(cam_names)
     p2ds_dict = dict.fromkeys(cam_names)
@@ -2550,7 +2550,10 @@ def match_3view_pts(pts_ud, calibration_data, dirview_lims=[450, 1500]):
     n_matchedpairs = int(min(n_viewpts))
     p2ds_array = np.empty((n_cams, n_matchedpairs, 2))
     p2ds_array[:] = np.nan
-    p2ds_array[0, :, :], p2ds_array[1, :, :], _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['lm'], board=None)
+    try:
+        p2ds_array[0, :, :], p2ds_array[1, :, :], _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['lm'], board=None)
+    except:
+        pass
     dir_pts, rm_pts, _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['rm'], board=None)
 
     # match direct view points matched with right mirror view with the order for the left mirror view

@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import shutil
 from datetime import datetime, timedelta
-import navigation_utilities
 
 
 def find_rat_cropped_session_folder(session_metadata, parent_directories):

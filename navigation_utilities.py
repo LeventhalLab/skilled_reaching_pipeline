@@ -179,7 +179,7 @@ def is_valid_ratID(test_string):
     return isvalid
 
 
-def session_metadata_from_path(full_pathname):
+def session_metadata_from_traj_folder(full_pathname):
     '''
 
     :param full_pathname:
@@ -191,11 +191,11 @@ def session_metadata_from_path(full_pathname):
     if os.path.isfile(full_pathname):
         pname, fname = os.path.split(full_pathname)
         fname_parts = fname.split('_')
-        if 'current' in fname_parts[-1]:
-            # current was specified at the end of the filename
-            current_value = int(fname_parts[-1][7:10]) / 1000
-        else:
-            current_value = 0.
+        # if 'current' in fname_parts[-1]:
+        #     # current was specified at the end of the filename
+        #     current_value = int(fname_parts[-1][7:10]) / 1000
+        # else:
+        #     current_value = 0.
     else:
         pname = full_pathname
         current_value = 0.
@@ -213,8 +213,7 @@ def session_metadata_from_path(full_pathname):
                         'rat_num': rat_num,
                         'date': session_date,
                         'task': folder_parts[2],
-                        'session_num': session_num,
-                        'current': current_value
+                        'session_num': session_num
     }
 
     return session_metadata

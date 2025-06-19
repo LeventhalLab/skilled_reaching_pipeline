@@ -2239,6 +2239,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
                            full_calib_vid_name=None, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, max_dist_from_epiline=5, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
+    dest_folder = navigation_utilities.cal_frames_folder_from_cal_vids_name(full_calib_vid_name)
     # crop_videos.write_video_frames(full_calib_vid_name, img_type='.jpg')
     # return None, None
     if os.path.exists(calibration_pickle_name):
@@ -2550,10 +2551,7 @@ def match_3view_pts(pts_ud, calibration_data, dirview_lims=[400, 1500]):
     n_matchedpairs = int(min(n_viewpts))
     p2ds_array = np.empty((n_cams, n_matchedpairs, 2))
     p2ds_array[:] = np.nan
-    try:
-        p2ds_array[0, :, :], p2ds_array[1, :, :], _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['lm'], board=None)
-    except:
-        pass
+    p2ds_array[0, :, :], p2ds_array[1, :, :], _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['lm'], board=None)
     dir_pts, rm_pts, _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['rm'], board=None)
 
     # match direct view points matched with right mirror view with the order for the left mirror view
@@ -2562,6 +2560,7 @@ def match_3view_pts(pts_ud, calibration_data, dirview_lims=[400, 1500]):
         for i_p2ds_dir, p2ds_dir in enumerate(p2ds_array[0,:,:]):
             if np.array_equal(dir_pt, p2ds_dir):
                 row_idx[i_dir_pt] = int(i_p2ds_dir)
+
 
     p2ds_array[2, : , :] = rm_pts[row_idx, :]
 
@@ -3261,7 +3260,10 @@ def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line
             if type(mir_row) is tuple:
                 mir_row = mir_row[0]
 
-            match_idx[n_matches, 0] = dir_row
+            try:
+                match_idx[n_matches, 0] = dir_row
+            except:
+                pass
             match_idx[n_matches, 1] = mir_row
 
             remaining_dir_corners = np.array([])
@@ -3595,7 +3597,6 @@ def detect_video_pts(calibration_video, board, camera, prefix=None, skip=20, pro
 
     # if not enough rows, save frames for manual point extraction
     if len(rows) < min_rows_detected:
-        # todo: check to see if the board corners have already been manually identified
         crop_videos.write_video_frames(calibration_video, img_type='.jpg')
 
     return rows, size

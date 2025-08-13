@@ -334,8 +334,11 @@ def calibrate_all_sessions(parent_directories,
                 session_row,
                 filtertype=filtertype)
             print('calibrating {}'.format(mirror_calib_vid_name))
-            if mirror_calib_vid_name in ["GridCalibration_b01_20240401_13-43-11.avi","GridCalibration_b01_20240402_10-23-30.avi",
-                                         "GridCalibration_b01_20240403_11-51-17.avi","GridCalibration_b01_20240404_14-03-33.avi"]:
+            if mirror_calib_vid_name in ['GridCalibration_b01_20230807_15-53-57.avi', 'GridCalibration_b01_20230808_15-47-52.avi',
+                                         'GridCalibration_b01_20230418_13-33-28.avi','GridCalibration_b01_20230419_11-58-09.avi',
+                                         'GridCalibration_b01_20230420_14-51-42.avi','GridCalibration_b01_20230421_14-12-21.avi',
+                                         'GridCalibration_b01_20230424_13-32-35.avi','GridCalibration_b01_20230425_12-56-33.avi',
+                                         'GridCalibration_b01_20230426_11-41-05.avi']:
                 # continue
                 cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, session_row, calibration_pickle_name, full_calib_vid_name=full_calib_vid_name)
             # cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids,
@@ -512,7 +515,8 @@ if __name__ == '__main__':
                        586, 587, 588, 589, 590, 591, 592, 595, 596, 597, 598, 599, 600, 601, 602, 611, 612, 613, 614,
                        615, 616, 617, 618, 603, 604, 605, 607, 608, 619, 620, 621, 622, 623, 624, 625, 626]
 
-    rats_to_analyze = [549]
+    rats_to_analyze = [468, 484, 486, 555]
+
     ratIDs_to_analyze = ['R{:04d}'.format(rn) for rn in rats_to_analyze]
     gputouse = 0
 
@@ -521,7 +525,7 @@ if __name__ == '__main__':
                            'calibrate_videos',
                            # 'crop_sr_vids',
                            # 'analyze_sr_vids',
-                           # 'create_marked_vids',
+                           'create_marked_vids',
                            # 'reconstruct_3d'
                            ]
 

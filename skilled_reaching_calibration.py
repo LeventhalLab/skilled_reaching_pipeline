@@ -2202,7 +2202,10 @@ def match_2d_merged_pts(merged_row, cam_names, board=None, pt_type='corners'):
     if board is None:
         max_pts = max([merged_row[key]['ids'] for key in row_keys])
     else:
-        max_pts = board.total_size
+        if isinstance(board, Checkerboard):
+            max_pts = np.prod([board.squaresX, board.squaresY])
+        else:
+            max_pts = board.total_size
 
     frame_pts = np.empty((n_cams, max_pts, 2))
     frame_pts[:] = np.nan
@@ -2210,7 +2213,7 @@ def match_2d_merged_pts(merged_row, cam_names, board=None, pt_type='corners'):
     for i_cam, cam_name in enumerate(cam_names):
         if cam_name in row_keys:
             # frame_pts[i_cam, merged_row[cam_name]['ids'], :] = merged_row[cam_name][pt_type][merged_row[cam_name]['ids'], 0, :]
-            frame_pts[i_cam, merged_row[cam_name]['ids'], :] = merged_row[cam_name][pt_type]
+            frame_pts[i_cam, merged_row[cam_name]['ids'], :] = np.squeeze(merged_row[cam_name][pt_type])
 
     return frame_pts
 
@@ -2552,6 +2555,8 @@ def match_3view_pts(pts_ud, calibration_data, dirview_lims=[400, 1500]):
     p2ds_array = np.empty((n_cams, n_matchedpairs, 2))
     p2ds_array[:] = np.nan
     p2ds_array[0, :, :], p2ds_array[1, :, :], _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['lm'], board=None)
+
+
     dir_pts, rm_pts, _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['rm'], board=None)
 
     # match direct view points matched with right mirror view with the order for the left mirror view
@@ -3292,6 +3297,7 @@ def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line
 
                     remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt2, axis=1))[0][0]
                     remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt1, axis=1))[0][0]
+
 
                 # have potential matches - is it possible that there is a better match that lies along the same line (hidden
                 # by noise in how accurately points were marked/identifed)?

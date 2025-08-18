@@ -145,7 +145,7 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
     return scorernames
 
 
-def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_paths, scorernames,
+def create_labeled_videos(parent_directories, view_config_paths, scorernames,
                           cropped_vid_type='.avi',
                           skipdirect=False,
                           skipmirror=False,
@@ -161,6 +161,8 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
         to make it easier to move them to another computer without taking the original videos with them
     :return: 
     '''
+
+    cropped_videos_parent = parent_directories['cropped_videos_parent']
     # in case there are some previously cropped videos that need to be analyzed
     folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent, view_list=view_list)
     # view_list = folders_to_analyze.keys()
@@ -376,7 +378,11 @@ if __name__ == '__main__':
 
     label_videos = True
 
-    rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514, 519, 520, 521, 522, 526, 528, 529, 532, 533, 534, 535, 536, 537]
+    rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514, 519, 520, 521, 522, 526, 528, 529, 532, 533, 534, 535, 536, 537, 526, 528, 529, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557]
+
+    rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514,
+                       519, 520, 521, 522, 526, 528, 529, 530, 532, 533, 534, 535, 536, 537, 548, 549, 550, 551, 552,
+                       553, 554, 555, 556, 557, 558, 561, 562, 565, 568, 575, 576, 577, 578, 579, 580, 581, 582, 602]
 
     # if you only want to label the direct or mirror views, set the skip flag for the other view to True
     skipdirectlabel = False
@@ -399,9 +405,11 @@ if __name__ == '__main__':
 
     if sys.platform in ['win32']:
         # assume DKL computer
-        DLC_top_folder = r'C:\Users\dleventh\Documents\deeplabcut_projects'
+        # DLC_top_folder = r'C:\Users\dleventh\Documents\deeplabcut_projects'
+        DLC_top_folder = r'Z:\deeplabcut_projects'
         # data_root_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr'
-        data_root_folder = r'X:\data\sr'
+        # data_root_folder = r'X:\data\sr'
+        data_root_folder = r'Z:\data\sr'
     elif sys.platform in ['linux']:
         # lambda computer
         DLC_top_folder = '/home/dleventh/Documents/DLC_projects'
@@ -411,7 +419,7 @@ if __name__ == '__main__':
     view_keys = ('direct', 'nearpaw', 'farpaw')   #list(DLC_folder_names.keys())
     anipose_config_path = os.path.join(DLC_top_folder, 'sr_anipose', 'config.toml')
     anipose_config = toml.load(anipose_config_path)
-    DLC_folder_names = {view_key: anipose_config['DLC_folders'][i_view] for i_view, view_key in enumerate(view_keys)}
+    # DLC_folder_names = {view_key: anipose_config['DLC_folders'][i_view] for i_view, view_key in enumerate(view_keys)}
 
         # 'direct': DLC_proj_names['direct'] + '-DL-2023-06-07',
         #                 'nearpaw': DLC_proj_names['nearpaw'] + '-DL-2023-06-19',
@@ -521,8 +529,8 @@ if __name__ == '__main__':
     #                             lim_3d=lim_3d,
     #                             frames2mark={'reach_on': 240, 'contact': 306, 'drop': 308})
 
-    traj3d_fname2 = 'R0487_b01_20230918_12-33-32_005_r3d.pickle'
-    traj3d_fname2 = os.path.join(full_trajpath, traj3d_fname2)
+    # traj3d_fname2 = 'R0487_b01_20230918_12-33-32_005_r3d.pickle'
+    # traj3d_fname2 = os.path.join(full_trajpath, traj3d_fname2)
 
     # sr_visualization.create_presentation_vid_1view(traj3d_fname2, session_metadata, parent_directories['dLight'], session_summary, trials_df,
     #                             paw_pref,
@@ -549,24 +557,24 @@ if __name__ == '__main__':
         #                             view_list=cam_names,
         #                             filtertype=filtertype,
         #                             rat_nums=rats_to_analyze)
-    # #
-    # #
-    #     calibrate_all_sessions(parent_directories[expt],
-    #                            calibration_metadata_df,
-    #                            cam_names,
-    #                            filtertype=filtertype,
-    #                            rat_nums=rats_to_analyze)
+    #
+    #
+        calibrate_all_sessions(parent_directories[expt],
+                               calibration_metadata_df,
+                               cam_names,
+                               filtertype=filtertype,
+                               rat_nums=rats_to_analyze)
 
-    for expt in experiment_list:
-        # crop_params_csv_path = os.path.join(video_root_folders[expt], 'SR_video_crop_regions.csv')
-        # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
-        crop_filtertype = 'h264'  # currently choices are 'h264' or 'mjpeg2jpeg'. Python based vid conversion (vs labview) should use h264
-
-        session_metadata_xlsx_path = os.path.join(video_root_folders[expt],
-                                                  'SR_{}_video_session_metadata.xlsx'.format(expt))
-        calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
-        video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folders[expt], rats_to_analyze=rats_to_analyze)
-        cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parents[expt], calibration_metadata_df, cam_names, vidtype='avi', filtertype=crop_filtertype)
+    # for expt in experiment_list:
+    #     # crop_params_csv_path = os.path.join(video_root_folders[expt], 'SR_video_crop_regions.csv')
+    #     # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
+    #     crop_filtertype = 'h264'  # currently choices are 'h264' or 'mjpeg2jpeg'. Python based vid conversion (vs labview) should use h264
+    #
+    #     session_metadata_xlsx_path = os.path.join(video_root_folders[expt],
+    #                                               'SR_{}_video_session_metadata.xlsx'.format(expt))
+    #     calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+    #     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folders[expt], rats_to_analyze=rats_to_analyze)
+    #     cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parents[expt], calibration_metadata_df, cam_names, vidtype='avi', filtertype=crop_filtertype)
 
 
     # step 2: run the vids through DLC
@@ -574,21 +582,23 @@ if __name__ == '__main__':
     # need to update these paths when moved to the lambda machine
 
 
-    # for expt in experiment_list:
-    #     rat_db = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
-    #     folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parents[expt], view_list=cam_names)
-    #
-    #     scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, marked_videos_parents[expt], rat_db, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
-    #
-    #     if label_videos:
-    #         create_labeled_videos(cropped_videos_parent,
-    #                               marked_videos_parent,
-    #                               view_config_paths,
-    #                               scorernames,
-    #                               cropped_vid_type=cropped_vid_type,
-    #                               skipdirect=skipdirectlabel,
-    #                               skipmirror=skipmirrorlabel,
-    #                               view_list=cam_names)
+    for expt in experiment_list:
+        cropped_vid_type = '.avi'
+        rat_db = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
+        folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parents[expt], view_list=cam_names)
+
+        # scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, parent_directories[expt], rat_db, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
+        scorernames = dict.fromkeys(view_config_paths.keys())
+
+        if label_videos:
+
+            create_labeled_videos(parent_directories[expt],
+                                  view_config_paths,
+                                  scorernames,
+                                  cropped_vid_type=cropped_vid_type,
+                                  skipdirect=skipdirectlabel,
+                                  skipmirror=skipmirrorlabel,
+                                  view_list=cam_names)
 
     # step 3: make sure calibration has been run for these sessions
     # find list of all analyzed videos; extract dates and boxes for each session

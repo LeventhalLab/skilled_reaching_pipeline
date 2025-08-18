@@ -2213,7 +2213,11 @@ def match_2d_merged_pts(merged_row, cam_names, board=None, pt_type='corners'):
     for i_cam, cam_name in enumerate(cam_names):
         if cam_name in row_keys:
             # frame_pts[i_cam, merged_row[cam_name]['ids'], :] = merged_row[cam_name][pt_type][merged_row[cam_name]['ids'], 0, :]
-            frame_pts[i_cam, merged_row[cam_name]['ids'], :] = np.squeeze(merged_row[cam_name][pt_type])
+            try:
+                frame_pts[i_cam, merged_row[cam_name]['ids'], :] = np.squeeze(merged_row[cam_name][pt_type])
+            except:
+                pass
+
 
     return frame_pts
 
@@ -2243,8 +2247,8 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
     dest_folder = navigation_utilities.cal_frames_folder_from_cal_vids_name(full_calib_vid_name)
-    # crop_videos.write_video_frames(full_calib_vid_name, img_type='.jpg')
-    # return None, None
+    crop_videos.write_video_frames(full_calib_vid_name, img_type='.jpg')
+    return None, None
     if os.path.exists(calibration_pickle_name):
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
         # working here... check to see if there is a .csv file with points in it for all 3 views; if so, load them and use them for bundle adjustment
@@ -2500,7 +2504,7 @@ def collect_3view_pts(full_calib_vid_name, calibration_data):
         for i_file, csv_file in enumerate(csv_list):
             csv_metadata = navigation_utilities.parse_frame_csv_name(csv_file)
             csv_table = pd.read_csv(csv_file)
-            pts_3view_list.append(sort_3view_pts(csv_table, calibration_data, dirview_lims=[400, 1600]))
+            pts_3view_list.append(sort_3view_pts(csv_table, calibration_data, dirview_lims=[400, 1550]))
 
         pts_3view = np.concatenate(pts_3view_list, axis=1)
 
@@ -2510,7 +2514,7 @@ def collect_3view_pts(full_calib_vid_name, calibration_data):
     return pts_3view
 
 
-def sort_3view_pts(csv_3view_table, calibration_data, dirview_lims=[400, 1600]):
+def sort_3view_pts(csv_3view_table, calibration_data, dirview_lims=[400, 1550]):
     '''
 
     :param csv_3view_table:
@@ -3288,15 +3292,21 @@ def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line
                     dir_row = np.where(np.all(dir_corners == test_pt1, axis=1))[0][0]
                     mir_row = np.where(np.all(mirr_corners == test_pt2, axis=1))[0][0]
 
-                    remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt1, axis=1))[0][0]
-                    remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt2, axis=1))[0][0]
+                    try:
+                        remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt1, axis=1))[0][0]
+                        remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt2, axis=1))[0][0]
+                    except:
+                        pass
                 else:
                     # test_pt2 is in the direct view, test_pt1 is in the mirror view
                     mir_row = np.where(np.all(mirr_corners == test_pt1, axis=1))[0][0]
                     dir_row = np.where(np.all(dir_corners == test_pt2, axis=1))[0][0]
 
                     remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt2, axis=1))[0][0]
-                    remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt1, axis=1))[0][0]
+                    try:
+                        remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt1, axis=1))[0][0]
+                    except:
+                        pass
 
 
                 # have potential matches - is it possible that there is a better match that lies along the same line (hidden
@@ -3321,9 +3331,12 @@ def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line
                 if len(mirr_candidates) != len(dir_candidates) or len(mirr_candidates) == 1:
                     # only one candidate point in each view or there are mutliple candidates in one view but only one in the other view?
                     # I don't think this is quite right, but it seems to work well enough
-                    match_idx[n_matches, 0] = dir_row
-                    match_idx[n_matches, 1] = mir_row
-                    n_matches += 1
+                    try:
+                        match_idx[n_matches, 0] = dir_row
+                        match_idx[n_matches, 1] = mir_row
+                        n_matches += 1
+                    except:
+                        pass
 
                     # remove the rows that were just matched
                     remaining_dir_corners = np.delete(remaining_dir_corners, remaining_dir_row, axis=0)

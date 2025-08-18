@@ -122,7 +122,10 @@ def reconstruct_folders_anipose(ratID, parent_directories, expt, rat_df, anipose
         session_row = box_df.loc[box_df['session_num'] == session_num]
 
         # calibrate the camera for this session
-        mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
+        try:
+            mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
+        except:
+            pass
         if mirror_calib_vid_name.lower() == 'none':
             continue
         full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
@@ -195,14 +198,21 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         h5_list.append(cam_h5s)
 
     h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_list[0][0])
+
+    # comment back in statement below if trying to look at data from a single date
+    # if h5_metadata['triggertime'].date() != datetime(2024, 2, 29).date():
+    #     return
+
     cgroup_name = '_'.join((h5_metadata['ratID'],
                             h5_metadata['triggertime'].strftime('%Y%m%d'),
                             'ses{:02d}'.format(h5_metadata['session_num']),
                             'cgroup'))
     # if calibration hasn't been refined by dlc points, refine it now, then write back to disk so we don't have to do it again
-    if not cgroup_name in calibration_data.keys():
-        calibration_data = skilled_reaching_calibration.refine_calibration(calibration_data, h5_list, parent_directories)
-        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+    # if not cgroup_name in calibration_data.keys():
+    calibration_data = skilled_reaching_calibration.refine_calibration(calibration_data, h5_list, parent_directories)
+    skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+
+    return
 
     trials_db_name = navigation_utilities.get_trialsdb_name(parent_directories, session_metadata['ratID'], 'sr')
     if os.path.exists(trials_db_name):
@@ -248,6 +258,9 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
     # now find matching files from each view
     for h5_file in h5_list[0]:
         h5_vid_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_file)
+        # comment in line below to look at a specific video
+        # if (h5_vid_metadata['ratID'] != 'R0526') or not(h5_vid_metadata['video_number'] in [20]) or (h5_vid_metadata['triggertime'].date() != datetime(2024, 2, 29).date()):
+        #     continue
         h5_file_group = [h5_file]
         for cam_name in cams[1:]:
             cam_folder_name = os.path.join(cropped_session_folder, '_'.join((session_folder_name, cam_name)))
@@ -275,8 +288,12 @@ def reconstruct_folder_anipose(session_metadata, calibration_pickle_name, rat_df
         # select 1/4 of trials at random to make videos
         # if random.random() < 0.1 and not already_reconstructed:
         # if not already_reconstructed:
-        if random.random() < 0.1:
-            sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
+        if random.random() <= 0.1:
+            # sr_visualization.plot_anipose_results(trajectory_fname, session_metadata, rat_df, parent_directories, session_summary, trials_df)
+            rat_dfrow = rat_df[rat_df['ratid'] == h5_metadata['ratID']]
+            paw_pref = rat_dfrow.pawpref.values[0]
+            sr_visualization.create_3dgrant_vid(trajectory_fname, session_metadata, parent_directories,
+                                                  session_summary, trials_df, paw_pref, bpts2plot='reachingpaw')
 
 
 def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data, anipose_config, rat_df, trials_df, parent_directories):
@@ -342,7 +359,7 @@ def reconstruct_single_vid_anipose(h5_group, session_metadata, calibration_data,
     scores = np.zeros((n_cams, n_frames, n_joints))
     cam_vit_pts = []
     cam_vit_scores = []
-    # todo: how different is "points" from "all_points" and points in the "el.h5" file?
+
     for i_cam, cam_name in enumerate(cam_names):
         # for input to the anipose 2d filtering code, the "points" should be given as an n_frames x n_joints x n_possible x 3 array
         cam_points = d['all_points'][i_cam, :, :, :, :]

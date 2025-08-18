@@ -45,6 +45,8 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
         #     print(view + ' does not contain the keyword "direct" or "mirror"')
         #     continue
 
+        if view != 'rm':
+            continue
 
         current_view_folders = folders_to_analyze[view]
 
@@ -53,9 +55,10 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
 
             # find the row of the rat dataframe for this ratID, extract a paw preference series, take the first element as this rat's paw preference
             paw_pref = rat_df['pawpref'][rat_df['ratid'] == ratID].values[0]
-            if 'direct' in view:
+
+            if 'dir' in view:
                 dlc_network = 'direct'
-            elif 'leftmirror' in view:
+            elif 'lm' in view:
                 if paw_pref.lower() in ('r', 'right'):
                     # left mirror view is the near paw view for a right-pawed rat
                     dlc_network = 'nearpaw'
@@ -96,10 +99,13 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
                                           vids_to_analyze,
                                           videotype=cropped_vid_type,
                                           gputouse=gputouse,
+                                          auto_track=False,
                                           save_as_csv=save_as_csv)
                 # might want to add additional options to these commands
                 deeplabcut.convert_detections2tracklets(config_path, vids_to_analyze, videotype=cropped_vid_type)
                 deeplabcut.filterpredictions(config_path, vids_to_analyze, videotype=cropped_vid_type)
+                # deeplabcut.convert_detections2tracklets(config_path, vids_to_analyze, videotype=cropped_vid_type)
+                # deeplabcut.filterpredictions(config_path, vids_to_analyze, videotype=cropped_vid_type)
             else:
                 scorername = navigation_utilities.scorername_from_fname(test_pickle_list[0])
 
@@ -130,8 +136,6 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
                     if len(marked_vids) == 0:
                         # the marked video hasn't been made yet
                         vids_to_mark.append(cropped_vid)
-
-                deeplabcut.create_labeled_video(config_path, vids_to_mark, color_by='bodypart', filtered=True, videotype=cropped_vid_type)
                 # deeplabcut.create_video_with_all_detections(config_path, vids_to_mark, videotype=cropped_vid_type)
 
                 test_marked_name = os.path.join(current_folder, '{}_*{}_labeled.mp4'.format(ratID, scorername))
@@ -145,24 +149,77 @@ def analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_di
     return scorernames
 
 
-def create_labeled_videos(parent_directories, view_config_paths, scorernames,
+def label_videos_in_cropped_folder(folder_to_mark, rat_db, analysis_params, expt, cropped_vid_type='.avi'):
+
+    view_config_paths = analysis_params['view_config_paths'][expt]
+    engine = analysis_params['engines'][expt]
+
+    _, folder_name = os.path.split(folder_to_mark)
+    fname_parts = folder_name.split('_')
+    ratID = fname_parts[0]
+    view = fname_parts[-1]
+
+    try:
+        paw_pref = rat_db[rat_db['ratid']==ratID]['pawpref'].values[0]
+    except:
+        pass
+    if analysis_params['strains'][expt] == 'SD':   # current Sprague-Dawley network does not care about right vs left mirror
+        if view in ['lm', 'rm']:
+            dlc_name = 'mirror'
+        elif view == 'dir':
+            dlc_name = 'direct'
+    elif analysis_params['strains'][expt] == 'LE':   # current Long-Evans network cares about right vs left mirror
+        if view == 'rm':
+            if paw_pref.lower() == 'right':
+                dlc_name = 'farpaw'
+            elif paw_pref.lower() == 'left':
+                dlc_name = 'nearpaw'
+        elif view == 'lm':
+            if paw_pref.lower() == 'left':
+                dlc_name = 'farpaw'
+            elif paw_pref.lower() == 'right':
+                dlc_name = 'nearpaw'
+        elif view == 'dir':
+            dlc_name = 'direct'
+
+    shuffle = analysis_params['shuffles'][expt][dlc_name]
+    dlc_config = view_config_paths[dlc_name]
+
+    # scorername = navigation_utilities.scorername_from_cropped_folder(folder_to_mark, cropped_vid_type=cropped_vid_type)
+    #todo: make sure not to include marked vids
+    cropped_video_list = glob.glob(os.path.join(folder_to_mark, '*' + cropped_vid_type))
+
+    # eliminate videos for which there isn't a pickle file
+    analyzed_vid_list = []
+    for cropped_vid in cropped_video_list:
+        cv_path, _ = os.path.split(cropped_vid)
+        test_pickle = navigation_utilities.match_pickle_to_cropped_vid(cropped_vid)
+        full_test_path = os.path.join(cv_path, test_pickle)
+
+        pickle_list = glob.glob(full_test_path)
+
+        if len(pickle_list) > 0:
+            analyzed_vid_list.append(cropped_vid)
+
+    deeplabcut.create_video_with_all_detections(dlc_config, analyzed_vid_list, shuffle=shuffle)
+
+
+def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_paths, scorernames,
                           cropped_vid_type='.avi',
                           skipdirect=False,
                           skipmirror=False,
                           view_list=('dir', 'lm', 'rm')
 ):
     '''
-    
-    :param folders_to_analyze: 
-    :param view_config_paths: 
+
+    :param folders_to_analyze:
+    :param view_config_paths:
     :param scorernames: dictionary with keys 'direct' and 'mirror'
     :param cropped_vid_type:
     :param move_to_new_folder: if True, create a new folder in which the marked videos and analysis files are stored
         to make it easier to move them to another computer without taking the original videos with them
-    :return: 
+    :return:
     '''
-
-    cropped_videos_parent = parent_directories['cropped_videos_parent']
     # in case there are some previously cropped videos that need to be analyzed
     folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent, view_list=view_list)
     # view_list = folders_to_analyze.keys()
@@ -236,7 +293,6 @@ def calibrate_all_sessions(parent_directories,
         ratIDs = ['R{:04d}'.format(rn) for rn in rat_nums]
 
     # to skip to where I'm working...
-    # ratIDs = ['R0484', 'R0485', 'R0486', 'R0487']
     # make sure all cameras have been calibrated
     for ratID in ratIDs:
         if ratID not in expt_ratIDs:
@@ -287,7 +343,16 @@ def calibrate_all_sessions(parent_directories,
                 session_row,
                 filtertype=filtertype)
             print('calibrating {}'.format(mirror_calib_vid_name))
-            cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, session_row, calibration_pickle_name)
+            if mirror_calib_vid_name in ['GridCalibration_b01_20230503_11-46-08.avi'
+
+                                         ]:
+                # continue
+                cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, session_row, calibration_pickle_name, full_calib_vid_name=full_calib_vid_name)
+            cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids,
+                                                                                cam_intrinsics, mirror_board, cam_names,
+                                                                                parent_directories, session_row,
+                                                                                calibration_pickle_name,
+                                                                                full_calib_vid_name=full_calib_vid_name)
             # note that calibrate_mirror_views writes a pickle file with updated calibration parameters including cgroup
 
 
@@ -365,66 +430,75 @@ def perform_calibrations(parent_directories, cam_names=('dir', 'lm', 'rm'),
     return calibration_metadata_df
 
 
-if __name__ == '__main__':
-
-
-    # experiment_list = ['GRABAch-rDA', 'sr6OHDA', 'dLight']
-    # experiment_list = ['dLight', 'sr6OHDA', 'GRABAch-rDA']
-    experiment_list = ['sr6OHDA', 'dLight']
-    # experiment_list = ['dLight', 'sr6OHDA']
-    rat_db_fnames = {expt: 'rat_{}_SRdb.xlsx'.format(expt) for expt in experiment_list}
-    session_scores_fnames = {expt: 'rat_{}_SRsessions.xlsx'.format(expt) for expt in experiment_list}
-    create_marked_vids = True
-
-    label_videos = True
-
-    rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514, 519, 520, 521, 522, 526, 528, 529, 532, 533, 534, 535, 536, 537, 526, 528, 529, 548, 549, 550, 551, 552, 553, 554, 555, 556, 557]
-
-    rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 497, 498, 499, 500, 501, 502, 514,
-                       519, 520, 521, 522, 526, 528, 529, 530, 532, 533, 534, 535, 536, 537, 548, 549, 550, 551, 552,
-                       553, 554, 555, 556, 557, 558, 561, 562, 565, 568, 575, 576, 577, 578, 579, 580, 581, 582, 602]
-
-    # if you only want to label the direct or mirror views, set the skip flag for the other view to True
-    skipdirectlabel = False
-    skipmirrorlabel = False
-
-    gputouse = 3
-
-    cam_names = ('dir', 'lm', 'rm')
-    n_cams = len(cam_names)
-    # cgroup = CameraGroup.from_names(cam_names, fisheye=False)
-
-    filtertype = 'h264'
-
-    # # for lambda computer
-    # view_config_paths = {
-    #     'direct': '/home/levlab/deeplabcut_projects/ratdirsr-DL-2023-06-07/config.yaml',
-    #     'nearpaw': '/home/levlab/deeplabcut_projects/ratnearpawmirrsr-DL-2023-06-19/config.yaml',
-    #     'farpaw': '/home/levlab/deeplabcut_projects/ratfarpawmirrsr-DL-2023-07-03/config.yaml'
-    # }
+def initialize_analysis_params(experiment_list=('dLight', 'GRABAch-rDA', 'sr6OHDA'),
+                               cam_names=('dir', 'lm', 'rm'),
+                               rats_to_analyze=[],
+                               analyses_to_perform='all',
+                               rat_db_fname_fmt='rat_{}_SRdb.xlsx',
+                               session_score_fname_fmt='rat_{}_SRsessions.xlsx',
+                               session_md_fmt='SR_{}_video_session_metadata.xlsx',
+                               DLC_top_folder=None,
+                               data_root_folder=None,
+                               gputouse=0,
+                               view_keys=('direct', 'nearpaw', 'farpaw'),
+                               crop_filtertype='h264',
+                               shuffles=None,
+                               ):
 
     if sys.platform in ['win32']:
         # assume DKL computer
-        # DLC_top_folder = r'C:\Users\dleventh\Documents\deeplabcut_projects'
-        DLC_top_folder = r'Z:\deeplabcut_projects'
-        # data_root_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr'
-        # data_root_folder = r'X:\data\sr'
-        data_root_folder = r'Z:\data\sr'
+        if DLC_top_folder == None:
+            DLC_top_folder = r'C:\Users\dleventh\Documents\deeplabcut_projects'
+        if data_root_folder == None:
+            data_root_folder = r'X:\data\sr'
     elif sys.platform in ['linux']:
         # lambda computer
-        DLC_top_folder = '/home/dleventh/Documents/DLC_projects'
-        data_root_folder = '/home/dleventh/SharedX/Neuro-Leventhal/data/sr'
+        if DLC_top_folder == None:
+            DLC_top_folder = '/home/dleventh/Documents/DLC_projects'
+            DLC_top_folder = '/home/dleventh/Documents/deeplabcut_projects'
+        if data_root_folder == None:
+            data_root_folder = '/home/dleventh/SharedX/Neuro-Leventhal/data/sr'
 
-    # to find the config files for each DLC network for each view
-    view_keys = ('direct', 'nearpaw', 'farpaw')   #list(DLC_folder_names.keys())
-    anipose_config_path = os.path.join(DLC_top_folder, 'sr_anipose', 'config.toml')
-    anipose_config = toml.load(anipose_config_path)
-    # DLC_folder_names = {view_key: anipose_config['DLC_folders'][i_view] for i_view, view_key in enumerate(view_keys)}
+    strains = {expt: '' for expt in experiment_list}
+    engines = {expt: '' for expt in experiment_list}
+    if shuffles is None:
+        shuffles = dict.fromkeys(experiment_list)
+    anipose_config_path = {expt: '' for expt in experiment_list}
+    DLC_folder_names = {}
+    view_config_paths = {}
 
-        # 'direct': DLC_proj_names['direct'] + '-DL-2023-06-07',
-        #                 'nearpaw': DLC_proj_names['nearpaw'] + '-DL-2023-06-19',
-        #                 'farpaw': DLC_proj_names['farpaw'] + '-DL-2023-07-03'}
-    view_config_paths = {view_key: os.path.join(DLC_top_folder, anipose_config['DLC_folders'][i_view], 'config.yaml') for i_view, view_key in enumerate(view_keys)}
+    for expt in experiment_list:
+        if expt in ['dLight', 'sr6OHDA']:
+            strain = "LE"
+            engine = 'tensorflow'
+            # to find the config files for each DLC network for each view
+            view_keys = ('direct', 'nearpaw', 'farpaw')  # list(DLC_folder_names.keys())
+            anipose_config_path[expt] = os.path.join(DLC_top_folder, 'sr_anipose', 'config.toml')
+            anipose_config = toml.load(anipose_config_path[expt])
+            if expt in shuffles.keys():
+                if shuffles[expt] is None:
+                    shuffles[expt] = {view: 1 for view in view_keys}
+            else:
+                shuffles[expt] = {view: 1 for view in view_keys}
+        elif expt in ['DYT1', 'PavcaMotorflex']:
+            strain = "SD"
+            engine = 'pytorch'
+            # to find the config files for each DLC network for each view
+            view_keys = ('direct', 'mirror')  # list(DLC_folder_names.keys())
+            anipose_config_path[expt] = os.path.join(DLC_top_folder, 'sr_SD_anipose', 'config.toml')
+            anipose_config = toml.load(anipose_config_path[expt])
+            if expt in shuffles.keys():
+                if shuffles[expt] is None:
+                    shuffles[expt] = {view: 1 for view in view_keys}
+            else:
+                shuffles[expt] = {view: 1 for view in view_keys}
+        else:
+            strain = "unknown"
+
+        strains[expt] = strain
+        engines[expt] = engine
+        DLC_folder_names[expt] = {view_key: anipose_config['DLC_folders'][i_view] for i_view, view_key in enumerate(view_keys)}
+        view_config_paths[expt] = {view_key: os.path.join(DLC_top_folder, anipose_config['DLC_folders'][i_view], 'config.yaml') for i_view, view_key in enumerate(view_keys)}
 
     # store directory tree for each experiment
     videos_parents = {expt: os.path.join(data_root_folder, expt) for expt in experiment_list}
@@ -452,83 +526,144 @@ if __name__ == '__main__':
                             }
                             for expt in experiment_list}
 
+    analysis_params = {'experiment_list': experiment_list,
+                       'cam_names': cam_names,
+                       'rats_to_analyze': rats_to_analyze,
+                       'analyses_to_perform': analyses_to_perform,
+                       'rat_db_fnames': {expt: rat_db_fname_fmt.format(expt) for expt in experiment_list},
+                       'session_score_fnames': {expt: session_score_fname_fmt.format(expt) for expt in experiment_list},
+                       'session_md_fnames': {expt: session_md_fmt.format(expt) for expt in experiment_list},
+                       'gputouse': gputouse,
+                       'anipose_config_path': anipose_config_path,
+                       'view_config_paths': view_config_paths,
+                       'parent_directories': parent_directories,
+                       'view_keys': view_keys,
+                       'crop_filtertype': crop_filtertype,
+                       'DLC_folder_names': DLC_folder_names,
+                       'strains': strains,
+                       'engines': engines,
+                       'shuffles': shuffles
+    }
+
+    return analysis_params
+
+
+if __name__ == '__main__':
+
+    experiment_list = ['dLight', 'sr6OHDA', 'PavcaMotorflex', 'DYT1', 'GRABAch-rDA']
+    experiment_list = ['PavcaMotorflex', 'DYT1']
+    # experiment_list = ['sr6OHDA', 'dLight', 'PavcaMotorflex', 'DYT1', 'GRABAch-rDA']
+    rats_to_analyze = [600, 468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 514,
+                       519, 520, 521, 522, 526, 528, 529, 530, 532, 533, 534, 535, 536, 537, 548, 549, 550, 551, 552,
+                       553, 554, 555, 556, 557, 558, 561, 562, 565, 568, 575, 576, 577, 578, 579, 580, 581, 582, 585,
+                       586, 587, 588, 589, 590, 591, 592, 595, 596, 597, 598, 599, 600, 601, 602, 611, 612, 613, 614,
+                       615, 616, 617, 618, 603, 604, 605, 607, 608, 619, 620, 621, 622, 623, 624, 625, 626]
+
+    # rats_to_analyze = [468, 484, 486, 555]
+    # rats_to_analyze = [555]
+
+    ratIDs_to_analyze = ['R{:04d}'.format(rn) for rn in rats_to_analyze]
+    gputouse = 0
+
+    analyses_to_perform = [
+                           # 'crop_calibration_vids',
+                           # 'calibrate_videos',
+                           # 'crop_sr_vids',
+                           # 'analyze_sr_vids',
+                           'create_marked_vids',
+                           # 'reconstruct_3d'
+                           ]
+
+    # analyses_to_perform = ['reconstruct_3d']
+
+    shuffles = dict.fromkeys(experiment_list)
+    shuffles['DYT1'] = {'direct': 4, 'mirror': 2}
+    shuffles['PavcaMotorflex'] = {'direct': 4, 'mirror': 2}
+    analysis_params = initialize_analysis_params(experiment_list=experiment_list,
+                                                 gputouse=gputouse,
+                                                 analyses_to_perform=analyses_to_perform,
+                                                 rats_to_analyze=rats_to_analyze,
+                                                 shuffles=shuffles)
+
+    # anipose_config = toml.load(analysis_params['anipose_config_path'])
+
+    # rat_db_fname = analysis_params['rat_db_fnames']['dLight']
+    # rat_df = skilled_reaching_io.read_rat_db(analysis_params['parent_directories']['dLight'], rat_db_fname)
+    # reconstruct_3d.reconstruct_folders_anipose('R0468', analysis_params['parent_directories']['dLight'], 'dLight', rat_df,
+    #                                            anipose_config,
+    #                                            cam_names=analysis_params['cam_names'], filtered=False)
+
     # use the code below to write a charuco board to a file
-    # ncols = 10
-    # nrows = 7
+    # ncols = 5
+    # nrows = 4
     # square_length = 16
     # marker_length = 12
     # board = skilled_reaching_calibration.create_charuco(nrows, ncols, square_length, marker_length)
-    # skilled_reaching_calibration.write_charuco_image(board, 600, calibration_vids_parents['dLight'])
+    # expt = 'dLight'
+    # calib_folder = analysis_params['parent_directories'][expt]['calibration_vids_parent']
+    # skilled_reaching_calibration.write_charuco_image(board, 600, calib_folder)
 
-    # excel file containing the cropping parameters, which calibration file to use for each session, etc.
-    # session_metadata_xlsx_path = os.path.join(video_root_folders[expt],
-    #                                           'SR_{}_video_session_metadata.xlsx'.format(expt))
-    # calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
-
-    # crop calibration videos and perform the calibrations
-    # perform_calibrations(parent_directories, vidtype='.avi', cam_names=cam_names, filtertype=filtertype, rat_nums=rats_to_analyze)
-
-    test_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0452\R0452_20230329_sr_ses01'
-    # analyze_3d_recons.analyze_trajectories(test_folder, anipose_config)
-
-    traj_path = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files'
-    analysis_path = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\analysis\sr'
-    traj3d_fname = 'R0487_b01_20230918_12-36-33_011_r3d.pickle'
-    session_metadata = navigation_utilities.metadata_from_traj_name(traj3d_fname)
-    datestring = navigation_utilities.datetime_to_string_for_fname(session_metadata['date'])[:8]
-    ses_name = '_'.join((session_metadata['ratID'], datestring, 'sr', 'ses01'))
-    full_trajpath = os.path.join(traj_path, session_metadata['ratID'], ses_name)
-    traj3d_fname = os.path.join(full_trajpath, traj3d_fname)
-
-    # agg_pickle = os.path.join(analysis_path, session_metadata['ratID'] + '_sr_aggregated.pickle')
-    trials_df_name = os.path.join(analysis_path, session_metadata['ratID'] + '_sr_trialsdb.pickle')
-    trials_df = skilled_reaching_io.read_pickle(trials_df_name)
-    session_metadata['task'] = 'sr'
-    session_metadata['session_num'] = 1
-    processed_phot_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories['dLight'])
-    if os.path.exists(processed_phot_name):
-        # if no processed photometry file, just reconstruct the 3d points
-        processed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
-        # session_summary, trials_df = srphot_anal.aggregate_data_pre_20230904(processed_phot_data, session_metadata,
-        #                                                                      trials_df,
-        #                                                                      smooth_window=101,
-        #                                                                      f0_pctile=10,
-        #                                                                      expected_baseline=0.2)
-    else:
-        analog_bin_file = navigation_utilities.find_analog_bin_file(parent_directories['dLight'], session_metadata)
-        digital_bin_file = navigation_utilities.find_digital_bin_file(parent_directories['dLight'], session_metadata)
-        metadata_file = navigation_utilities.find_metadata_file(parent_directories['dLight'], session_metadata)
-
-        data_files = {'analog_bin': analog_bin_file,
-                      'digital_bin': digital_bin_file,
-                      'metadata': metadata_file
-                      }
-        # session_summary, trials_df = srphot_anal.aggregate_data_post_20230904(data_files, parent_directories['dLight'],
-        #                                                                       session_metadata,
-        #                                                                       trials_df,
-        #                                                                       smooth_window=101,
-        #                                                                       f0_pctile=10,
-        #                                                                       expected_baseline=0.2)
-
-
-    rat_df = skilled_reaching_io.read_rat_db(parent_directories['dLight'], rat_db_fnames['dLight'])
-
-    df_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
-    paw_pref = df_row['pawpref'].values[0]
-    cw = [[800, 1200, 475, 900], [200, 600, 425, 850], [1425, 1825, 425, 850]]
-    lim_3d = [[-20, 30], [0, 70], [280, 340]]
-    # sr_visualization.create_presentation_vid(traj3d_fname, session_metadata, parent_directories['dLight'], session_summary, trials_df,
-    #                             paw_pref,
-    #                             bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],
-    #                             cw=cw,
-    #                             lim_3d=lim_3d)
-    # sr_visualization.create_presentation_vid_1view(traj3d_fname, session_metadata, parent_directories['dLight'], session_summary, trials_df,
-    #                             paw_pref,
-    #                             bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],
-    #                             cw=cw,
-    #                             lim_3d=lim_3d,
-    #                             frames2mark={'reach_on': 240, 'contact': 306, 'drop': 308})
-
+    # test_folder = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files\R0452\R0452_20230329_sr_ses01'
+    # # analyze_3d_recons.analyze_trajectories(test_folder, anipose_config)
+    #
+    # traj_path = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\traj_files'
+    # analysis_path = r'\\corexfs.med.umich.edu\SharedX\Neuro-Leventhal\data\sr\dLight\analysis\sr'
+    # traj3d_fname = 'R0487_b01_20230918_12-36-33_011_r3d.pickle'
+    # session_metadata = navigation_utilities.metadata_from_traj_name(traj3d_fname)
+    # datestring = navigation_utilities.datetime_to_string_for_fname(session_metadata['date'])[:8]
+    # ses_name = '_'.join((session_metadata['ratID'], datestring, 'sr', 'ses01'))
+    # full_trajpath = os.path.join(traj_path, session_metadata['ratID'], ses_name)
+    # traj3d_fname = os.path.join(full_trajpath, traj3d_fname)
+    #
+    # # agg_pickle = os.path.join(analysis_path, session_metadata['ratID'] + '_sr_aggregated.pickle')
+    # trials_df_name = os.path.join(analysis_path, session_metadata['ratID'] + '_sr_trialsdb.pickle')
+    # trials_df = skilled_reaching_io.read_pickle(trials_df_name)
+    # session_metadata['task'] = 'sr'
+    # session_metadata['session_num'] = 1
+    # processed_phot_name = navigation_utilities.processed_data_pickle_name(session_metadata, parent_directories['dLight'])
+    # if os.path.exists(processed_phot_name):
+    #     # if no processed photometry file, just reconstruct the 3d points
+    #     processed_phot_data = skilled_reaching_io.read_pickle(processed_phot_name)
+    #     # session_summary, trials_df = srphot_anal.aggregate_data_pre_20230904(processed_phot_data, session_metadata,
+    #     #                                                                      trials_df,
+    #     #                                                                      smooth_window=101,
+    #     #                                                                      f0_pctile=10,
+    #     #                                                                      expected_baseline=0.2)
+    # else:
+    #     analog_bin_file = navigation_utilities.find_analog_bin_file(parent_directories['dLight'], session_metadata)
+    #     digital_bin_file = navigation_utilities.find_digital_bin_file(parent_directories['dLight'], session_metadata)
+    #     metadata_file = navigation_utilities.find_metadata_file(parent_directories['dLight'], session_metadata)
+    #
+    #     data_files = {'analog_bin': analog_bin_file,
+    #                   'digital_bin': digital_bin_file,
+    #                   'metadata': metadata_file
+    #                   }
+    #     # session_summary, trials_df = srphot_anal.aggregate_data_post_20230904(data_files, parent_directories['dLight'],
+    #     #                                                                       session_metadata,
+    #     #                                                                       trials_df,
+    #     #                                                                       smooth_window=101,
+    #     #                                                                       f0_pctile=10,
+    #     #                                                                       expected_baseline=0.2)
+    #
+    #
+    # rat_df = skilled_reaching_io.read_rat_db(parent_directories['dLight'], rat_db_fnames['dLight'])
+    #
+    # df_row = rat_df[rat_df['ratid'] == session_metadata['ratID']]
+    # paw_pref = df_row['pawpref'].values[0]
+    # cw = [[800, 1200, 475, 900], [200, 600, 425, 850], [1425, 1825, 425, 850]]
+    # lim_3d = [[-20, 30], [0, 70], [280, 340]]
+    # # sr_visualization.create_presentation_vid(traj3d_fname, session_metadata, parent_directories['dLight'], session_summary, trials_df,
+    # #                             paw_pref,
+    # #                             bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],
+    # #                             cw=cw,
+    # #                             lim_3d=lim_3d)
+    # # sr_visualization.create_presentation_vid_1view(traj3d_fname, session_metadata, parent_directories['dLight'], session_summary, trials_df,
+    # #                             paw_pref,
+    # #                             bpts2plot='reachingpaw', phot_ylim=[-2.5, 5],
+    # #                             cw=cw,
+    # #                             lim_3d=lim_3d,
+    # #                             frames2mark={'reach_on': 240, 'contact': 306, 'drop': 308})
+    #
     # traj3d_fname2 = 'R0487_b01_20230918_12-33-32_005_r3d.pickle'
     # traj3d_fname2 = os.path.join(full_trajpath, traj3d_fname2)
 
@@ -544,80 +679,115 @@ if __name__ == '__main__':
     #                             cw=cw,
     #                             lim_3d=lim_3d)
 
-    for expt in experiment_list:
+    # LOOP TO CROP CALIBRATION VIDEOS
+    if analysis_params['analyses_to_perform'][0] == 'all' or 'crop_calibration_vids' in analysis_params['analyses_to_perform']:
+        for expt in experiment_list:
 
-        # calibration_metadata_csv_path = os.path.join(calibration_vids_parents[expt], 'SR_calibration_vid_metadata.csv')
-        session_metadata_xlsx_path = os.path.join(video_root_folders[expt], 'SR_{}_video_session_metadata.xlsx'.format(expt))
-        # calibration_metadata_df = skilled_reaching_io.read_calibration_metadata_csv(calibration_metadata_csv_path)
-        calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
-    #
-        # crop_videos.crop_all_calibration_videos(parent_directories[expt],
-        #                             calibration_metadata_df,
-        #                             vidtype='.avi',
-        #                             view_list=cam_names,
-        #                             filtertype=filtertype,
-        #                             rat_nums=rats_to_analyze)
-    #
-    #
-        calibrate_all_sessions(parent_directories[expt],
-                               calibration_metadata_df,
-                               cam_names,
-                               filtertype=filtertype,
-                               rat_nums=rats_to_analyze)
+            video_root_folder = analysis_params['parent_directories'][expt]['videos_root_folder']
+            session_metadata_xlsx_path = os.path.join(video_root_folder, analysis_params['session_md_fnames'][expt])
+            calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
 
-    # for expt in experiment_list:
-    #     # crop_params_csv_path = os.path.join(video_root_folders[expt], 'SR_video_crop_regions.csv')
-    #     # crop_params_df = skilled_reaching_io.read_crop_params_csv(crop_params_csv_path)
-    #     crop_filtertype = 'h264'  # currently choices are 'h264' or 'mjpeg2jpeg'. Python based vid conversion (vs labview) should use h264
-    #
-    #     session_metadata_xlsx_path = os.path.join(video_root_folders[expt],
-    #                                               'SR_{}_video_session_metadata.xlsx'.format(expt))
-    #     calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
-    #     video_folder_list = navigation_utilities.get_video_folders_to_crop(video_root_folders[expt], rats_to_analyze=rats_to_analyze)
-    #     cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parents[expt], calibration_metadata_df, cam_names, vidtype='avi', filtertype=crop_filtertype)
+            crop_videos.crop_all_calibration_videos(analysis_params['parent_directories'][expt],
+                                        calibration_metadata_df,
+                                        vidtype='.avi',
+                                        view_list=analysis_params['cam_names'],
+                                        filtertype=analysis_params['crop_filtertype'],
+                                        rat_nums=analysis_params['rats_to_analyze'])
+
+    # LOOP TO CALIBRATE SESSIONS
+    if analysis_params['analyses_to_perform'][0] == 'all' or 'calibrate_videos' in analysis_params['analyses_to_perform']:
+        for expt in experiment_list:
+
+            videos_root_folder = analysis_params['parent_directories'][expt]['videos_root_folder']
+            session_metadata_xlsx_path = os.path.join(videos_root_folder, analysis_params['session_md_fnames'][expt])
+            calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+
+            calibrate_all_sessions(analysis_params['parent_directories'][expt],
+                                   calibration_metadata_df,
+                                   analysis_params['cam_names'],
+                                   filtertype=analysis_params['crop_filtertype'],
+                                   rat_nums=rats_to_analyze)
+
+    # LOOP TO CROP REACHING VIDEOS
+    if analysis_params['analyses_to_perform'][0] == 'all' or 'crop_sr_vids' in analysis_params['analyses_to_perform']:
+        for expt in experiment_list:
+
+            crop_filtertype = analysis_params['crop_filtertype']  # currently choices are 'h264' or 'mjpeg2jpeg'. Python based vid conversion (vs labview) should use h264
+            videos_root_folder = analysis_params['parent_directories'][expt]['videos_root_folder']
+            session_metadata_xlsx_path = os.path.join(videos_root_folder, analysis_params['session_md_fnames'][expt])
+            cropped_videos_parent = analysis_params['parent_directories'][expt]['cropped_videos_parent']
+            calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+            rats_to_analyze = analysis_params['rats_to_analyze']
+            cam_names = analysis_params['cam_names']
+
+            video_folder_list = navigation_utilities.get_video_folders_to_crop(videos_root_folder, rats_to_analyze=rats_to_analyze)
+            cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, calibration_metadata_df, cam_names,
+                                                                      vidtype='avi', filtertype=crop_filtertype)
+    # LOOP TO RUN DLC ON CROPPED VIDEOS
+    if analysis_params['analyses_to_perform'][0] == 'all' or 'analyze_sr_vids' in analysis_params['analyses_to_perform']:
+        for expt in experiment_list:
+            parent_directories = analysis_params['parent_directories'][expt]
+            cropped_videos_parent = parent_directories['cropped_videos_parent']
+            rat_db_fname = analysis_params['rat_db_fnames'][expt]
+            rat_db = skilled_reaching_io.read_rat_db(parent_directories, rat_db_fname)
+            folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent,
+                                                                              rat_list=ratIDs_to_analyze,
+                                                                              view_list=analysis_params['cam_names'])
+            view_config_paths = analysis_params['view_config_paths']
+            expt_parent_dirs = analysis_params['parent_directories'][expt]
+
+            analyze_cropped_videos(folders_to_analyze, view_config_paths, expt_parent_dirs, rat_db,
+                                   cropped_vid_type='.avi',
+                                   gputouse=gputouse,
+                                   save_as_csv=True,
+                                   create_marked_vids=False)
 
 
-    # step 2: run the vids through DLC
-    # parameters for running DLC
-    # need to update these paths when moved to the lambda machine
+    # LOOP TO CREATE LABELED VIDEOS FROM VIDEOS THAT HAVE ALREADY BEEN ANALYZED
+    if analysis_params['analyses_to_perform'][0] == 'all' or 'create_marked_vids' in analysis_params['analyses_to_perform']:
+        for expt in experiment_list:
+            parent_directories = analysis_params['parent_directories'][expt]
+            cropped_videos_parent = parent_directories['cropped_videos_parent']
+            rat_db_fname = analysis_params['rat_db_fnames'][expt]
+            rat_db = skilled_reaching_io.read_rat_db(parent_directories, rat_db_fname)
+            folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parent, rat_list=ratIDs_to_analyze,
+                                                                              view_list=analysis_params['cam_names'])
 
+            # folders_to_analyze is a dictionary whose keys are the views ('dir', 'lm', 'rm')
+            for view in folders_to_analyze.keys():
+                for crop_folder in folders_to_analyze[view]:
 
-    for expt in experiment_list:
-        cropped_vid_type = '.avi'
-        rat_db = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
-        folders_to_analyze = navigation_utilities.find_folders_to_analyze(cropped_videos_parents[expt], view_list=cam_names)
-
-        # scorernames = analyze_cropped_videos(folders_to_analyze, view_config_paths, parent_directories[expt], rat_db, cropped_vid_type=cropped_vid_type, gputouse=gputouse, save_as_csv=True)
-        scorernames = dict.fromkeys(view_config_paths.keys())
-
-        if label_videos:
-
-            create_labeled_videos(parent_directories[expt],
-                                  view_config_paths,
-                                  scorernames,
-                                  cropped_vid_type=cropped_vid_type,
-                                  skipdirect=skipdirectlabel,
-                                  skipmirror=skipmirrorlabel,
-                                  view_list=cam_names)
+                    label_videos_in_cropped_folder(crop_folder, rat_db, analysis_params, expt)
 
     # step 3: make sure calibration has been run for these sessions
     # find list of all analyzed videos; extract dates and boxes for each session
 
     # step 4: reconstruct the 3d trajectories
 
-    for expt in experiment_list:
-        rat_df = skilled_reaching_io.read_rat_db(parent_directories[expt], rat_db_fnames[expt])
-        # folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(parent_directories[expt]['cropped_videos_parent'], cam_names)
+    # LOOP TO RECONSTRUCT 3D TRAJECTORIES
+    if analysis_params['analyses_to_perform'][0] == 'all' or 'reconstruct_3d' in analysis_params['analyses_to_perform']:
+        for expt in experiment_list:
+            rat_db_fname = analysis_params['rat_db_fnames'][expt]
+            rat_df = skilled_reaching_io.read_rat_db(analysis_params['parent_directories'][expt], rat_db_fname)
 
-        DLC_folder_keys = DLC_folder_names.keys()
-        # for DLC_key in DLC_folder_keys:
-        #     train_autoencoder.train_autoencoder(anipose_config, DLC_folder_names[DLC_key])
-        # ftr = [folder for folder in folders_to_reconstruct if ((folder['ratID'] == 'R0486') and (folder['date'] == datetime(2023, 9, 8)))]
-        # ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453', 'R0468', 'R0469', 'R0472', 'R0473']]
-        # ftr = [folder for folder in folders_to_reconstruct if folder['ratID'] in ['R0472']]
-        # ftr = folders_to_reconstruct
-        for ratID in ['R0487']:
-            reconstruct_3d.reconstruct_folders_anipose(ratID, parent_directories[expt], expt, rat_df, anipose_config, cam_names=cam_names, filtered=False)
+            anipose_config = toml.load(analysis_params['anipose_config_path'][expt])
+
+            # folders_to_reconstruct = navigation_utilities.find_folders_to_reconstruct(analysis_params['parent_directories'][expt]['cropped_videos_parent'], analysis_params['cam_names'])
+
+            DLC_folder_keys = analysis_params['DLC_folder_names'].keys()
+
+            # below is left over from trying to use the anipose autoencoder, which didn't seem to work for us very well
+            # for DLC_key in DLC_folder_keys:
+            #     train_autoencoder.train_autoencoder(anipose_config, DLC_folder_names[DLC_key])
+            # ftr = [folder for folder in folders_to_reconstruct if ((folder['ratID'] == 'R0486') and (folder['date'] == datetime(2023, 9, 8)))]
+            # ftr = [folder for folder in folders_to_reconstruct if not folder['ratID'] in ['R0452', 'R0453', 'R0468', 'R0469', 'R0472', 'R0473']]
+            # ftr = [folder for folder in folders_to_reconstruct if folder['ratID'] in ['R0472']]
+            # ftr = folders_to_reconstruct
+            all_rats = navigation_utilities.get_ratIDs(analysis_params['parent_directories'][expt]['cropped_videos_parent'])
+            # ratIDs_to_analyze = all_rats
+            for ratID in ratIDs_to_analyze:
+                reconstruct_3d.reconstruct_folders_anipose(ratID, analysis_params['parent_directories'][expt], expt, rat_df, anipose_config,
+                                                           cam_names=analysis_params['cam_names'], filtered=False)
 
     # step 5: post-processing including smoothing (should there be smoothing on the 2-D images first?)
 

@@ -6,7 +6,6 @@ import numpy as np
 import pandas as pd
 import shutil
 from datetime import datetime, timedelta
-import navigation_utilities
 
 
 def find_rat_cropped_session_folder(session_metadata, parent_directories):
@@ -180,7 +179,7 @@ def is_valid_ratID(test_string):
     return isvalid
 
 
-def session_metadata_from_path(full_pathname):
+def session_metadata_from_traj_folder(full_pathname):
     '''
 
     :param full_pathname:
@@ -192,11 +191,11 @@ def session_metadata_from_path(full_pathname):
     if os.path.isfile(full_pathname):
         pname, fname = os.path.split(full_pathname)
         fname_parts = fname.split('_')
-        if 'current' in fname_parts[-1]:
-            # current was specified at the end of the filename
-            current_value = int(fname_parts[-1][7:10]) / 1000
-        else:
-            current_value = 0.
+        # if 'current' in fname_parts[-1]:
+        #     # current was specified at the end of the filename
+        #     current_value = int(fname_parts[-1][7:10]) / 1000
+        # else:
+        #     current_value = 0.
     else:
         pname = full_pathname
         current_value = 0.
@@ -214,8 +213,7 @@ def session_metadata_from_path(full_pathname):
                         'rat_num': rat_num,
                         'date': session_date,
                         'task': folder_parts[2],
-                        'session_num': session_num,
-                        'current': current_value
+                        'session_num': session_num
     }
 
     return session_metadata
@@ -251,9 +249,11 @@ def find_scores_xlsx(parent_directories, expt_name):
         return None
 
 
-def get_video_folders_to_crop(video_root_folder, rats_to_analyze='all'):
+def get_video_folders_to_crop(video_root_folder, rats_to_analyze='all', use_already_cropped=True):
 
     rat_folders = glob.glob(os.path.join(video_root_folder, 'R*'))
+    rat_alreadycropped_folders = glob.glob(os.path.join(video_root_folder, 'already_cropped', 'R*'))
+    rat_folders = rat_folders + rat_alreadycropped_folders
 
     vid_folders_to_crop = []
     for rf in rat_folders:
@@ -624,12 +624,15 @@ def trajectory_folder(trajectories_parent, ratID, session_name):
     return traj_folder
 
 
-def find_orig_rat_video(video_metadata, video_root_folder, vidtype='.avi'):
+def find_orig_rat_video(video_metadata, video_root_folder, vidtype='.avi', use_already_cropped=True):
 
     # directory structure:
     #  video_root_folder --> ratID --> ratID_sessiondateX
 
-    rat_folder = os.path.join(video_root_folder, video_metadata['ratID'])
+    if use_already_cropped:
+        rat_folder = os.path.join(video_root_folder, 'already_cropped', video_metadata['ratID'])
+    else:
+        rat_folder = os.path.join(video_root_folder, video_metadata['ratID'])
     datestring = date_to_string_for_fname(video_metadata['triggertime'])
     date_folder_test = os.path.join(rat_folder, video_metadata['ratID'] + '_' + datestring + '*')
     date_folder_list = glob.glob(date_folder_test)
@@ -819,7 +822,7 @@ def test_dlc_h5_name_from_h5_metadata(h5_metadata, suffix=''):
 def match_dlc_h5_views(session_metadata):
     pass
 
-def find_folders_to_analyze(cropped_videos_parent, view_list=None):
+def find_folders_to_analyze(cropped_videos_parent, rat_list=['all'], view_list=None):
     """
     get the full list of directories containing cropped videos in the videos_to_analyze folder
     :param cropped_videos_parent: parent directory with subfolders direct_view and mirror_views, which have subfolders
@@ -836,19 +839,21 @@ def find_folders_to_analyze(cropped_videos_parent, view_list=None):
 
     rat_folder_list = glob.glob(os.path.join(cropped_videos_parent, 'R*'))
     for rat_folder in rat_folder_list:
-        if os.path.isdir(rat_folder):
-            # assume the rat_folder directory name is the same as ratID (i.e., form of RXXXX)
-            _, ratID = os.path.split(rat_folder)
-            session_name = ratID + '_*'
-            session_dir_list = glob.glob(rat_folder + '/' + session_name)
-            # make sure we only include directories (just in case there are some stray files with the right names)
-            session_dir_list = [session_dir for session_dir in session_dir_list if os.path.isdir(session_dir)]
-            for session_dir in session_dir_list:
-                _, cur_session = os.path.split(session_dir)
-                for view in view_list:
-                    view_folder = os.path.join(session_dir, cur_session + '_' + view)
-                    if os.path.isdir(view_folder):
-                        folders_to_analyze[view].extend([view_folder])
+        _, current_ratID = os.path.split(rat_folder)
+        if 'all' in rat_list or current_ratID in rat_list:
+            if os.path.isdir(rat_folder):
+                # assume the rat_folder directory name is the same as ratID (i.e., form of RXXXX)
+                _, ratID = os.path.split(rat_folder)
+                session_name = ratID + '_*'
+                session_dir_list = glob.glob(rat_folder + '/' + session_name)
+                # make sure we only include directories (just in case there are some stray files with the right names)
+                session_dir_list = [session_dir for session_dir in session_dir_list if os.path.isdir(session_dir)]
+                for session_dir in session_dir_list:
+                    _, cur_session = os.path.split(session_dir)
+                    for view in view_list:
+                        view_folder = os.path.join(session_dir, cur_session + '_' + view)
+                        if os.path.isdir(view_folder):
+                            folders_to_analyze[view].extend([view_folder])
 
     return folders_to_analyze
 
@@ -893,7 +898,7 @@ def find_optitrack_folders_to_analyze(parent_directories, cam_list=(1, 2)):
     return folders_to_analyze
 
 
-def parse_cropped_video_name(cropped_video_name):
+def parse_cropped_video_name_legacy(cropped_video_name):
     """
     extract metadata information from the video name
     :param cropped_video_name: video name with expected format RXXXX_yyyymmdd_HH-MM-SS_ZZZ_[view]_l-r-t-b.avi
@@ -1336,6 +1341,81 @@ def parse_dlc_output_pickle_name(dlc_output_pickle_name):
     return pickle_metadata
 
 
+def scorername_from_cropped_folder(analysis_folder, cropped_vid_type='.avi'):
+    _, folder_name = os.path.split(analysis_folder)
+    fname_parts = folder_name.split('_')
+    ratID = fname_parts[0]
+
+    cropped_video_list = glob.glob(os.path.join(analysis_folder, '{}_*'.format(ratID) + cropped_vid_type))
+
+    cv_path, vid_name = os.path.split(cropped_video_list[0])
+    vid_name, vid_ext = os.path.splitext(vid_name)
+
+    test_pickle_name = os.path.join(cv_path, vid_name + 'DLC*.pickle')
+
+    # have pickle files already been created for this video?
+    test_pickle_list = glob.glob(test_pickle_name)
+
+    scorername = scorername_from_fname(test_pickle_list[0])
+
+    return scorername
+
+
+def match_pickle_to_cropped_vid(cropped_vid_name):
+
+    cv_metadata = parse_cropped_vid_name(cropped_vid_name)
+
+    cp_strings = [str(int(cp)) for cp in cv_metadata['crop_window']]
+    crop_string = '-'.join(cp_strings)
+    test_pickle = '_'.join((cv_metadata['ratID'],
+                            'b{:02d}'.format(cv_metadata['box_num']),
+                            datetime_to_string_for_fname(cv_metadata['triggertime']),
+                            '{:03d}'.format(cv_metadata['vid_num']),
+                            cv_metadata['view'],
+                            crop_string + '*',   # '*' is for the scorername
+                            'full.pickle'))
+    return test_pickle
+
+
+def parse_cropped_vid_name(cropped_vid_name):
+
+    cropped_vid_metadata = {
+        'ratID': '',
+        'rat_num': 0,
+        'box_num': 99,
+        'triggertime': datetime(1,1,1),
+        'vid_num': 0,
+        'view': '',
+        'vid_type': '',
+        'crop_window': [],
+        'cropped_video_name': ''
+    }
+
+    _, fname = os.path.split(cropped_vid_name)
+    fname, vid_type = os.path.splitext(fname)
+
+    fname_parts = fname.split('_')
+
+    cropped_vid_metadata['ratID'] = fname_parts[0]
+    num_string = ''.join(filter(lambda i: i.isdigit(), cropped_vid_metadata['ratID']))
+    cropped_vid_metadata['rat_num'] = int(num_string)
+    cropped_vid_metadata['box_num'] = int(fname_parts[1][1:])
+    datestr = fname_parts[2]
+    timestr = fname_parts[3]
+
+    cropped_vid_metadata['triggertime'] = fname_string_to_datetime(datestr + '_' + timestr)
+
+    cropped_vid_metadata['vid_num'] = int(fname_parts[4])
+    cropped_vid_metadata['vid_type'] = vid_type
+
+    cropped_vid_metadata['view'] = fname_parts[5]
+
+    left, right, top, bottom = list(map(int, fname_parts[6].split('-')))
+    cropped_vid_metadata['crop_window'].extend([left, right, top, bottom])
+
+    return cropped_vid_metadata
+
+
 def scorername_from_fname(fname):
 
     fpath, fname = os.path.split(fname)
@@ -1638,7 +1718,10 @@ def create_cam_cal_pickle_name(cam_cal_vid_name, parent_directories):
 
     cal_metadata = parse_camera_calibration_video_name(cam_cal_vid_name)
 
-    _, vid_name = os.path.split(cam_cal_vid_name)
+    try:
+        _, vid_name = os.path.split(cam_cal_vid_name)
+    except:
+        pass
     vid_name, _ = os.path.splitext(vid_name)
     pickle_name = vid_name + '.pickle'
 
@@ -1687,6 +1770,11 @@ def cal_frames_folder_from_cal_vids_name(cal_vid_name):
 
     name_parts = cal_vid_name.split('_')
     cal_frames_foldername = '_'.join(name_parts[:5])
+
+
+    # comment the next line out if want the folder called "GridCalibration_..."
+    cal_frames_foldername = cal_frames_foldername.replace('GridCalibration', 'Calibration3views')
+
     cal_frames_folder = os.path.join(month_frames_dir, cal_frames_foldername)
 
     if not os.path.exists(cal_frames_folder):
@@ -1695,18 +1783,48 @@ def cal_frames_folder_from_cal_vids_name(cal_vid_name):
     return cal_frames_folder
 
 
+def get_ratIDs(parent_directory):
+    '''
+    assumes that subfolders are formatted as RXXXX where XXXX is the rat number
+    :param parent_directory:
+    :return:
+    '''
+
+    subfolders = glob.glob(os.path.join(parent_directory, 'R*'))
+
+    valid_folders = [sf for sf in subfolders if os.path.isdir(sf)]
+
+    folder_names = []
+    for vf in valid_folders:
+        _, folder_name = os.path.split(vf)
+        folder_names.append(folder_name)
+
+    ratIDs = [fn[:5] for fn in folder_names if fn[1:5].isdigit()]
+
+    unique_ratIDs = sorted(list(set(ratIDs)))
+
+    return unique_ratIDs
+
+
 def find_mirror_calibration_video(mirror_cal_vid_name, parent_directories):
 
     cal_metadata = parse_camera_calibration_video_name(mirror_cal_vid_name)
     if cal_metadata is None:
         return None
     month_folder = 'calibration_videos_{}'.format(cal_metadata['time'].strftime('%Y%m'))
-    month_folder = os.path.join(parent_directories['calibration_vids_parent'], month_folder)
+    full_month_folder = os.path.join(parent_directories['calibration_vids_parent'], month_folder)
 
-    full_mirror_cal_vid_name = os.path.join(month_folder, mirror_cal_vid_name)
+    full_mirror_cal_vid_name = os.path.join(full_month_folder, mirror_cal_vid_name)
 
     if not os.path.exists(full_mirror_cal_vid_name):
-        return None
+        # check if it's in an 'already_cropped' folder
+        full_mirror_cal_vid_name = os.path.join(full_month_folder, month_folder + '_already_cropped', mirror_cal_vid_name)
+
+        if not os.path.exists(full_mirror_cal_vid_name):
+            full_mirror_cal_vid_name = os.path.join(full_month_folder, month_folder + '_alreadycropped', mirror_cal_vid_name)
+
+            if not os.path.exists(full_mirror_cal_vid_name):
+                return None
 
     return full_mirror_cal_vid_name
 
@@ -1962,6 +2080,15 @@ def create_trajectory_filename(video_metadata):
 #     return calibration_video_name
 
 
+def find_3dframes_folder(session_metadata):
+
+    folder_name = '_'.join(('Calibration3views',
+                            'b{:02d}'.format(session_metadata['boxnum']),
+                            datetime_to_string_for_fname(session_metadata['time'])))
+
+    return folder_name
+
+
 def parse_camera_calibration_video_name(calibration_video_name):
     """
 
@@ -2140,10 +2267,14 @@ def fname_datestring_from_datetime(dtime, formatstring='%Y%m%d'):
     return datestring
 
 
-def find_session_folder(parent_directories, session_metadata):
+def find_session_folder(parent_directories, session_metadata, search_already_cropped=True):
 
     ratID = session_metadata['ratID']
-    rat_folder = os.path.join(parent_directories['videos_root_folder'], ratID)
+
+    if search_already_cropped:
+        rat_folder = os.path.join(parent_directories['videos_root_folder'], 'already_cropped', ratID)
+    else:
+        rat_folder = os.path.join(parent_directories['videos_root_folder'], ratID)
 
     formatstring = date_formatstring()
     if 'date' in session_metadata.keys():
@@ -2756,6 +2887,25 @@ def find_orig_movies_from_r3d_filename(r3d_file, parent_directories):
     video_root_folder = parent_directories['video_root_folder']
 
 
+def find_original_calibration_from_cropped_vid(cropped_vid, parent_directories):
+    cropped_vid_metadata = parse_cropped_calibration_video_name(cropped_vid)
+    cal_vids_parent = parent_directories['calibration_vids_parent']
+    orig_vid_name = '_'.join(('GridCalibration',
+                              'b{:02d}'.format(cropped_vid_metadata['boxnum']),
+                              datetime_to_string_for_fname(cropped_vid_metadata['time']) + '.avi'))
+    datestring = cropped_vid_metadata['time'].strftime('%Y%m')
+    month_folder = 'calibration_videos_' + datestring
+
+    test_name = os.path.join(cal_vids_parent, month_folder, orig_vid_name)
+    if os.path.exists(test_name):
+        return test_name
+
+    already_cropped_folder = month_folder + '_alreadycropped'
+    test_name = os.path.join(cal_vids_parent, month_folder, already_cropped_folder, orig_vid_name)
+    if os.path.exists(test_name):
+        return test_name
+
+    return None
 
 
 def get_Burgess_video_folders_to_crop(video_root_folder):
@@ -2946,10 +3096,64 @@ def parse_cropped_calibration_video_name(cropped_calibration_vid_name):
     return cropped_cal_vid_metadata
 
 
+def find_calibration_vid_folder(vid_params, parent_directories):
+
+    calibration_vids_parent = parent_directories['calibration_vids_parent']
+    vid_month_name = 'calibration_videos_{}'.format(vid_params['time'].strftime('%Y%m'))
+    month_folder = os.path.join(calibration_vids_parent, vid_month_name)
+
+    return month_folder
+
+
+def parse_frame_csv_name(frame_csv_file):
+
+    _, csv_name = os.path.split(frame_csv_file)
+    csv_name, _ = os.path.splitext(csv_name)
+
+    csv_name_parts = csv_name.split('_')
+
+    box_num = int(csv_name_parts[1][1:])
+    csv_time = datetime_from_fname_string(csv_name_parts[2] + '_' + csv_name_parts[3])
+    framenum = int(csv_name_parts[-1])
+
+    csv_metadata = {'boxnum': box_num,
+                    'time': csv_time,
+                    'framenum': framenum - 1  # subtract one because Fiji indexes starting at 1 but opencv/ffmpeg start indexing at zero
+    }
+
+    return csv_metadata
+
+
+def check_for_calibration_csvs(cropped_vid_name, parent_directories):
+
+    vid_params = parse_cropped_calibration_video_name(cropped_vid_name)
+    calibration_vid_folder = find_calibration_vid_folder(vid_params, parent_directories)
+
+    time_string = vid_params['time'].strftime('%Y%m%d_%H-%M-%S')
+    test_folder_name = '_'.join(('GridCalibration',
+                                 'b{:02d}'.format(vid_params['boxnum']),
+                                 time_string))
+
+    test_folder = os.path.join(calibration_vid_folder, test_folder_name)
+
+    if os.path.exists(test_folder):
+        # check for csv's
+        test_name = 'GridCalibration_*_frame_*.csv'
+        test_name = os.path.join(test_folder, test_name)
+        csv_list = glob.glob(test_name)
+
+        return csv_list
+    else:
+        return []
+
+
 def create_calibration_file_path(calibration_files_parent, calib_metadata):
 
     # year_str = calib_metadata['time'].strftime('%Y')
-    month_str = calib_metadata['time'].strftime('%Y%m')
+    try:
+        month_str = calib_metadata['time'].strftime('%Y%m')
+    except:
+        pass
     # year_folder = os.path.join(calibration_files_parent, 'calibration_files_' + year_str)
     month_folder = os.path.join(calibration_files_parent, 'calibration_files_' + month_str)
     # box_folder = os.path.join(month_folder, 'calibration_files_' + month_str + '_box{:02d}'.format(calib_metadata['boxnum']))
@@ -3165,7 +3369,7 @@ def find_analog_bin_file(parent_directory, session_metadata):
     return analog_name
 
 
-def find_digital_bin_file(parent_directory, session_metadata):
+def find_digital_bin_file(parent_directory, session_metadata, search_already_cropped=True):
 
     session_folder = find_session_folder(parent_directory, session_metadata)
     ratID = session_metadata['ratID']

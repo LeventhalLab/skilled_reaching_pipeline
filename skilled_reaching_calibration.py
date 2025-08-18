@@ -40,7 +40,7 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_list[0][0])
     print('refining calibration for {}, {}, session {:d}'.format(h5_metadata['ratID'], h5_metadata['triggertime'].strftime('%m/%d/%Y'), h5_metadata['session_num']))
 
-    cgroup = calibration_data['cgroup']
+    cgroup = copy.deepcopy(calibration_data['cgroup'])
     cam_names = cgroup.get_names()
     calibration_data['original_cgroup'] = copy.deepcopy(cgroup)
 
@@ -51,7 +51,8 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     # cam_intrinsics = calibration_data['cam_intrinsics']
     # E, F, rot, t = mirror_stereo_cal(imgp_dict, cam_intrinsics, view_names=cam_names)
     # error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra=None, verbose=verbose)
-    error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, undistort=False, extra=None, verbose=verbose)
+    # error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, undistort=False, extra=None, verbose=verbose)
+    error = cgroup.bundle_adjust_iter_fixed_intrinsics_and_cam0(imgp, undistort=False, extra=None, verbose=verbose)
 
 
     # cgroup was modified by the bundle_adjust_iter_fixed_intrinsics function
@@ -1038,11 +1039,23 @@ def mirror_board_from_df(session_row):
 
 def create_charuco(squaresX, squaresY, square_length, marker_length, marker_bits=4, dict_size=50, aruco_dict=None, manually_verify=False):
 
-    board = CharucoBoard(int(squaresX), int(squaresY), square_length, marker_length,
-                         marker_bits=marker_bits,
-                         dict_size=dict_size,
-                         aruco_dict=aruco_dict,
-                         manually_verify=manually_verify)
+    try:
+        board = CharucoBoard(int(squaresX), int(squaresY), square_length, marker_length,
+                             marker_bits=marker_bits,
+                             dict_size=dict_size,
+                             aruco_dict=aruco_dict,
+                             manually_verify=manually_verify)
+    except:
+        pass
+
+    # just to test that the board really looks like the board used for calibration
+    # img = board.board.generateImage((600, 600))
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
+    # ax.imshow(img)
+    # plt.show()
+
+
 
     return board
 
@@ -1133,14 +1146,10 @@ def crop_calibration_video(calib_vid,
 
     session_date = cc_metadata['time'].date()
 
-    # todo: calibrate the camera and undistort the videos prior to cropping, then don't allow calculation of distortion
-    # coefficients, etc. during calibration with anipose
     crop_params_dict = crop_params_dict_from_sessionrow(session_row, view_list=view_list)
 
     if crop_params_dict is None:
         return None
-
-    # crop_params_dict = crop_videos.crop_params_dict_from_df(calibration_metadata_df, session_date, cc_metadata['boxnum'])
 
     cropped_vid_names = []
     if crop_params_dict:
@@ -1545,10 +1554,20 @@ def create_cal_frame_figure(width, height, ax3d=None, scale=1.0, dpi=100, nrows=
     return fig, axs
 
 
-def calibrate_single_camera(cal_vid, board, num_frames2use=20):
+def calibrate_single_camera(cal_vid, board, num_frames2use=20, min_pts_per_frame=10):
+    '''
+
+    :param cal_vid:
+    :param board:
+    :param num_frames2use:
+    :param min_pts_per_frame: minimum number of identified charuco points needed in each frame for calibration.
+        8 or more should be adequate, but I think if they're colinear the algorithm collapses. Made default 10 and that
+        seemed to fix the error (DL, 11/14/2024)
+    :return:
+    '''
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO
 
-    rows, size = detect_video_pts(cal_vid, board)
+    rows, size = detect_video_pts(cal_vid, board, camera=None, skip=1)
     # size is (w, h)
     # rows = board.detect_video(cal_vid, prefix=None, skip=skip, progress=True)
 
@@ -1557,17 +1576,21 @@ def calibrate_single_camera(cal_vid, board, num_frames2use=20):
     skip = int(len(objp) / num_frames2use)
 
     #
-    mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= 7]
-    valid_frames = [ii for ii, o in enumerate(objp) if len(o) >= 7]
+    mixed = [(o, i) for (o, i) in zip(objp, imgp) if len(o) >= min_pts_per_frame]
+    valid_frames = [ii for ii, o in enumerate(objp) if len(o) >= min_pts_per_frame]
 
     objp, imgp = zip(*mixed)
 
     # matrix = cv2.initCameraMatrix2D(objp, imgp, tuple(size))
     num_frames = len(objp)
+    n_charuco_pts_per_frame = np.array([len(row['ids']) for row in rows])
     frames_to_use = list(range(0, num_frames, skip))
     objp_to_use = [objp[ii] for ii in frames_to_use]
     imgp_to_use = [imgp[ii] for ii in frames_to_use]
-    ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp_to_use, imgp_to_use, size, None, None, flags=CALIBRATION_FLAGS)
+    try:
+        ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objp_to_use, imgp_to_use, size, None, None, flags=CALIBRATION_FLAGS)
+    except:
+        pass
 
     cam_intrinsic_data = {'ret': ret,
                           'mtx': mtx,
@@ -1589,7 +1612,11 @@ def collect_matched_mirror_points(merged, board):
     # first dictionary in this list is for the left mirror, second dictionary is for the right mirror
     matched_points_metadata = [{'framenumbers': [],'ptids': []}, {'framenumbers': [],'ptids': []}]
     if type(board) is Checkerboard:
-        pts_per_frame = np.shape(merged[0]['dir']['corners'])[0]
+        # find the first element of merged that has a 'dir' view entry
+        for merged_row in merged:
+            if 'dir' in list(merged_row.keys()):
+                pts_per_frame = np.shape(merged_row['dir']['corners'])[0]
+                break
         # count up all merged rows that contain leftmirror points
         leftmirror_rows = [mr for mr in merged if 'lm' in mr.keys() and 'dir' in mr.keys()]
         rightmirror_rows = [mr for mr in merged if 'rm' in mr.keys() and 'dir' in mr.keys()]
@@ -1824,7 +1851,7 @@ def select_correct_E_mirror(R1, R2, T, pts1, pts2, mtx):
     return c_rot, c_t, correct
 
 
-def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']]):
+def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], max_dist_from_epiline=5):
 
     view_keys = list(stereo_cal_points.keys())
     for view_key in view_keys:
@@ -1840,12 +1867,15 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
     if stereo_cal_points[lm_key] is None:
         F[:, :, 0].fill(np.nan)
     else:
-        F[:, :, 0] = cvb.fund_matrix_mirror(stereo_cal_points['directleft'], stereo_cal_points['leftmirror'])
+        Finit = cvb.fund_matrix_mirror(stereo_cal_points['directleft'], stereo_cal_points['leftmirror'])
+        F[:, :, 0], inliers_left = cvb.refine_fundamental_matrix(Finit, stereo_cal_points['directleft'], stereo_cal_points['leftmirror'], max_dist_from_epiline=max_dist_from_epiline)
 
     if stereo_cal_points[rm_key] is None:
         F[:, :, 1].fill(np.nan)
     else:
-        F[:, :, 1] = cvb.fund_matrix_mirror(stereo_cal_points['directright'], stereo_cal_points['rightmirror'])
+        Finit = cvb.fund_matrix_mirror(stereo_cal_points['directright'], stereo_cal_points['rightmirror'])
+        F[:, :, 1], inliers_right = cvb.refine_fundamental_matrix(Finit, stereo_cal_points['directright'],
+                                                            stereo_cal_points['rightmirror'], max_dist_from_epiline=max_dist_from_epiline)
 
     # calculate essential matrices
     E = np.empty((3, 3, 2))
@@ -1877,7 +1907,7 @@ def mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=[['directlef
             t_mat = np.expand_dims(c_t[:, i_view], 1)
         # P2[:, :, i_view] = np.hstack((c_rot[:, :, i_view], t_mat))
 
-    return E, F, c_rot, c_t
+    return E, F, c_rot, c_t, inliers_left, inliers_right
 
 
 def calc_3d_gridspacing_checkerboard(pts3d, board_size):
@@ -2069,13 +2099,161 @@ def test_board_reconstruction(pts1, pts2, mtx, rot, t, board):
     pass
 
 
+def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, board):
+
+    vid_folder, vid_name = os.path.split(full_calib_vid_name)
+    labeledvids_folder = os.path.join(vid_folder, 'labeled_vids')
+    if not os.path.exists(labeledvids_folder):
+        os.makedirs(labeledvids_folder)
+    labeled_vid_name = vid_name.replace('.avi', '_labeled.avi')
+    labeled_vid_name = os.path.join(labeledvids_folder, labeled_vid_name)
+    # if os.path.exists(labeled_vid_name):
+    #     return
+
+    all_rows = calibration_data['all_rows']
+    n_cams = len(all_rows)
+    cv_cap = cv2.VideoCapture(full_calib_vid_name)
+    n_frames = int(cv_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    w = int(cv_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cv_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cv_cap.get(cv2.CAP_PROP_FPS)
+
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    cv_out = cv2.VideoWriter(labeled_vid_name, fourcc, fps, (w, h))
+    mtx = calibration_data['cam_intrinsics']['mtx']
+    dist = calibration_data['cam_intrinsics']['dist']
+    cam_names = calibration_data['cgroup_3view'].get_names()
+    merged = merge_rows(all_rows, cam_names=cam_names)
+
+    for i_frame in range(n_frames):
+        # overlay points
+        row_idx = [0, 0, 0]
+        ret, img = cv_cap.read()
+        if not ret:
+            break
+        img_ud = cv2.undistort(img, mtx, dist)
+        # fig = plt.figure()
+        # ax = fig.add_subplot()
+
+        for i_view, rows in enumerate(all_rows):
+            frame_nums = np.array([(i_row, row['framenum']) for i_row, row in enumerate(rows)])
+            try:
+                frame_row_idx = frame_nums[frame_nums[:,1]==i_frame,0][0]
+            except:
+                # there aren't data for this frame
+                frame_row_idx = None
+            row_idx[i_view] = frame_row_idx
+
+        # try:
+        merged_row = None
+        # merged_row = next(filter(lambda x: x['dir']['framenum'] == i_frame, merged), None)
+        for test_row in merged:
+            if 'dir' in list(test_row.keys()):
+                if test_row['dir']['framenum'] == i_frame:
+                    merged_row = test_row
+                    break
+        if merged_row is None:
+            projected_pts = None
+        else:
+            merged_pts = match_2d_merged_pts(merged_row, cam_names, board=board, pt_type='corners')
+            pts3d = calibration_data['cgroup_3view'].triangulate(merged_pts, undistort=False, progress=False)
+            projected_pts = calibration_data['cgroup_3view'].project(pts3d)
+        # except:
+        #     # this should mean that there was no row with the current frame (i_frame) available in the direct view
+        #     projected_pts = None
+
+        for i_view, rows in enumerate(all_rows):
+            if not row_idx[i_view] is None:
+                frame_row = rows[row_idx[i_view]]
+                for ii, id in enumerate(np.squeeze(frame_row['ids'])):
+                    try:
+                        plt.text(frame_row['corners'][ii, 0, 0], frame_row['corners'][ii, 0, 1],
+                                 '{:d}'.format(id), c='r', fontsize='small')
+                    except:
+                        pass
+                    text_loc = (int(frame_row['corners'][ii, 0, 0]), int(frame_row['corners'][ii, 0, 1]))
+                    cv2.putText(img_ud, '{:d}'.format(id), text_loc, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=0.8, color=(0, 0, 255))
+                    cv2.circle(img_ud, (int(frame_row['corners'][ii, 0, 0]), int(frame_row['corners'][ii, 0, 1])), radius=1, color=(0, 0, 255), thickness=-1)
+            if projected_pts is not None:
+                for ii in range(np.shape(projected_pts)[1]):
+                    if not np.isnan(projected_pts[i_view, ii, 0]):
+                        cv2.circle(img_ud, (int(projected_pts[i_view, ii, 0]), int(projected_pts[i_view, ii, 1])),
+                                   radius=3, color=(255, 0, 0), thickness=-1)
+        try:
+            cv_out.write(img_ud)
+        except:
+            pass
+        # frame_name = '{:04d}.jpg'.format(i_frame)
+        # frame_name = os.path.join(temp_folder, frame_name)
+
+        # plt.savefig(frame_name)
+        # ax.imshow(img_ud)
+        # plt.close(fig)
+
+    # check_detections()
+    cv_cap.release()
+    cv_out.release()
+
+
+def match_2d_merged_pts(merged_row, cam_names, board=None, pt_type='corners'):
+
+    n_cams = len(cam_names)
+    row_keys = list(merged_row.keys())
+    if board is None:
+        max_pts = max([merged_row[key]['ids'] for key in row_keys])
+    else:
+        if isinstance(board, Checkerboard):
+            max_pts = np.prod([board.squaresX, board.squaresY])
+        else:
+            max_pts = board.total_size
+
+    frame_pts = np.empty((n_cams, max_pts, 2))
+    frame_pts[:] = np.nan
+
+    for i_cam, cam_name in enumerate(cam_names):
+        if cam_name in row_keys:
+            # frame_pts[i_cam, merged_row[cam_name]['ids'], :] = merged_row[cam_name][pt_type][merged_row[cam_name]['ids'], 0, :]
+            try:
+                frame_pts[i_cam, merged_row[cam_name]['ids'], :] = np.squeeze(merged_row[cam_name][pt_type])
+            except:
+                pass
+
+
+    return frame_pts
+
+
+def remove_outlier_imgp(imgp, F, max_dist_from_epiline=5):
+
+    # first look at all points visible in the direct view and left mirror
+    lm_dist_from_epilines = cvb.dist_from_epilines(F[:, :, 0], imgp[0, :, :], imgp[1, :, :])
+    rm_dist_from_epilines = cvb.dist_from_epilines(F[:, :, 1], imgp[0, :, :], imgp[2, :, :])
+
+    lm_outliers = lm_dist_from_epilines > max_dist_from_epiline
+    rm_outliers = rm_dist_from_epilines > max_dist_from_epiline
+    imgp[1, lm_outliers, :] = np.nan
+    imgp[2, rm_outliers, :] = np.nan
+
+    # eliminate any imgp with only one valid point
+    n_valid_pts_per_match = np.sum(~np.isnan(imgp[:,:,0]), axis=0)
+    valid_combos = n_valid_pts_per_match > 1
+
+    new_imgp = imgp[:, valid_combos, :]
+
+    return new_imgp, valid_combos
+
+
 def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, session_row, calibration_pickle_name,
-                           view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, verbose=True):
+                           full_calib_vid_name=None, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, max_dist_from_epiline=5, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
+    dest_folder = navigation_utilities.cal_frames_folder_from_cal_vids_name(full_calib_vid_name)
+    crop_videos.write_video_frames(full_calib_vid_name, img_type='.jpg')
+    return None, None
     if os.path.exists(calibration_pickle_name):
         calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
-        cgroup = calibration_data['cgroup']
+        # working here... check to see if there is a .csv file with points in it for all 3 views; if so, load them and use them for bundle adjustment
+        overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, board)
+        cgroup = calibration_data['cgroup_3view']
         return cgroup, None
     else:
         cgroup = CameraGroup.from_names(cam_names, fisheye=False)
@@ -2098,12 +2276,12 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     #  2. undistort points in the full original reference frame, then move them back into the cropped
     #      video, then flip them left-right if in a mirror view
     if 'all_rows' not in calibration_data.keys():
-        all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, mirror_board, parent_directories)
+        all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, mirror_board, parent_directories, cgroup, full_calib_vid_name=full_calib_vid_name)
         for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
             # need to make sure the cameras are in the right order; this should have been checked in the code above
             all_rows[i] = mirror_board.estimate_pose_rows(cam, row)
         calibration_data['all_rows'] = all_rows
-        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+        # skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
     else:
         all_rows = calibration_data['all_rows']
         for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
@@ -2118,7 +2296,12 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     merged = merge_rows(all_rows, cam_names=cam_names)
     stereo_cal_points, matched_points_metadata = collect_matched_mirror_points(merged, mirror_board)
     # if calibration_data['E'] is None:
-    E, F, rot, t = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names)
+    # stereo_cal_points are undistorted (this occurs in get_rows_cropped_vids)
+    try:
+        E, F, rot, t, inliers_left, inliers_right = mirror_stereo_cal(stereo_cal_points, cam_intrinsics, view_names=view_names,
+                                                                      max_dist_from_epiline=max_dist_from_epiline)
+    except:
+        pass
 
     calibration_data['E'] = E
     calibration_data['F'] = F
@@ -2127,6 +2310,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     rvecs = [[0., 0., 0.]]
     cam_t = [[0., 0., 0.]]
     scale_factors = np.zeros(2)
+
     for i_view in range(2):
         cam_rvec, _ = cv2.Rodrigues(rot[:, :, i_view])
         rvecs.append(cam_rvec)
@@ -2141,26 +2325,52 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     cgroup.set_rotations(rvecs)
     cgroup.set_translations(cam_t)
 
+    calibration_data['cgroup'] = cgroup
     calibration_data['extrinsics_initialized'] = True
 
+    pts_3view = collect_3view_pts(full_calib_vid_name, calibration_data)
+
     cgroup_old = copy.deepcopy(cgroup)
+    # cgroup2 = copy.deepcopy(cgroup)
+    cgroup_3view = copy.deepcopy(cgroup)
+    # cgroup_3view2 = copy.deepcopy(cgroup)
+
+    # need to modify extract_points so that outlier points are excluded from bundle adjustment
     imgp, extra = extract_points(merged, mirror_board, cam_names=cam_names, min_cameras=2)
+    imgp, valid_matches = remove_outlier_imgp(imgp, F, max_dist_from_epiline=max_dist_from_epiline)
+    extra['objp'] = extra['objp'][valid_matches, :]
+    extra['ids'] = extra['ids'][valid_matches]
+    extra['rvecs'] = extra['rvecs'][:, valid_matches, :]
+    extra['tvecs'] = extra['tvecs'][:, valid_matches, :]
 
     # if not calibration_data['bundle_adjust_completed']:
         # if one of the views couldn't be calibrated, skip bundle adjustment for now
     if not np.isnan(calibration_data['E']).any():
         # error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra, verbose=verbose)
-        error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, extra, verbose=verbose)
-
+        # error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, extra, verbose=verbose)
+        error = cgroup.bundle_adjust_iter_fixed_intrinsics_and_cam0(imgp, extra, verbose=verbose, use_jac_sparsity=True)
+        # error2 = cgroup2.bundle_adjust_iter_fixed_intrinsics(imgp, extra, verbose=verbose)
+        # error_3view = cgroup_3view.bundle_adjust_iter_fixed_intrinsics_and_cam0(pts_3view, extra=None, verbose=verbose, use_jac_sparsity=True)
+        try:
+            error_3view = cgroup_3view.bundle_adjust_iter_fixed_intrinsics_and_cam0(pts_3view, extra=None, verbose=verbose, use_jac_sparsity=False)
+        except:
+            pass
+        # using the full Jacobian works better for points visible in all 3 views empirically, and doesn't make the
+        # computations too long because the number of points is small
         calibration_data['cgroup'] = cgroup
+        calibration_data['cgroup_3view'] = cgroup_3view
+        # calibration_data['cgroup_3view_jsnone'] = cgroup_3view2
+        calibration_data['cgroup_old'] = cgroup_old
         calibration_data['error'] = error
+        calibration_data['error_3view'] = error_3view
+        # calibration_data['error_3view_jsnone'] = error_3view_jsnone
         calibration_data['bundle_adjust_completed'] = True
     else:
         # todo: manually calibrate if automatic detection didn't work
         error = None
 
     skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
-
+    overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, board)
     # else:
     #     cgroup = calibration_data['cgroup']
     #     error = calibration_data['error']
@@ -2275,6 +2485,97 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     #     error = calibration_data['error']
     #
     # return cgroup, error
+
+
+def collect_3view_pts(full_calib_vid_name, calibration_data):
+
+    vid_path, vid_name = os.path.split(full_calib_vid_name)
+    calib_metadata = navigation_utilities.parse_camera_calibration_video_name(full_calib_vid_name)
+    frames_3view_folder = navigation_utilities.find_3dframes_folder(calib_metadata)
+    frames_3view_folder = os.path.join(vid_path, frames_3view_folder)
+
+    if os.path.exists(frames_3view_folder):
+
+        # find .csv files
+        csv_test_string = os.path.join(frames_3view_folder, '*.csv')
+        csv_list = glob.glob(csv_test_string)
+
+        pts_3view_list = []
+        for i_file, csv_file in enumerate(csv_list):
+            csv_metadata = navigation_utilities.parse_frame_csv_name(csv_file)
+            csv_table = pd.read_csv(csv_file)
+            pts_3view_list.append(sort_3view_pts(csv_table, calibration_data, dirview_lims=[400, 1550]))
+
+        pts_3view = np.concatenate(pts_3view_list, axis=1)
+
+    else:
+        pts_3view = None
+
+    return pts_3view
+
+
+def sort_3view_pts(csv_3view_table, calibration_data, dirview_lims=[400, 1550]):
+    '''
+
+    :param csv_3view_table:
+    :param calibration_data:
+    :param dirview_lims: 2-element vector containing the left and right edge x-values for the direct view
+    :return:
+    '''
+
+    X = csv_3view_table['X'].values
+    Y = csv_3view_table['Y'].values
+    pts = np.vstack((X, Y)).T
+
+    cam_names = calibration_data['cgroup'].get_names()
+
+    # undistort since points were marked on original calibration video
+    cam_intrinsics = calibration_data['cam_intrinsics']
+    pts_ud = cv2.undistortPoints(pts, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+    pts_ud = cvb.unnormalize_points(pts_ud, cam_intrinsics['mtx'])
+
+    pts_3view = match_3view_pts(pts_ud, calibration_data, dirview_lims=dirview_lims)
+
+    return pts_3view
+
+
+def match_3view_pts(pts_ud, calibration_data, dirview_lims=[400, 1500]):
+    cam_names = calibration_data['cgroup'].get_names()
+    n_cams = len(cam_names)
+    p2ds_dict = dict.fromkeys(cam_names)
+    n_viewpts = np.zeros(n_cams)
+    for i_cam, cam in enumerate(cam_names):
+        if cam == 'dir':
+            view_bool = np.logical_and(pts_ud[:, 0] > dirview_lims[0], pts_ud[:, 0] < dirview_lims[1])
+        elif cam == 'lm':
+            view_bool = (pts_ud[:, 0] < dirview_lims[0])
+        elif cam == 'rm':
+            view_bool = (pts_ud[:, 0] > dirview_lims[1])
+
+        p2ds_dict[cam] = pts_ud[view_bool, :]
+        n_viewpts[i_cam] = np.sum(view_bool)
+
+    n_matchedpairs = int(min(n_viewpts))
+    p2ds_array = np.empty((n_cams, n_matchedpairs, 2))
+    p2ds_array[:] = np.nan
+    p2ds_array[0, :, :], p2ds_array[1, :, :], _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['lm'], board=None)
+
+
+    dir_pts, rm_pts, _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['rm'], board=None)
+
+    # match direct view points matched with right mirror view with the order for the left mirror view
+    row_idx = np.zeros(n_matchedpairs, dtype=int)
+    for i_dir_pt, dir_pt in enumerate(dir_pts):
+        for i_p2ds_dir, p2ds_dir in enumerate(p2ds_array[0,:,:]):
+            if np.array_equal(dir_pt, p2ds_dir):
+                row_idx[i_dir_pt] = int(i_p2ds_dir)
+
+
+    p2ds_array[2, : , :] = rm_pts[row_idx, :]
+
+    return p2ds_array
+
+
 
 
 def test_anipose_calibration(session_row, parent_directories):
@@ -2406,56 +2707,280 @@ def test_fundamental_matrix(full_calib_vid_name, merged, frame_num, calibration_
     return
 
 
-def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories):
+def check_detections(board, all_rows, cropped_vids, full_calib_vid_name, cam_intrinsics):
 
+    cv_cap = cv2.VideoCapture(full_calib_vid_name)
+    i_frame = 51
+
+    cv_cap.set(cv2.CAP_PROP_POS_FRAMES, i_frame)
+    res, img = cv_cap.read()
+
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    ax.imshow(img)
+
+    # overlay points
+    row_idx = [0, 0, 0]
+    for i_view, rows in enumerate(all_rows):
+        frame_nums = np.array([(i_row, row['framenum']) for i_row, row in enumerate(rows)])
+        try:
+            frame_row_idx = frame_nums[frame_nums[:,1]==i_frame,0][0]
+        except:
+            # there aren't data for this frame
+            frame_row_idx = None
+        row_idx[i_view] = frame_row_idx
+
+    for i_view, rows in enumerate(all_rows):
+        if not row_idx[i_view] is None:
+            frame_row = rows[row_idx[i_view]]
+            for ii, id in enumerate(frame_row['ids']):
+                plt.text(frame_row['corners'][ii, 0, 0], frame_row['corners'][ii, 0, 1],
+                         '{:d}'.format(id[0]), c='r')
+
+
+    plt.show()
+    pass
+
+
+def find_supporting_lines(pts1, pts2):
+
+    rounded_pts1 = pts1.astype(np.int)
+    rounded_pts2 = pts2.astype(np.int)
+    all_pts = np.vstack((rounded_pts1, rounded_pts2))
+
+    full_cvx_hull = np.squeeze(cv2.convexHull(all_pts))
+
+    full_cvx_hull = np.vstack((full_cvx_hull, full_cvx_hull[0, :]))
+    # wrap around so the last point is the same as the first point for processing purposes below
+
+    n_lines_found = 0
+    n_hullpts = np.shape(full_cvx_hull)[0]
+
+    cv_pts = np.empty((2, 2))
+    cv_pts_round = np.zeros((2, 2), dtype=np.int)
+    supporting_lines = np.zeros((2, 2, 2))
+    # each(:,:, p) array contains[x1, y1; x2, y2] coordinates that define the endpoints of a supporting line
+
+    for i_pt, hull_pt in enumerate(full_cvx_hull[:-1, :]):
+
+        cv_pts_round[0, :] = hull_pt
+        cv_pts_round[1, :] = full_cvx_hull[i_pt+1, :]
+
+        cv_pts = np.empty((2, 2))
+
+        pts_set = np.zeros(2, dtype=np.int) - 1
+        # which sets (pts1 or pts2) do adjacent points in the convex hull belong to?
+        pt_set_match = np.all(rounded_pts1 == cv_pts_round[0, :], axis=1)
+        if np.any(pt_set_match):
+            # if there is a match between set 1 and the first test point on the convex hull
+            pts_set[0] = 1
+            idx_in_set = np.where(pt_set_match)[0][0]
+            cv_pts[0, :] = pts1[idx_in_set, :]
+        else:
+            # there must be a match between set 2 and the first test point on the convex hull
+            pt_set_match = np.all(rounded_pts2 == cv_pts_round[0, :], axis=1)
+            pts_set[0] = 2
+            idx_in_set = np.where(pt_set_match)[0][0]
+            cv_pts[0, :] = pts2[idx_in_set, :]   # go back to the original point instead of the rounded point
+
+        pt_set_match = np.all(rounded_pts1 == cv_pts_round[1, :], axis=1)
+        if np.any(pt_set_match):
+            # if there is a match between set 1 and the second test point on the convex hull
+            pts_set[1] = 1
+            idx_in_set = np.where(pt_set_match)[0][0]
+            cv_pts[1, :] = pts1[idx_in_set, :]   # go back to the original point instead of the rounded point
+        else:
+            # there must be a match between set 2 and the second test point on the convex hull
+            pt_set_match = np.all(rounded_pts2 == cv_pts_round[1, :], axis=1)
+            pts_set[1] = 2
+            idx_in_set = np.where(pt_set_match)[0][0]
+            cv_pts[1, :] = pts2[idx_in_set, :]   # go back to the original point instead of the rounded point
+
+        if pts_set[0] != pts_set[1]:
+            supporting_lines[n_lines_found, :, :] = cv_pts   # this needs to be redone so that we go back to the original points (not the integers)
+            n_lines_found += 1
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
+    #
+    # ax.scatter(pts1[:, 0], pts1[:, 1])
+    # ax.scatter(pts2[:, 0], pts2[:, 1])
+    #
+    # ax.plot(supporting_lines[0, :, 0], supporting_lines[0, :, 1])
+    # ax.plot(supporting_lines[1, :, 0], supporting_lines[1, :, 1])
+    # ax.invert_yaxis()
+    # plt.show()
+
+    return supporting_lines
+
+
+def rows_from_csvs(csv_list, board, cam_intrinsics, n_views=3):
+    board_size = np.array(board.get_size())
+    pts_per_view = np.prod(board_size-1)
+
+    jpg_name = csv_list[0].replace('.csv', '.jpg')
+    # read in the jpeg to get the image size
+    if os.path.exists(jpg_name):
+        img = cv2.imread(jpg_name)
+        w = np.shape(img)[1]
+        h = np.shape(img)[0]
+        size = (w, h)
+    else:
+        size = (2040, 1024)   # hardcode default for now
+
+    all_rows = [[] for i_view in range(n_views)]
+    for csv_file in csv_list:
+        csv_metadata = navigation_utilities.parse_frame_csv_name(csv_file)
+        csv_table = pd.read_csv(csv_file)
+
+        frame_corners = np.array((csv_table['X'], csv_table['Y'])).T
+        n_pts = np.shape(frame_corners)[0]
+
+        n_views_with_pts = int(n_pts / pts_per_view)
+
+        # assume first pts_per_view points belong to the direct view
+        dir_corners = frame_corners[:pts_per_view, :]
+        mirr_corners = frame_corners[pts_per_view:, :]
+        # do the next points belong to the left mirror or right mirror view?
+        if frame_corners[pts_per_view, 0] < frame_corners[pts_per_view - 1, 0]:
+            # must be the left mirror
+            mirror_view_idx = 1
+        else:
+            mirror_view_idx = 2
+
+        dir_corners, mirr_corners, matched_ids = match_mirror_points(dir_corners, mirr_corners, board)
+        # dir_ids and mirr_ids would be the same since the points have been matched
+        # rearrange the matched points so that they go left to right, top to bottom in the direct view; right to left and top to bottom in the mirror
+        # then the ids should just be 0 to pts_per_view-1
+        sorted_dir_corners = np.zeros((pts_per_view, 2))
+        sorted_mirr_corners = np.zeros((pts_per_view, 2))
+        for i_pt in range(pts_per_view):
+            try:
+                sorted_dir_corners[i_pt, :] = dir_corners[matched_ids == i_pt, :]
+            except:
+                pass
+            sorted_mirr_corners[i_pt, :] = mirr_corners[matched_ids == i_pt, :]
+
+        dir_corners_ud_norm = cv2.undistortPoints(sorted_dir_corners, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+        dir_corners_ud = cvb.unnormalize_points(dir_corners_ud_norm, cam_intrinsics['mtx'])
+        dir_corners_ud = np.expand_dims(dir_corners_ud, 1)
+
+        mirr_corners_ud_norm = cv2.undistortPoints(sorted_mirr_corners, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+        mirr_corners_ud = cvb.unnormalize_points(mirr_corners_ud_norm, cam_intrinsics['mtx'])
+        mirr_corners_ud = np.expand_dims(mirr_corners_ud, 1)
+
+        dir_filled_ud = dir_corners_ud    # not sure what "filled" is, but it seems to work with anipose
+        mirr_filled_ud = mirr_corners_ud
+        ids = np.arange(pts_per_view)
+        dir_row = {'framenum': csv_metadata['framenum'],
+                   'corners': dir_corners_ud,
+                   'corners_distorted': dir_corners,
+                   'filled': dir_filled_ud,
+                   'ids': ids}
+        all_rows[0].append(dir_row)
+        mirrr_row = {'framenum': csv_metadata['framenum'],
+                     'corners': mirr_corners_ud,
+                     'corners_distorted': mirr_corners,
+                     'filled': mirr_corners_ud,
+                     'ids': ids}
+        all_rows[mirror_view_idx].append(mirrr_row)
+
+    return all_rows, size
+
+
+def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories, cgroup, skip=20, full_calib_vid_name=None):
     all_rows = []
-    for cropped_vid in cropped_vids:
-        # rows_cam = []
-        rows, size = detect_video_pts(cropped_vid, board)
+    # check to see if there is a folder with individual images and a .csv file with points marked in fiji
+    csv_list = navigation_utilities.check_for_calibration_csvs(cropped_vids[0], parent_directories)
+    n_views = len(cropped_vids)
+    if len(csv_list) > 0:
+        all_rows, size = rows_from_csvs(csv_list, board, cam_intrinsics, n_views=n_views)
+    else:
+        for i_vid, cropped_vid in enumerate(cropped_vids):
+            # rows_cam = []
+            orig_cal_vid = navigation_utilities.find_original_calibration_from_cropped_vid(cropped_vid, parent_directories)
 
-        cropped_vid_metadata = navigation_utilities.parse_cropped_calibration_video_name(cropped_vid)
-        # undistort the points in the rows list
-        # translate points back to full frame, then undistort and unnormalize
-        for i_row, row in enumerate(rows):
-            orig_coord_x = row['corners'][:,:,0] + cropped_vid_metadata['crop_params'][0]
-            orig_coord_y = row['corners'][:,:,1] + cropped_vid_metadata['crop_params'][2]
-            orig_coord = np.hstack((orig_coord_x, orig_coord_y))
+            # if 'rm' in cropped_vid:
+            #     skip = 1
+            camera = cgroup.cameras[i_vid]
+            rows, size = detect_video_pts(cropped_vid, board, camera, skip=skip)
 
-            # not sure what the difference is between 'filled' and 'corners' in each row dictionary, just trying to make
-            # this work with anipose
-            orig_filled_x = row['filled'][:, :, 0] + cropped_vid_metadata['crop_params'][0]
-            orig_filled_y = row['filled'][:, :, 1] + cropped_vid_metadata['crop_params'][2]
-            orig_filled = np.hstack((orig_filled_x, orig_filled_y))
+            cropped_vid_metadata = navigation_utilities.parse_cropped_calibration_video_name(cropped_vid)
+            # undistort the points in the rows list
+            # translate points back to full frame, then undistort and unnormalize
+            for i_row, row in enumerate(rows):
+                orig_coord_x = row['corners'][:,:,0] + cropped_vid_metadata['crop_params'][0]
+                orig_coord_y = row['corners'][:,:,1] + cropped_vid_metadata['crop_params'][2]
+                orig_coord = np.hstack((orig_coord_x, orig_coord_y))
 
-            orig_ud_norm = cv2.undistortPoints(orig_coord, cam_intrinsics['mtx'], cam_intrinsics['dist'])
-            corners_ud = cvb.unnormalize_points(orig_ud_norm, cam_intrinsics['mtx'])
+                # not sure what the difference is between 'filled' and 'corners' in each row dictionary, just trying to make
+                # this work with anipose
+                orig_filled_x = row['filled'][:, :, 0] + cropped_vid_metadata['crop_params'][0]
+                orig_filled_y = row['filled'][:, :, 1] + cropped_vid_metadata['crop_params'][2]
+                orig_filled = np.hstack((orig_filled_x, orig_filled_y))
 
-            filled_ud_norm = cv2.undistortPoints(orig_filled, cam_intrinsics['mtx'], cam_intrinsics['dist'])
-            filled_ud = cvb.unnormalize_points(filled_ud_norm, cam_intrinsics['mtx'])
+                orig_ud_norm = cv2.undistortPoints(orig_coord, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+                corners_ud = cvb.unnormalize_points(orig_ud_norm, cam_intrinsics['mtx'])
 
-            if isinstance(board, Checkerboard):
-                # make sure the top left corner is always labeled first in the direct view and the labels go left->right across rows
-                # make sure the top right corner is labeled first in the mirror views and labels go right->left across rows
+                filled_ud_norm = cv2.undistortPoints(orig_filled, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+                filled_ud = cvb.unnormalize_points(filled_ud_norm, cam_intrinsics['mtx'])
 
-                fliplr = True
-                if 'dir' in cropped_vid:
-                    fliplr = False
+                if isinstance(board, Checkerboard):
+                    # make sure the top left corner is always labeled first in the direct view and the labels go left->right across rows
+                    # make sure the top right corner is labeled first in the mirror views and labels go right->left across rows
 
-                oc = corners_ud
-                corners_ud = reorder_checkerboard_points(corners_ud, board.get_size(), fliplr)
-                filled_ud = reorder_checkerboard_points(filled_ud, board.get_size(), fliplr)
-            corners_ud = np.expand_dims(corners_ud, 1)
-            filled_ud = np.expand_dims(filled_ud, 1)
+                    fliplr = True
+                    if 'dir' in cropped_vid:
+                        fliplr = False
 
-            rows[i_row]['corners_distorted'] = row['corners']   # these are still in the cropped video reference frame
-            rows[i_row]['corners'] = corners_ud
-            rows[i_row]['filled'] = filled_ud
+                    oc = corners_ud
+                    corners_ud = reorder_checkerboard_points(corners_ud, board.get_size(), fliplr)
+                    filled_ud = reorder_checkerboard_points(filled_ud, board.get_size(), fliplr)
+                corners_ud = np.expand_dims(corners_ud, 1)
+                filled_ud = np.expand_dims(filled_ud, 1)
 
-            # rows_cam.extend(rows)
+                rows[i_row]['corners_distorted'] = copy.deepcopy(orig_coord)   # these are still in the full video reference frame, but still distorted
+                rows[i_row]['corners'] = copy.deepcopy(corners_ud)
+                rows[i_row]['filled'] = filled_ud
 
-        all_rows.append(rows)
+                # rows_cam.extend(rows)
+
+            all_rows.append(rows)
+
+    # put in a catch here if the number of points detected is too low
+    # check_detections(board, all_rows, cropped_vids, full_calib_vid_name, cam_intrinsics)
 
     return all_rows
+
+
+def overlay_rows(rows, orig_cal_vid, cam_intrinsics):
+
+    cap = cv2.VideoCapture(orig_cal_vid)
+
+    # for i_row, row in enumerate(rows):
+    i_row = 0
+    row = rows[i_row]
+
+    cap.set(cv2.CAP_PROP_POS_FRAMES, row['framenum'])
+    res, img = cap.read()
+
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    ax.imshow(img)
+
+    ax.scatter(row['corners_distorted'][:,0], row['corners_distorted'][:,1])
+
+    img_ud = cv2.undistort(img, cam_intrinsics['mtx'], cam_intrinsics['dist'])
+
+    fig2 = plt.figure()
+    ax2 = fig2.add_subplot()
+    ax2.imshow(img_ud)
+
+    ax2.scatter(row['corners'][:, 0, 0], row['corners'][:, 0, 1])
+
+    cap.release()
+
+
 
     # mirror_calib_vid_name = navigation_utilities.calib_vid_name_from_cropped_calib_vid_name(cropped_vid)
     #
@@ -2692,11 +3217,322 @@ def get_rows_cropped_vids_anipose(cropped_vids, cam_intrinsics, board, parent_di
     # return all_rows
 
 
-def match_mirror_points(mirrors_corner, direct_corner, direct_ids):
+def point_to_line_distance(line_pts, test_pt):
+    '''
 
-    pass
+    :param line_pts: 2 x 2 or 2 x 3 matrix where each row is a point that defines the line
+    :param test_pt: the point to which we are trying to find the distance
+    :return:
+    '''
 
-def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=True, min_rows_detected=20):
+    if np.shape(line_pts)[1] == 2:
+        d = calc2Ddistance(line_pts[0, :], line_pts[1, :], test_pt)
+    elif np.shape(line_pts)[1] == 3:
+        d = calc3Ddistance(line_pts[0, :], line_pts[1, :], test_pt)
+
+    return d
+
+
+def calc2Ddistance(Q1, Q2, test_pt):
+    d = abs(np.linalg.det(np.vstack((Q2 - Q1, test_pt - Q1)))) / np.linalg.norm(Q2 - Q1)
+
+    return d
+
+
+def calc3Ddistance(Q1, Q2, test_pt):
+
+    # hasn't been tested
+    d = np.linalg.norm(np.cross(Q2 - Q1, test_pt - Q1)) / np.linalg.norm(Q2 - Q1)
+
+    return d
+
+
+def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line=5, mirr_max_dist_from_line=3):
+
+    n_points = np.shape(mirr_corners)[0]
+    remaining_dir_corners = np.copy(dir_corners)
+    remaining_mirr_corners = np.copy(mirr_corners)
+    n_matches = 0
+    match_idx = np.zeros((n_points, 2), dtype=np.int)
+
+    while np.shape(remaining_dir_corners)[0] > 0:
+
+        if np.shape(remaining_dir_corners)[0] == 1:
+            # only one point left
+            dir_row = np.where((dir_corners == remaining_dir_corners).all(axis=1))
+            if type(dir_row) is tuple:
+                dir_row = dir_row[0]
+            try:
+                mir_row = np.where((mirr_corners == remaining_mirr_corners).all(axis=1))
+            except:
+                pass
+            if type(mir_row) is tuple:
+                mir_row = mir_row[0]
+
+            try:
+                match_idx[n_matches, 0] = dir_row
+            except:
+                pass
+            match_idx[n_matches, 1] = mir_row
+
+            remaining_dir_corners = np.array([])
+            remaining_mirr_corners = np.array([])
+
+        else:
+            supporting_lines = find_supporting_lines(remaining_dir_corners, remaining_mirr_corners)
+
+            for i_line in range(2):
+                test_pt1 = np.squeeze(supporting_lines[i_line, 0, :])
+                test_pt2 = np.squeeze(supporting_lines[i_line, 1, :])
+
+                # is test_pt1 in the direct or mirror view?
+                test_is_dir_pt = np.any(np.all(dir_corners == test_pt1, axis=1))
+                if test_is_dir_pt:
+                    # test_pt1 is in the direct view, test_pt2 is in the mirror view
+                    dir_row = np.where(np.all(dir_corners == test_pt1, axis=1))[0][0]
+                    mir_row = np.where(np.all(mirr_corners == test_pt2, axis=1))[0][0]
+
+                    try:
+                        remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt1, axis=1))[0][0]
+                        remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt2, axis=1))[0][0]
+                    except:
+                        pass
+                else:
+                    # test_pt2 is in the direct view, test_pt1 is in the mirror view
+                    mir_row = np.where(np.all(mirr_corners == test_pt1, axis=1))[0][0]
+                    dir_row = np.where(np.all(dir_corners == test_pt2, axis=1))[0][0]
+
+                    remaining_dir_row = np.where(np.all(remaining_dir_corners == test_pt2, axis=1))[0][0]
+                    try:
+                        remaining_mirr_row = np.where(np.all(remaining_mirr_corners == test_pt1, axis=1))[0][0]
+                    except:
+                        pass
+
+
+                # have potential matches - is it possible that there is a better match that lies along the same line (hidden
+                # by noise in how accurately points were marked/identifed)?
+                n_remaining_points = np.shape(remaining_dir_corners)[0]
+                mirr_dist_from_line = np.empty(n_remaining_points)
+                dir_dist_from_line = np.empty(n_remaining_points)
+                mirr_dist_from_line[:] = np.nan
+                dir_dist_from_line[:] = np.nan
+                supporting_line = np.squeeze(supporting_lines[i_line, :, :])
+                for i_corner in range(n_remaining_points):
+                    try:
+                        mirr_dist_from_line[i_corner] = point_to_line_distance(supporting_line, remaining_mirr_corners[i_corner, :])
+                    except:
+                        pass
+                    dir_dist_from_line[i_corner] = point_to_line_distance(supporting_line,
+                                                                           remaining_dir_corners[i_corner, :])
+
+                mirr_candidates = np.where(mirr_dist_from_line < mirr_max_dist_from_line)[0]
+                dir_candidates = np.where(dir_dist_from_line < dir_max_dist_from_line)[0]
+
+                if len(mirr_candidates) != len(dir_candidates) or len(mirr_candidates) == 1:
+                    # only one candidate point in each view or there are mutliple candidates in one view but only one in the other view?
+                    # I don't think this is quite right, but it seems to work well enough
+                    try:
+                        match_idx[n_matches, 0] = dir_row
+                        match_idx[n_matches, 1] = mir_row
+                        n_matches += 1
+                    except:
+                        pass
+
+                    # remove the rows that were just matched
+                    remaining_dir_corners = np.delete(remaining_dir_corners, remaining_dir_row, axis=0)
+                    remaining_mirr_corners = np.delete(remaining_mirr_corners, remaining_mirr_row, axis=0)
+                    continue
+
+                # multiple candidate matches along the supporting line
+                mirr_dir_distance = np.zeros((len(mirr_candidates), len(mirr_candidates)))
+                for i_dirpt in range(len(mirr_candidates)):
+                    for i_mirrpt in range(len(mirr_candidates)):
+                        mirr_dir_distance[i_dirpt, i_mirrpt] = np.linalg.norm(remaining_dir_corners[dir_candidates[i_dirpt], :] -
+                                                                              remaining_mirr_corners[mirr_candidates[i_mirrpt], :])
+
+                # which direct/mirror points are closest together? (they're a match due to mirror symmetry)
+                m, n = (mirr_dir_distance == np.min(mirr_dir_distance)).nonzero()  # m is the row, n the column where the minimum is
+                cur_dirpt = remaining_dir_corners[dir_candidates[m], :]
+                cur_mirrpt = remaining_mirr_corners[mirr_candidates[n], :]
+
+                mir_row = np.where(np.all(mirr_corners == cur_mirrpt, axis=1))[0][0]
+                dir_row = np.where(np.all(dir_corners == cur_dirpt, axis=1))[0][0]
+
+                match_idx[n_matches, 0] = dir_row
+                match_idx[n_matches, 1] = mir_row
+                n_matches += 1
+
+                remaining_dir_row = np.where(np.all(remaining_dir_corners == cur_dirpt, axis=1))[0][0]
+                remaining_mirr_row = np.where(np.all(remaining_mirr_corners == cur_mirrpt, axis=1))[0][0]
+
+                # remove the rows that were just matched
+                remaining_dir_corners = np.delete(remaining_dir_corners, remaining_dir_row, axis=0)
+                remaining_mirr_corners = np.delete(remaining_mirr_corners, remaining_mirr_row, axis=0)
+
+    # dir_corners, mirr_corners, dir_ids, mirr_ids = match_mirror_points(mirr_corners, dir_corners)
+    matched_dir_corners = dir_corners[match_idx[:, 0], :]
+    matched_mirr_corners = mirr_corners[match_idx[:, 1], :]
+
+    if board is not None:
+        dir_ids = find_pt_ids(matched_dir_corners, board)
+        # since the direct and mirror points should be matched, the points order will be the same for both
+    else:
+        dir_ids = None
+
+    return matched_dir_corners, matched_mirr_corners, dir_ids
+
+
+def find_top_left_corner(corners):
+    # have to manipulate x-values because sometimes vertical overwhelms the horizontal if the chessboard in angled too
+    # much away from the camera
+    stretched_corners = np.copy(corners)
+    stretched_corners[:, 0] = (corners[:, 0] - np.min(corners[:, 0])) * 1
+    top_left_stretched_pt = stretched_corners[0, :]
+    top_left_idx = 0
+    for i_corner, corner in enumerate(stretched_corners):
+        if np.sum(corner) < np.sum(top_left_stretched_pt):
+            top_left_stretched_pt = corner
+            top_left_idx = i_corner
+
+    top_left_pt = corners[top_left_idx, :]
+
+    return top_left_pt, top_left_idx
+
+
+def find_bottom_right_corner(corners):
+    botom_right_pt = corners[0, :]
+    bottom_right_idx = 0
+    for i_corner, corner in enumerate(corners):
+        if np.sum(corner) > np.sum(botom_right_pt):
+            botom_right_pt = corner
+            bottom_right_idx = i_corner
+
+    return botom_right_pt, bottom_right_idx
+
+
+def find_pt_ids(corners, board):
+    board_size = np.array(board.get_size()) - 1
+    n_rows = board_size[1]
+    n_cols = board_size[0]
+    # I suppose the above could be wrong if the geometry changes, but I think this is safe for now, at least for the mirror calibration -DL 12/17/2024
+
+    n_pts = np.shape(corners)[0]
+    pt_ids = np.zeros(n_pts, dtype=np.int)
+
+    remaining_corners = np.copy(corners)
+    pt_id_idx = 0
+    for i_row in range(n_rows):
+        # find the top left corner
+        if i_row < n_rows - 1:
+            top_left, top_left_idx = find_top_left_corner(remaining_corners)
+        else:
+            # if we're on the last row, the algorithm for finding the top left might fail if the row is angled upwards too steeply
+            # just take the left-most point
+            top_left = remaining_corners[remaining_corners[:, 0] == min(remaining_corners[:, 0]), :]
+
+        cur_pt = top_left
+        top_left_idx = np.where(np.all(corners == top_left, axis=1))[0][0]
+        pt_ids[top_left_idx] = pt_id_idx
+        pt_id_idx += 1
+        cur_remaining_corner_idx = np.where(np.all(remaining_corners == cur_pt, axis=1))[0][0]
+        remaining_corners = np.delete(remaining_corners, cur_remaining_corner_idx, axis=0)
+        for i_col in range(1, n_cols):   # start with 1 because we already captured the first point in the row
+            # the next point will be the closest point to the right. Maybe there's some weird geometry where that isn't true, but should be good enough
+            pts_to_right = remaining_corners[remaining_corners[:, 0] > cur_pt[0], :]
+
+            # calculate distance to each of the other points to the right of this one
+            d_right = np.linalg.norm(pts_to_right - cur_pt, axis=1)
+            try:
+                cur_pt = np.squeeze(pts_to_right[d_right == np.min(d_right), :])
+            except:
+                pass
+            cur_corner_idx = np.where(np.all(corners == cur_pt, axis=1))[0][0]
+
+            pt_ids[cur_corner_idx] = pt_id_idx
+            pt_id_idx += 1
+
+            cur_remaining_corner_idx = np.where(np.all(remaining_corners == cur_pt, axis=1))[0][0]
+            remaining_corners = np.delete(remaining_corners, cur_remaining_corner_idx, axis=0)
+
+
+
+    # if top_left[1] == min(corners[:, 1]):
+    #     # the top left corner is the highest point in the top row
+    #     n_remaining_corners = n_pts
+    #     cur_pt = top_left
+    #     top_left_idx = np.where(np.all(corners == top_left, axis=1))[0][0]
+    #     pt_ids[top_left_idx] = 0
+    #     pt_id_idx = 1
+    #     for i_row in range(board_size[1]):
+    #         # the next board_size[0] - 1 points should be the two points
+    #         if top_left[1] == min(remaining_corners[:, 1]):
+    #             min_remaining_y_idx = remaining_corners[:, 1] == np.min(remaining_corners[:, 1])
+    #             cur_pt = remaining_corners[min_remaining_y_idx, :]
+    #
+    #
+    #     while n_remaining_corners > 1:
+    #         # remove the point that already was allocated
+    #         remaining_cur_pt_idx = np.where(np.all(remaining_corners == cur_pt, axis=1))[0][0]
+    #         remaining_corners = np.delete(remaining_corners, remaining_cur_pt_idx, axis=0)
+    #         n_remaining_corners -= 1
+    #
+    #         # for this tilt, each successively lower point should be the next point in the list
+    #         min_remaining_y_idx = remaining_corners[:, 1] == np.min(remaining_corners[:, 1])
+    #         cur_pt = remaining_corners[min_remaining_y_idx, :]
+    #         try:
+    #             cur_pt_idx = np.where(np.all(corners == cur_pt, axis=1))[0][0]
+    #         except:
+    #             pass
+    #         pt_ids[cur_pt_idx] = pt_id_idx
+    #         pt_id_idx += 1
+    #
+    # else:
+    #     # I'm pretty sure this means rectangle is tilted up to the right
+    #     # this means the other points in the top row will all be higher (lower y) than the top left point
+    #     n_remaining_corners = n_pts
+    #     cur_top_left = top_left
+    #     pt_id_idx = 0
+    #     while n_remaining_corners > 0:
+    #         # assign the top left point index into the pt_ids vector
+    #         top_left_idx = np.where(np.all(corners == cur_top_left, axis=1))[0][0]
+    #         pt_ids[top_left_idx] = pt_id_idx
+    #         pt_id_idx += 1
+    #
+    #         # remove the top left point from the remaining points
+    #         cur_top_left_idx = np.where(np.all(remaining_corners == cur_top_left, axis=1))[0][0]
+    #         remaining_corners = np.delete(remaining_corners, cur_top_left_idx, axis=0)
+    #
+    #         # find points among the ones that are left that are higher than the current leftmost point
+    #         row_pts_bool = remaining_corners[:, 1] < cur_top_left[1]
+    #         cur_row_pts = remaining_corners[row_pts_bool, :]
+    #         cur_row_idx = np.where(row_pts_bool)[0]
+    #
+    #         # find the indices of these points in the original corners array
+    #         corners_row_idxs = [np.where(np.all(corners == cur_row_pt, axis=1))[0][0] for cur_row_pt in cur_row_pts]
+    #         cur_pt_order = np.argsort(corners[corners_row_idxs, 0])
+    #
+    #         for row_pt in cur_pt_order:
+    #             pt_ids[corners_row_idxs[row_pt]] = pt_id_idx
+    #             pt_id_idx += 1
+    #
+    #         # remove points we've already sorted into rows
+    #         remaining_corners = np.delete(remaining_corners, cur_row_idx, axis=0)
+    #         n_remaining_corners = np.shape(remaining_corners)[0]
+    #         if n_remaining_corners > 0:
+    #             cur_top_left, _ = find_top_left_corner(remaining_corners)
+
+    ## for testing whether the order came out right
+    # fig = plt.figure()
+    # ax = fig.add_subplot()
+    # ax.scatter(corners[:, 0], corners[:, 1])
+    # for i_corner, corner in enumerate(corners):
+    #     ax.text(corner[0], corner[1], '{:d}'.format(pt_ids[i_corner]))
+    # ax.invert_yaxis()
+
+    return pt_ids
+
+
+def detect_video_pts(calibration_video, board, camera, prefix=None, skip=20, progress=True, min_rows_detected=20):
     # adapted from anipose
     cap = cv2.VideoCapture(calibration_video)
 
@@ -2729,6 +3565,7 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
         if framenum % skip != 0 and go <= 0:
             continue
 
+        frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         if isinstance(board, CharucoBoard):
             if 'rm' in cvid_name or 'lm' in cvid_name or 'mirror' in cvid_name:
                 ismirrorview = True
@@ -2738,7 +3575,7 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
                 # aruco markers are flipped left-right in the mirror, so need to flip the frame image to detect them
                 orig_frame = np.copy(frame)
                 frame = cv2.flip(frame, 1)
-            charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame, board)
+            charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame, board, camera=camera)
 
             if ismirrorview and charucoCorners is not None and len(charucoCorners) > 0:
                 # now need to flip the identified points left-right to match in the original image
@@ -2779,7 +3616,6 @@ def detect_video_pts(calibration_video, board, prefix=None, skip=20, progress=Tr
 
     # if not enough rows, save frames for manual point extraction
     if len(rows) < min_rows_detected:
-        # todo: check to see if the board corners have already been manually identified
         crop_videos.write_video_frames(calibration_video, img_type='.jpg')
 
     return rows, size
@@ -2994,6 +3830,19 @@ def CharucoBoardObject_from_AniposeBoard(board):
     return ch_board
 
 
+def unsharp_mask(image, kernel_size=(5, 5), sigma=1.0, amount=1.0, threshold=0):
+    """Return a sharpened version of the image, using an unsharp mask."""
+    blurred = cv2.GaussianBlur(image, kernel_size, sigma)
+    sharpened = float(amount + 1) * image - float(amount) * blurred
+    sharpened = np.maximum(sharpened, np.zeros(sharpened.shape))
+    sharpened = np.minimum(sharpened, 255 * np.ones(sharpened.shape))
+    sharpened = sharpened.round().astype(np.uint8)
+    if threshold > 0:
+        low_contrast_mask = np.absolute(image - blurred) < threshold
+        np.copyto(sharpened, image, where=low_contrast_mask)
+    return sharpened
+
+
 def detect_markers(image, board, camera=None, refine=True):
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -3007,14 +3856,15 @@ def detect_markers(image, board, camera=None, refine=True):
     params.adaptiveThreshWinSizeMin = 100
     params.adaptiveThreshWinSizeMax = 700
     params.adaptiveThreshWinSizeStep = 50
+    # params.minMarkerPerimeterRate = 0.05
     params.adaptiveThreshConstant = 0
 
     ch_detector = aruco.CharucoDetector(board.board)
-    ar_detector = aruco.ArucoDetector(board.board.getDictionary())
+    ar_detector = aruco.ArucoDetector(board.board.getDictionary(), detectorParams=params)
 
     markerCorners, markerIds, rejectedImgPoints = ar_detector.detectMarkers(gray)
-
-    # marker_img = aruco.drawDetectedMarkers(gray, markerCorners, markerIds)
+    temp = unsharp_mask(gray, sigma=1., amount=4.)
+    # a,b,c = ar_detector.detectMarkers(temp)
 
     if refine:
         # detectedCorners, detectedIds, rejectedCorners, recoveredIdxs = \
@@ -3023,16 +3873,30 @@ def detect_markers(image, board, camera=None, refine=True):
         #                                 K, D,
         #                                 parameters=params)
         detectedCorners, detectedIds, rejectedCorners, recoveredIdxs = ar_detector.refineDetectedMarkers(gray, board.board, markerCorners, markerIds, rejectedImgPoints)
+        # d,e,f,g = ar_detector.refineDetectedMarkers(temp, board.board, a, b, c)
     else:
         detectedCorners, detectedIds = markerCorners, markerIds
 
-    charucoCorners, charucoIds, markerCorners, markerIds  = ch_detector.detectBoard(gray, markerCorners=markerCorners, markerIds=markerIds)
+    charucoCorners, charucoIds, markerCorners, markerIds  = ch_detector.detectBoard(gray, markerCorners=detectedCorners, markerIds=detectedIds)
     # charuco_img = aruco.drawDetectedCornersCharuco(gray, charucoCorners, charucoIds, (255, 0, 0))
 
     # todo: do we need to refine the detected corners?
+    # if np.shape(charucoCorners)[0] < 30:
+    #     fig = plt.figure()
+    #     ax = fig.add_subplot()
+    #
+    #     fig2 = plt.figure()
+    #     ax2 = fig2.add_subplot()
+    #
+    #     detect_markers_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    #     detect_markers_img = aruco.drawDetectedMarkers(detect_markers_img, detectedCorners, detectedIds)
+    #     ax2.imshow(detect_markers_img)
+    #
+    #     detect_charuco_img = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    #     detect_charuco_img = aruco.drawDetectedCornersCharuco(detect_charuco_img, charucoCorners, charucoIds)
+    #     ax.imshow(detect_charuco_img)
 
     return charucoCorners, charucoIds, markerCorners, markerIds
-
 
 
 def calibrate_Burgess_session(calibration_data_name, vid_pair, parent_directories, num_frames_for_intrinsics=50, min_frames_for_intrinsics=10, num_frames_for_stereo=20, min_frames_for_stereo=5, use_undistorted_pts_for_stereo_cal=True):
@@ -3607,11 +4471,6 @@ def check_Rs(cal_data):
         T_ffmest[i_frame, :] = T_ffmest_frame
 
         pass
-    pass
-
-
-def match_cb_points(cb1, cb2):
-
     pass
 
 

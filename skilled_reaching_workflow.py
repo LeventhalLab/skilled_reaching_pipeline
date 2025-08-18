@@ -343,8 +343,8 @@ def calibrate_all_sessions(parent_directories,
                 session_row,
                 filtertype=filtertype)
             print('calibrating {}'.format(mirror_calib_vid_name))
-            if mirror_calib_vid_name in ['GridCalibration_b01_20230503_11-46-08.avi'
-
+            if mirror_calib_vid_name in ['GridCalibration_b01_20230504_13-28-29.avi', 'GridCalibration_b01_20230505_12-53-37.avi',
+                                         'GridCalibration_b01_20230508_12-44-18.avi'
                                          ]:
                 # continue
                 cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, session_row, calibration_pickle_name, full_calib_vid_name=full_calib_vid_name)
@@ -551,7 +551,7 @@ def initialize_analysis_params(experiment_list=('dLight', 'GRABAch-rDA', 'sr6OHD
 if __name__ == '__main__':
 
     experiment_list = ['dLight', 'sr6OHDA', 'PavcaMotorflex', 'DYT1', 'GRABAch-rDA']
-    experiment_list = ['PavcaMotorflex', 'DYT1']
+    # experiment_list = ['PavcaMotorflex', 'DYT1']
     # experiment_list = ['sr6OHDA', 'dLight', 'PavcaMotorflex', 'DYT1', 'GRABAch-rDA']
     rats_to_analyze = [600, 468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 514,
                        519, 520, 521, 522, 526, 528, 529, 530, 532, 533, 534, 535, 536, 537, 548, 549, 550, 551, 552,
@@ -559,7 +559,7 @@ if __name__ == '__main__':
                        586, 587, 588, 589, 590, 591, 592, 595, 596, 597, 598, 599, 600, 601, 602, 611, 612, 613, 614,
                        615, 616, 617, 618, 603, 604, 605, 607, 608, 619, 620, 621, 622, 623, 624, 625, 626]
 
-    # rats_to_analyze = [468, 484, 486, 555]
+    rats_to_analyze = [468, 469, 486, 555]
     # rats_to_analyze = [555]
 
     ratIDs_to_analyze = ['R{:04d}'.format(rn) for rn in rats_to_analyze]
@@ -567,7 +567,7 @@ if __name__ == '__main__':
 
     analyses_to_perform = [
                            # 'crop_calibration_vids',
-                           # 'calibrate_videos',
+                           'calibrate_videos',
                            # 'crop_sr_vids',
                            # 'analyze_sr_vids',
                            'create_marked_vids',

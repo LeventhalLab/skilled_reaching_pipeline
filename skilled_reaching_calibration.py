@@ -2247,10 +2247,11 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
     dest_folder = navigation_utilities.cal_frames_folder_from_cal_vids_name(full_calib_vid_name)
-    crop_videos.write_video_frames(full_calib_vid_name, img_type='.jpg')
-    return None, None
+    # crop_videos.write_video_frames(full_calib_vid_name, img_type='.jpg')
+    # return None, None
     if os.path.exists(calibration_pickle_name):
-        calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
+        # calibration_data = skilled_reaching_io.read_pickle(calibration_pickle_name)
+        calibration_data = pd.read_pickle(calibration_pickle_name)
         # working here... check to see if there is a .csv file with points in it for all 3 views; if so, load them and use them for bundle adjustment
         overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, board)
         cgroup = calibration_data['cgroup_3view']

@@ -759,7 +759,6 @@ if __name__ == '__main__':
 
                     label_videos_in_cropped_folder(crop_folder, rat_db, analysis_params, expt)
 
-
     # step 3: make sure calibration has been run for these sessions
     # find list of all analyzed videos; extract dates and boxes for each session
 

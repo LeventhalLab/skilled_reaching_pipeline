@@ -2559,7 +2559,10 @@ def match_3view_pts(pts_ud, calibration_data, dirview_lims=[400, 1500]):
     n_matchedpairs = int(min(n_viewpts))
     p2ds_array = np.empty((n_cams, n_matchedpairs, 2))
     p2ds_array[:] = np.nan
-    p2ds_array[0, :, :], p2ds_array[1, :, :], _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['lm'], board=None)
+    try:
+        p2ds_array[0, :, :], p2ds_array[1, :, :], _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['lm'], board=None)
+    except:
+        pass
 
 
     dir_pts, rm_pts, _ = match_mirror_points(p2ds_dict['dir'], p2ds_dict['rm'], board=None)
@@ -2745,8 +2748,8 @@ def check_detections(board, all_rows, cropped_vids, full_calib_vid_name, cam_int
 
 def find_supporting_lines(pts1, pts2):
 
-    rounded_pts1 = pts1.astype(np.int)
-    rounded_pts2 = pts2.astype(np.int)
+    rounded_pts1 = pts1.astype(int)
+    rounded_pts2 = pts2.astype(int)
     all_pts = np.vstack((rounded_pts1, rounded_pts2))
 
     full_cvx_hull = np.squeeze(cv2.convexHull(all_pts))
@@ -2758,7 +2761,7 @@ def find_supporting_lines(pts1, pts2):
     n_hullpts = np.shape(full_cvx_hull)[0]
 
     cv_pts = np.empty((2, 2))
-    cv_pts_round = np.zeros((2, 2), dtype=np.int)
+    cv_pts_round = np.zeros((2, 2), dtype=int)
     supporting_lines = np.zeros((2, 2, 2))
     # each(:,:, p) array contains[x1, y1; x2, y2] coordinates that define the endpoints of a supporting line
 
@@ -2769,7 +2772,7 @@ def find_supporting_lines(pts1, pts2):
 
         cv_pts = np.empty((2, 2))
 
-        pts_set = np.zeros(2, dtype=np.int) - 1
+        pts_set = np.zeros(2, dtype=int) - 1
         # which sets (pts1 or pts2) do adjacent points in the convex hull belong to?
         pt_set_match = np.all(rounded_pts1 == cv_pts_round[0, :], axis=1)
         if np.any(pt_set_match):
@@ -3254,7 +3257,10 @@ def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line
     remaining_dir_corners = np.copy(dir_corners)
     remaining_mirr_corners = np.copy(mirr_corners)
     n_matches = 0
-    match_idx = np.zeros((n_points, 2), dtype=np.int)
+    try:
+        match_idx = np.zeros((n_points, 2), dtype=int)
+    except:
+        pass
 
     while np.shape(remaining_dir_corners)[0] > 0:
 
@@ -3270,10 +3276,7 @@ def match_mirror_points(dir_corners, mirr_corners, board, dir_max_dist_from_line
             if type(mir_row) is tuple:
                 mir_row = mir_row[0]
 
-            try:
-                match_idx[n_matches, 0] = dir_row
-            except:
-                pass
+            match_idx[n_matches, 0] = dir_row
             match_idx[n_matches, 1] = mir_row
 
             remaining_dir_corners = np.array([])
@@ -3418,7 +3421,7 @@ def find_pt_ids(corners, board):
     # I suppose the above could be wrong if the geometry changes, but I think this is safe for now, at least for the mirror calibration -DL 12/17/2024
 
     n_pts = np.shape(corners)[0]
-    pt_ids = np.zeros(n_pts, dtype=np.int)
+    pt_ids = np.zeros(n_pts, dtype=int)
 
     remaining_corners = np.copy(corners)
     pt_id_idx = 0

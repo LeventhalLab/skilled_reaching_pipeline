@@ -348,11 +348,11 @@ def calibrate_all_sessions(parent_directories,
                                          ]:
                 # continue
                 cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, session_row, calibration_pickle_name, full_calib_vid_name=full_calib_vid_name)
-            cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids,
-                                                                                cam_intrinsics, mirror_board, cam_names,
-                                                                                parent_directories, session_row,
-                                                                                calibration_pickle_name,
-                                                                                full_calib_vid_name=full_calib_vid_name)
+            # cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids,
+            #                                                                     cam_intrinsics, mirror_board, cam_names,
+            #                                                                     parent_directories, session_row,
+            #                                                                     calibration_pickle_name,
+            #                                                                     full_calib_vid_name=full_calib_vid_name)
             # note that calibrate_mirror_views writes a pickle file with updated calibration parameters including cgroup
 
 
@@ -559,7 +559,7 @@ if __name__ == '__main__':
                        586, 587, 588, 589, 590, 591, 592, 595, 596, 597, 598, 599, 600, 601, 602, 611, 612, 613, 614,
                        615, 616, 617, 618, 603, 604, 605, 607, 608, 619, 620, 621, 622, 623, 624, 625, 626]
 
-    rats_to_analyze = [468, 469, 486, 555]
+    # rats_to_analyze = [468, 469, 486, 555]
     # rats_to_analyze = [555]
 
     ratIDs_to_analyze = ['R{:04d}'.format(rn) for rn in rats_to_analyze]

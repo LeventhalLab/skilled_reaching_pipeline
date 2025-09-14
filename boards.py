@@ -3,6 +3,7 @@ import numpy as np
 from abc import ABC, abstractmethod
 from tqdm import trange
 from collections import defaultdict
+from packaging.version import Version
 
 
 def get_video_params_cap(cap):
@@ -555,29 +556,29 @@ class CharucoBoard(CalibrationObject):
         from cv2 import aruco
 
         ARUCO_DICTS = {
-            (4, 50): aruco.DICT_4X4_50,
-            (5, 50): aruco.DICT_5X5_50,
-            (6, 50): aruco.DICT_6X6_50,
-            (7, 50): aruco.DICT_7X7_50,
-            (4, 100): aruco.DICT_4X4_100,
-            (5, 100): aruco.DICT_5X5_100,
-            (6, 100): aruco.DICT_6X6_100,
-            (7, 100): aruco.DICT_7X7_100,
-            (4, 250): aruco.DICT_4X4_250,
-            (5, 250): aruco.DICT_5X5_250,
-            (6, 250): aruco.DICT_6X6_250,
-            (7, 250): aruco.DICT_7X7_250,
-            (4, 1000): aruco.DICT_4X4_1000,
-            (5, 1000): aruco.DICT_5X5_1000,
-            (6, 1000): aruco.DICT_6X6_1000,
-            (7, 1000): aruco.DICT_7X7_1000
+            (4, 50): cv2.aruco.DICT_4X4_50,
+            (5, 50): cv2.aruco.DICT_5X5_50,
+            (6, 50): cv2.aruco.DICT_6X6_50,
+            (7, 50): cv2.aruco.DICT_7X7_50,
+            (4, 100): cv2.aruco.DICT_4X4_100,
+            (5, 100): cv2.aruco.DICT_5X5_100,
+            (6, 100): cv2.aruco.DICT_6X6_100,
+            (7, 100): cv2.aruco.DICT_7X7_100,
+            (4, 250): cv2.aruco.DICT_4X4_250,
+            (5, 250): cv2.aruco.DICT_5X5_250,
+            (6, 250): cv2.aruco.DICT_6X6_250,
+            (7, 250): cv2.aruco.DICT_7X7_250,
+            (4, 1000): cv2.aruco.DICT_4X4_1000,
+            (5, 1000): cv2.aruco.DICT_5X5_1000,
+            (6, 1000): cv2.aruco.DICT_6X6_1000,
+            (7, 1000): cv2.aruco.DICT_7X7_1000
         }
 
         dkey = (marker_bits, dict_size)
-        self.dictionary = aruco.getPredefinedDictionary(ARUCO_DICTS[dkey])
+        self.dictionary = cv2.aruco.getPredefinedDictionary(ARUCO_DICTS[dkey])
 
-        if cv2.__version__ >= '4.7.0':
-            self.board = aruco.CharucoBoard((squaresX, squaresY),
+        if Version(cv2.__version__) >= Version('4.7.0'):
+            self.board = cv2.aruco.CharucoBoard((squaresX, squaresY),
                                              square_length, marker_length,
                                              self.dictionary)
         else:

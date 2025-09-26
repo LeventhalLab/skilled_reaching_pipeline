@@ -129,12 +129,31 @@ def extract_points(merged,
                          dtype='int32')
 
     for rix, row in enumerate(merged):
-        objp[rix] = np.copy(objp_template)
+        row_keys = list(row.keys())
+        if 'objp' in list(row[row_keys[0]].keys()):
+            if np.shape(row['dir']['objp'])[0] < n_points_per_detect:
+                n_filler_rows = n_points_per_detect - np.shape(row[row_keys[0]]['objp'])[0]
+                filler_array = np.empty((n_filler_rows, 3))
+                filler_array[:] = np.nan
+                row_objp = np.append(row[row_keys[0]]['objp'], filler_array, axis=0)
+            else:
+                row_objp = row[row_keys[0]]['objp']
+            objp[rix] = np.copy(row_objp)
+        else:
+            objp[rix] = np.copy(objp_template)
         board_ids[rix] = rix
+
 
         for cix, cname in enumerate(cam_names):
             if cname in row:
                 filled = row[cname]['filled'].reshape(-1, 2)
+
+                if np.shape(filled)[0] < n_points_per_detect:
+                    n_filler_rows = n_points_per_detect - np.shape(filled)[0]
+                    filler_array = np.empty((n_filler_rows, 2))
+                    filler_array[:] = np.nan
+                    filled = np.append(filled, filler_array, axis=0)
+
                 bad = np.any(np.isnan(filled), axis=1)
                 num_good = np.sum(~bad)
                 if num_good < min_points:
@@ -147,9 +166,8 @@ def extract_points(merged,
                     else:
                         row[cname]['rvec'] = np.full(3, np.nan, dtype='float64')
                         row[cname]['tvec'] = np.full(3, np.nan, dtype='float64')
-                
-                imgp[cix, rix] = filled
 
+                imgp[cix, rix] = filled
                 rvecs[cix, rix, ~bad] = row[cname]['rvec'].ravel()
                 tvecs[cix, rix, ~bad] = row[cname]['tvec'].ravel()
 

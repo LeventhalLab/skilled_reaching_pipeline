@@ -105,9 +105,12 @@ def dist_from_epilines(F, x1, x2):
 
     x2_dist_from_epilines = np.zeros(n_pts)
     # x1_dist_from_epilines = np.zeros(n_pts)
-    for i_line, epi_line in enumerate(epi_lines):
-        x2_dist_from_epilines[i_line] = point_line_dist(epi_line, x2[i_line, :])
-        # x1_dist_from_epilines[i_line] = point_line_dist(epi_line, x1[i_line, :])   # sanity check, should be all zeros
+    try:
+        for i_line, epi_line in enumerate(epi_lines):
+            x2_dist_from_epilines[i_line] = point_line_dist(epi_line, x2[i_line, :])
+            # x1_dist_from_epilines[i_line] = point_line_dist(epi_line, x1[i_line, :])   # sanity check, should be all zeros
+    except:
+        pass
 
     return x2_dist_from_epilines
 

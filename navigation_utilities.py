@@ -440,6 +440,39 @@ def create_cropped_video_destination_list(cropped_vids_parent, video_folder_list
     return cropped_video_directories
 
 
+def create_labgym_cropped_video_destination_list(cropped_vids_parent, video_folder_list, view_list):
+    """
+    create subdirectory trees in which to store the cropped videos. Directory structure is ratID-->sessionID-->
+        [sessionID_direct/lm/rm]
+    :param cropped_vids_parent: parent directory in which to create directory tree
+    :param video_folder_list: list of lowest level directories containing the original videos
+    :return: cropped_video_directories
+    """
+
+    cropped_video_directories = [[], [], []]
+    for crop_dir in video_folder_list:
+        _, session_dir = os.path.split(crop_dir)
+        ratID, session_name = parse_session_dir_name(session_dir)
+
+        # create direct view directory for this raw video directory
+        cropped_vid_dir = session_dir + '_dir'
+        direct_view_directory = os.path.join(cropped_vids_parent, ratID, session_dir, 'labgym', cropped_vid_dir)
+
+        # create left mirror view directory for this raw video directory
+        cropped_vid_dir = session_dir + '_lm'
+        left_view_directory = os.path.join(cropped_vids_parent, ratID, session_dir, 'labgym', cropped_vid_dir)
+
+        # create right mirror view directory for this raw video directory
+        cropped_vid_dir = session_dir + '_rm'
+        right_view_directory = os.path.join(cropped_vids_parent, ratID, session_dir, 'labgym', cropped_vid_dir)
+
+        cropped_video_directories[0].append(direct_view_directory)
+        cropped_video_directories[1].append(left_view_directory)
+        cropped_video_directories[2].append(right_view_directory)
+
+    return cropped_video_directories
+
+
 def create_trajectory_name(h5_metadata, session_metadata, calibration_data, parent_directories):
 
     # need to create session name here

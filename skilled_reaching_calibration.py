@@ -1041,14 +1041,11 @@ def mirror_board_from_df(session_row):
 
 def create_charuco(squaresX, squaresY, square_length, marker_length, marker_bits=4, dict_size=50, aruco_dict=None, manually_verify=False):
 
-    try:
-        board = CharucoBoard(int(squaresX), int(squaresY), square_length, marker_length,
+    board = CharucoBoard(int(squaresX), int(squaresY), square_length, marker_length,
                              marker_bits=marker_bits,
                              dict_size=dict_size,
                              aruco_dict=aruco_dict,
                              manually_verify=manually_verify)
-    except:
-        pass
 
     # just to test that the board really looks like the board used for calibration
     # img = board.board.generateImage((600, 600))
@@ -2272,7 +2269,7 @@ def remove_outlier_imgp(imgp, F, max_dist_from_epiline=5):
     return new_imgp, valid_combos
 
 
-def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, session_row, calibration_pickle_name,
+def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, parent_directories, session_row, calibration_pickle_name, is2sided=False,
                            full_calib_vid_name=None, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, max_dist_from_epiline=5, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
@@ -2307,7 +2304,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
     #  2. undistort points in the full original reference frame, then move them back into the cropped
     #      video, then flip them left-right if in a mirror view
     if 'all_rows' not in calibration_data.keys():
-        all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, mirror_board, parent_directories, cgroup, full_calib_vid_name=full_calib_vid_name)
+        all_rows = get_rows_cropped_vids(cropped_vids, cam_intrinsics, mirror_board, parent_directories, cgroup, is2sided=is2sided, full_calib_vid_name=full_calib_vid_name)
 
         for i, (row, cam) in enumerate(zip(all_rows, cgroup.cameras)):
             # need to make sure the cameras are in the right order; this should have been checked in the code above
@@ -2397,7 +2394,10 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
         # calibration_data['cgroup_3view_jsnone'] = cgroup_3view2
         calibration_data['cgroup_old'] = cgroup_old
         calibration_data['error'] = error
-        calibration_data['error_3view'] = error_3view
+        try:
+            calibration_data['error_3view'] = error_3view
+        except:
+            calibration_data['error_3view'] = None
         # calibration_data['error_3view_jsnone'] = error_3view_jsnone
         calibration_data['bundle_adjust_completed'] = True
     else:
@@ -2593,7 +2593,7 @@ def collect_3view_pts(full_calib_vid_name, calibration_data):
         for i_file, csv_file in enumerate(csv_list):
             csv_metadata = navigation_utilities.parse_frame_csv_name(csv_file)
             csv_table = pd.read_csv(csv_file)
-            pts_3view_list.append(sort_3view_pts(csv_table, calibration_data, dirview_lims=[400, 1575]))
+            pts_3view_list.append(sort_3view_pts(csv_table, calibration_data, dirview_lims=[400, 1600]))
 
         pts_3view = np.concatenate(pts_3view_list, axis=1)
 
@@ -2603,7 +2603,7 @@ def collect_3view_pts(full_calib_vid_name, calibration_data):
     return pts_3view
 
 
-def sort_3view_pts(csv_3view_table, calibration_data, dirview_lims=[400, 1550]):
+def sort_3view_pts(csv_3view_table, calibration_data, dirview_lims=[400, 1600]):
     '''
 
     :param csv_3view_table:
@@ -3015,7 +3015,7 @@ def rows_from_csvs(csv_list, board, cam_intrinsics, cgroup, n_views=3, dirview_l
     return all_rows, size
 
 
-def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories, cgroup, skip=20, full_calib_vid_name=None):
+def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directories, cgroup, is2sided=False, skip=20, full_calib_vid_name=None):
     all_rows = []
     # check to see if there is a folder with individual images and a .csv file with points marked in fiji
     csv_list = navigation_utilities.check_for_calibration_csvs(cropped_vids[0], parent_directories)
@@ -3030,7 +3030,7 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
             # if 'rm' in cropped_vid:
             #     skip = 1
             camera = cgroup.cameras[i_vid]
-            rows, size = detect_video_pts(cropped_vid, board, camera, skip=skip)
+            rows, size = detect_video_pts(cropped_vid, board, camera, is2sided=is2sided, skip=skip)
 
             cropped_vid_metadata = navigation_utilities.parse_cropped_calibration_video_name(cropped_vid)
             # undistort the points in the rows list
@@ -3644,7 +3644,10 @@ def match_mirror_points_3views(dir_corners,mirr_corners, board, dir_max_dist_fro
                                                                               remaining_mirr_corners[mirr_candidates[i_mirrpt], :])
 
                 # which direct/mirror points are closest to each other? (they're a match due to mirror symmetry)
-                m_mindist, n_mindist = (mirr_dir_distance == np.min(mirr_dir_distance)).nonzero()  # m is the row, n the column where the minimum is
+                try:
+                    m_mindist, n_mindist = (mirr_dir_distance == np.min(mirr_dir_distance)).nonzero()  # m is the row, n the column where the minimum is
+                except:
+                    pass
 
                 # m_maxdist, n_maxdist = (mirr_dir_distance == np.max(mirr_dir_distance)).nonzero()  # m is the row, n the column where the maximum is
                 mindist_dirpt = remaining_dir_corners[dir_candidates[m_mindist], :]
@@ -3859,7 +3862,7 @@ def find_pt_ids(corners, board):
 
 
 
-def detect_video_pts(calibration_video, board, camera, prefix=None, skip=20, progress=True, min_rows_detected=20):
+def detect_video_pts(calibration_video, board, camera, is2sided=False, prefix=None, skip=20, progress=True, min_rows_detected=20):
     # adapted from anipose
     cap = cv2.VideoCapture(calibration_video)
 
@@ -3893,7 +3896,7 @@ def detect_video_pts(calibration_video, board, camera, prefix=None, skip=20, pro
             continue
 
         frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        if isinstance(board, CharucoBoard):
+        if isinstance(board, CharucoBoard) and not is2sided:
             if 'rm' in cvid_name or 'lm' in cvid_name or 'mirror' in cvid_name:
                 ismirrorview = True
             else:
@@ -3921,6 +3924,30 @@ def detect_video_pts(calibration_video, board, camera, prefix=None, skip=20, pro
                 rows.append(row)
 
             go = max(0, go - 1)
+        elif isinstance(board, CharucoBoard) and is2sided:
+            charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame, board, camera=camera)
+            if charucoCorners is None:
+                # try flipping the image
+                frame_flipped = frame = cv2.flip(frame, 1)
+                charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame_flipped, board, camera=camera)
+                if charucoCorners is not None and len(charucoCorners) > 0:
+                    w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+                    for i_cc, cc in enumerate(charucoCorners):
+                        cc_x = np.squeeze(cc)[0]
+                        charucoCorners[i_cc, 0, 0] = w - cc_x
+
+            if charucoCorners is not None and len(charucoCorners) > 0:
+                if prefix is None:
+                    key = framenum
+                else:
+                    key = (prefix, framenum)
+                go = int(skip / 2)
+                row = {'framenum': key, 'corners': charucoCorners, 'ids': charucoIds}
+                rows.append(row)
+
+            go = max(0, go - 1)
+
+            pass
         elif isinstance(board, Checkerboard):
             corners, ids = board.detect_image(frame, subpix=True)
 

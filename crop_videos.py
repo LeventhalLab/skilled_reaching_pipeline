@@ -129,6 +129,84 @@ def crop_folders(video_folder_list, cropped_vids_parent, crop_params, view_list,
     return cropped_video_directories
 
 
+def crop_folders_labgym(video_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi', filtertype='mjpeg2jpeg', crop_size=(480, 480)):
+    """
+    :param video_folder_list:
+    :param cropped_vids_parent:
+    :param crop_params: either a dictionary with keys 'dir', 'lm', 'rm', each with a 4-element list [left, right, top, bottom]
+            OR a pandas dataframe with columns 'date', 'box_num', 'direct_left', 'direct_right',...
+    :param vidtype:
+    :return:
+    """
+
+
+    cropped_video_directories = navigation_utilities.create_labgym_cropped_video_destination_list(cropped_vids_parent, video_folder_list, view_list)
+    # make sure vidtype starts with a '.'
+    if vidtype[0] != '.':
+        vidtype = '.' + vidtype
+
+    for i_path, vids_path in enumerate(video_folder_list):
+        # find files with extension vidtype
+        vids_list = glob.glob(os.path.join(vids_path, '*' + vidtype))
+        if not bool(vids_list):
+            # vids_list is empty
+            continue
+
+        test_vid = vids_list[0]
+        vid_metadata = navigation_utilities.parse_video_name(test_vid)
+        if isinstance(crop_params, dict):
+            if vid_metadata['ratID'] in list(crop_params.keys()):
+                cp = crop_params[vid_metadata['ratID'] + '_dlccrop']
+            else:
+                cp = crop_params
+        # if crop_params is a DataFrame object, create a crop_params dictionary based on the current folder
+        if isinstance(cp, pd.DataFrame):
+            # pick an .avi file in this folder
+            session_date = vid_metadata['triggertime'].date()
+            crop_params_dict = crop_params_dict_from_df(cp, session_date, vid_metadata['boxnum'], vid_metadata['session_num'])
+        elif isinstance(crop_params, dict):
+            crop_params_dict = crop_params
+
+        if not bool(crop_params_dict):
+            # the crop parameters dictionary is empty, skip to the next folder
+            continue
+
+        for i_view, view_name in enumerate(view_list):
+            if not 'dir' in view_name:
+                continue
+                # for now, only do the direct views
+            if 'rm' in view_name:
+                fliplr = True
+            else:
+                fliplr = False
+
+            current_crop_params = crop_params_dict[view_name]
+            current_h_center = np.mean(current_crop_params[:2])
+            crop_left = int(current_h_center - int(crop_size[0] / 2))
+            crop_right = int(crop_left + crop_size[0])
+            crop_bottom = current_crop_params[3]
+            crop_top = crop_bottom - crop_size[1]
+            dest_folder = cropped_video_directories[i_view][i_path]
+            if not os.path.isdir(dest_folder):
+                os.makedirs(dest_folder)
+
+            labgym_crop_params = [crop_left, crop_right, crop_top, crop_bottom]
+            for full_vid_path in vids_list:
+                # todo: calibrate the camera and undistort the videos prior to cropping, then don't allow calculation of distortion
+                # coefficients, etc. during calibration with anipose
+                dest_name = cropped_vid_name(full_vid_path, dest_folder, view_name, labgym_crop_params, fliplr=fliplr)
+
+                # if video was already cropped, skip it
+                if os.path.exists(dest_name):
+                    _, dest_fname = os.path.split(dest_name)
+                    print(dest_fname + ' already exists, skipping')
+                    continue
+                else:
+                    crop_video(full_vid_path, dest_name, labgym_crop_params, view_name, filtertype=filtertype, fliplr=fliplr)
+
+    return cropped_video_directories
+
+
 def write_video_frames(vid_name, img_type='.jpg', dest_folder=None):
 
     if img_type[0] != '.':
@@ -236,6 +314,7 @@ def crop_all_calibration_videos(parent_directories,
                 session_num = session_row['session_num'].values[0]
                 print('no calibration video for session {:d} on {}'.format(session_num, np.datetime_as_string(session_date, unit='D')))
                 continue
+
 
             full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
                                                                                      parent_directories)
@@ -346,5 +425,22 @@ def preprocess_videos(vid_folder_list, cropped_vids_parent, crop_params, view_li
     :return:
     '''
     cropped_video_directories = crop_folders(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi', filtertype=filtertype)
+
+    return cropped_video_directories
+
+
+def preprocess_videos_labgym(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi', filtertype='mjpeg2jpeg', crop_size=(480, 480)):
+    '''
+
+    :param vid_folder_list:
+    :param cropped_vids_parent:
+    :param crop_params: either a dictionary with keys 'dir', 'lm', 'rm', each with a 4-element list [left, right, top, bottom]
+            OR a pandas dataframe with columns 'date', 'box_num', 'direct_left', 'direct_right',...
+    :param view_list:
+    :param vidtype:
+    :param filtertype:
+    :return:
+    '''
+    cropped_video_directories = crop_folders_labgym(vid_folder_list, cropped_vids_parent, crop_params, view_list, vidtype='avi', filtertype=filtertype, crop_size=(480, 480))
 
     return cropped_video_directories

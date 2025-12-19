@@ -328,6 +328,10 @@ def calibrate_all_sessions(parent_directories,
             mirror_calib_vid_name = session_row['cal_vid_name_mirrors'].values[0]
             if mirror_calib_vid_name.lower() == 'none':
                 continue
+            try:
+                is2sided = session_row['is2sided'].values[0]
+            except:
+                is2sided = False
             full_calib_vid_name = navigation_utilities.find_mirror_calibration_video(mirror_calib_vid_name,
                                                                                      parent_directories)
 
@@ -343,14 +347,13 @@ def calibrate_all_sessions(parent_directories,
                 session_row,
                 filtertype=filtertype)
             print('calibrating {}'.format(mirror_calib_vid_name))
-            if mirror_calib_vid_name in ['GridCalibration_b01_20240524_12-04-01.avi',
-                                         ]:
+            if mirror_calib_vid_name in ['GridCalibration_b01_20251218_16-11-33.avi']:
                 # continue
-                cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, session_row, calibration_pickle_name, full_calib_vid_name=full_calib_vid_name)
+                cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, session_row, calibration_pickle_name, is2sided=is2sided, full_calib_vid_name=full_calib_vid_name)
             # cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids,
             #                                                                     cam_intrinsics, mirror_board, cam_names,
             #                                                                     parent_directories, session_row,
-            #                                                                     calibration_pickle_name,
+            #                                                                     calibration_pickle_name, is2sided=is2sided,
             #                                                                     full_calib_vid_name=full_calib_vid_name)
             # note that calibrate_mirror_views writes a pickle file with updated calibration parameters including cgroup
 
@@ -549,17 +552,19 @@ def initialize_analysis_params(experiment_list=('dLight', 'GRABAch-rDA', 'sr6OHD
 
 if __name__ == '__main__':
 
-    experiment_list = ['dLight', 'sr6OHDA', 'PavcaMotorflex', 'DYT1', 'GRABAch-rDA']
+    # experiment_list = ['dLight', 'sr6OHDA', 'PavcaMotorflex', 'DYT1', 'GRABAch-rDA']
     # experiment_list = ['PavcaMotorflex', 'DYT1']
-    # experiment_list = ['sr6OHDA', 'dLight', 'PavcaMotorflex', 'DYT1', 'GRABAch-rDA']
-    rats_to_analyze = [600, 468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 514,
+    experiment_list = ['dLight', 'DYT1'] # ['PavcaMotorflex', 'GRABAch-rDA']
+    rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 514,
                        519, 520, 521, 522, 526, 528, 529, 530, 532, 533, 534, 535, 536, 537, 548, 549, 550, 551, 552,
                        553, 554, 555, 556, 557, 558, 561, 562, 565, 568, 575, 576, 577, 578, 579, 580, 581, 582, 585,
-                       586, 587, 588, 589, 590, 591, 592, 595, 596, 597, 598, 599, 600, 601, 602, 611, 612, 613, 614,
+                       586, 587, 588, 589, 590, 591, 592, 595, 596, 597, 598, 599, 600, 601, 602, 611, 612, 614,
                        615, 616, 617, 618, 603, 604, 605, 607, 608, 619, 620, 621, 622, 623, 624, 625, 626]
 
-    # rats_to_analyze = [486, 555]
-    rats_to_analyze = [555]
+    # rats_to_analyze = [558, 561, 562, 565, 568, 603, 604, 605, 607, 608, 673, 675, 677]
+    rats_to_analyze = [654, 655, 658, 659, 660, 661, 662, 663, 664, 666, 667]
+    # rats_to_analyze = [603]
+    rats_to_analyze = [673]
 
     ratIDs_to_analyze = ['R{:04d}'.format(rn) for rn in rats_to_analyze]
     gputouse = 0
@@ -568,8 +573,9 @@ if __name__ == '__main__':
                            # 'crop_calibration_vids',
                            'calibrate_videos',
                            # 'crop_sr_vids',
+                           # 'standard_crop_sr_vids',
                            # 'analyze_sr_vids',
-                           'create_marked_vids',
+                           # 'create_marked_vids',
                            # 'reconstruct_3d'
                            ]
 
@@ -722,6 +728,28 @@ if __name__ == '__main__':
             video_folder_list = navigation_utilities.get_video_folders_to_crop(videos_root_folder, rats_to_analyze=rats_to_analyze)
             cropped_video_directories = crop_videos.preprocess_videos(video_folder_list, cropped_videos_parent, calibration_metadata_df, cam_names,
                                                                       vidtype='avi', filtertype=crop_filtertype)
+
+            cropped_video_directories = crop_videos.preprocess_videos_labgym(video_folder_list, cropped_videos_parent,
+                                                                      calibration_metadata_df, cam_names,
+                                                                      vidtype='avi', filtertype=crop_filtertype)
+
+    # LOOP TO DO A STANDARDIZED CROP OF REACHING VIDEOS - GOAL IS TO GET 480 X 480 FOR EACH VIDEO
+    if analysis_params['analyses_to_perform'][0] == 'all' or 'standard_crop_sr_vids' in analysis_params['analyses_to_perform']:
+        for expt in experiment_list:
+
+            crop_filtertype = analysis_params['crop_filtertype']  # currently choices are 'h264' or 'mjpeg2jpeg'. Python based vid conversion (vs labview) should use h264
+            videos_root_folder = analysis_params['parent_directories'][expt]['videos_root_folder']
+            session_metadata_xlsx_path = os.path.join(videos_root_folder, analysis_params['session_md_fnames'][expt])
+            cropped_videos_parent = analysis_params['parent_directories'][expt]['cropped_videos_parent']
+            calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+            rats_to_analyze = analysis_params['rats_to_analyze']
+            cam_names = analysis_params['cam_names']
+
+            video_folder_list = navigation_utilities.get_video_folders_to_crop(videos_root_folder, rats_to_analyze=rats_to_analyze)
+            cropped_video_directories = crop_videos.preprocess_videos_standard(video_folder_list, cropped_videos_parent, calibration_metadata_df, cam_names,
+                                                                      vidtype='avi', filtertype=crop_filtertype, crop_size=(480, 480))
+
+
     # LOOP TO RUN DLC ON CROPPED VIDEOS
     if analysis_params['analyses_to_perform'][0] == 'all' or 'analyze_sr_vids' in analysis_params['analyses_to_perform']:
         for expt in experiment_list:

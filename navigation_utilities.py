@@ -855,6 +855,42 @@ def test_dlc_h5_name_from_h5_metadata(h5_metadata, suffix=''):
 def match_dlc_h5_views(session_metadata):
     pass
 
+def find_sessions_with_calibration_files(calibration_metadata_df, calibration_pickle_name, parent_directories):
+    # construct video name from pickle name
+    calibration_filename = os.path.basename(calibration_pickle_name)
+    calibration_filename = os.path.splitext(calibration_filename)[0]
+    cal_name_parts = calibration_filename.split('_')
+    datestring = cal_name_parts[1]
+    timestring = cal_name_parts[2]
+    boxstring = cal_name_parts[3]
+
+    cal_vid_name_mirrors = '_'.join(('GridCalibration',
+                                     boxstring,
+                                     datestring,
+                                     timestring + '.avi'))
+
+    cropped_session_path_lists = []
+    for ratID in calibration_metadata_df.keys():
+        if 'dlccrop' in ratID:
+            # only consider sheets with ratID labels, not with ratID_dlccrop labels
+            continue
+        row_idx =  calibration_metadata_df[ratID]['cal_vid_name_mirrors'] == cal_vid_name_mirrors
+        if any(row_idx):
+            df_rows = calibration_metadata_df[ratID].loc[row_idx]
+            for index, df_row in df_rows.iterrows():
+                session_datestring = df_row['date'].strftime('%Y%m%d')
+                session_task = df_row['task']
+                session_num = df_row['session_num']
+                session_box =  df_row['box_num']
+                session_folder_name = '_'.join((ratID, session_datestring, session_task, 'ses{:02d}'.format(session_num)))
+                cropped_session_path = os.path.join(parent_directories['cropped_videos_parent'], ratID, session_folder_name)
+                if os.path.exists(cropped_session_path):
+                    cropped_session_path_lists.append(cropped_session_path)
+
+    return cropped_session_path_lists
+
+
+
 def find_folders_to_analyze(cropped_videos_parent, rat_list=['all'], view_list=None):
     """
     get the full list of directories containing cropped videos in the videos_to_analyze folder
@@ -1388,10 +1424,12 @@ def scorername_from_cropped_folder(analysis_folder, cropped_vid_type='.avi'):
 
     # have pickle files already been created for this video?
     test_pickle_list = glob.glob(test_pickle_name)
+    for pickle_name in test_pickle_list:
+        scorernames = [scorername_from_fname(test_pickle_name) for test_pickle_name in test_pickle_list]
 
-    scorername = scorername_from_fname(test_pickle_list[0])
+    scorernames = list(set(scorernames))
 
-    return scorername
+    return scorernames
 
 
 def match_pickle_to_cropped_vid(cropped_vid_name):
@@ -3331,6 +3369,7 @@ def find_manual_scoring_sheet(parent_directories, mouseID):
         scoring_file = None
 
     return scoring_file
+
 
 def get_pickled_metadata_fname(session_metadata, parent_directories):
     session_folder = find_session_folder(parent_directories, session_metadata)

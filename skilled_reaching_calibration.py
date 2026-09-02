@@ -31,8 +31,51 @@ import pandas as pd
 import matplotlib
 matplotlib.use('TKAgg')
 
+def refine_calibration_from_deeplabcut(calibration_pickle_name, parent_directories, min_conf=0.99):
+    expt = os.path.basename(parent_directories['videos_parent'])
+    session_metadata_xlsx_path = os.path.join(parent_directories['videos_root_folder'], 'SR_{}_video_session_metadata.xlsx'.format(expt))
+    calibration_metadata_df = skilled_reaching_io.read_session_metadata_xlsx(session_metadata_xlsx_path)
+    cropped_sessions_path_list = navigation_utilities.find_sessions_with_calibration_files(calibration_metadata_df, calibration_pickle_name, parent_directories)
+    calibration_data = pd.read_pickle(calibration_pickle_name)
+    cams = calibration_data['cgroup'].get_names()
 
-def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0.99, verbose=False):
+    for cropped_session_path in cropped_sessions_path_list:
+        h5_list = []
+        pickle_list = []
+        cropped_session_name = os.path.basename(cropped_session_path)
+        name_parts = cropped_session_name.split('_')
+        session_metadata = {'ratID': name_parts[0], 'date': datetime.strptime(name_parts[1], '%Y%m%d')}
+        for cam_name in cams:
+            cam_folder_name = os.path.join(cropped_session_path, '_'.join((cropped_session_name, cam_name)))
+            # test_h5_name = navigation_utilities.test_dlc_h5_name_from_session_metadata(session_metadata, cam_name, filtered=filtered)
+            test_pickle_name = navigation_utilities.test_dlc_pickle_name_from_session_metadata(session_metadata,
+                                                                                               cam_name)
+            test_pickle_name = os.path.join(cam_folder_name, test_pickle_name)
+            new_pickle_list = glob.glob(test_pickle_name)
+
+            if new_pickle_list:
+                # if _full.pickle files were found in this folder
+                cam_h5s = []
+                for fpickle in new_pickle_list:
+                    # is there already a corresponding .h5 file?
+                    h5_out_name = fpickle.split('_full.pickle')[0] + '.h5'
+                    if not os.path.exists(h5_out_name):
+                        utils.fullpickle2h5(fpickle, h5_out_name, num_outputs)
+                    cam_h5s.append(h5_out_name)
+            # new_h5_list = glob.glob(os.path.join(cam_folder_name, h5_out_name))
+            h5_list.append(cam_h5s)
+        h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_list[0][0])
+        new_cgroup_name = '_'.join((h5_metadata['ratID'],
+                            h5_metadata['triggertime'].strftime('%Y%m%d'),
+                            'ses{:02d}'.format(h5_metadata['session_num']),
+                            'cgroup'))
+        # if new_cgroup_name in calibration_data.keys():
+        #     continue
+        calibration_data = refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0.99)
+        skilled_reaching_io.write_pickle(calibration_pickle_name, calibration_data)
+
+
+def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0.99, verbose=True):
     '''
 
     :param calibration_data:
@@ -42,11 +85,14 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     h5_metadata = navigation_utilities.parse_dlc_output_h5_name(h5_list[0][0])
     print('refining calibration for {}, {}, session {:d}'.format(h5_metadata['ratID'], h5_metadata['triggertime'].strftime('%m/%d/%Y'), h5_metadata['session_num']))
 
-    cgroup = copy.deepcopy(calibration_data['cgroup'])
+    if 'cgroup_3view' in calibration_data.keys():
+        cgroup = copy.deepcopy(calibration_data['cgroup_3view'])
+    else:
+        cgroup = copy.deepcopy(calibration_data['cgroup'])
     cam_names = cgroup.get_names()
     calibration_data['original_cgroup'] = copy.deepcopy(cgroup)
 
-    imgp = match_dlc_points_from_all_views(h5_list, cam_names, calibration_data, parent_directories)
+    imgp = match_dlc_points_from_all_views(h5_list, cam_names, calibration_data, parent_directories, min_conf=min_conf)
 
     # do the fundamental and essential matrices need to be recalculated?
     # imgp_dict ={cam_name: imgp[i_cam] for i_cam, cam_name in enumerate(cam_names)}
@@ -55,7 +101,6 @@ def refine_calibration(calibration_data, h5_list, parent_directories, min_conf=0
     # error = cgroup.bundle_adjust_iter_fixed_dist(imgp, extra=None, verbose=verbose)
     # error = cgroup.bundle_adjust_iter_fixed_intrinsics(imgp, undistort=False, extra=None, verbose=verbose)
     error = cgroup.bundle_adjust_iter_fixed_intrinsics_and_cam0(imgp, undistort=False, extra=None, verbose=verbose)
-
 
     # cgroup was modified by the bundle_adjust_iter_fixed_intrinsics function
     cgroup_name = '_'.join((h5_metadata['ratID'],
@@ -1073,6 +1118,7 @@ def write_board_image(board, dpi, calib_dir, units='mm'):
     elif type(board) is CharucoBoard:
         write_charuco_image(board, dpi, calib_dir, units=units)
 
+
 def write_checkerboard_image(board, dpi, calib_dir, units='mm'):
     #todo: will have to build this, but for now just skipping it
     x_total = int(board.squaresX * board.square_length)
@@ -1648,11 +1694,12 @@ def collect_matched_mirror_points(merged, board):
             directleft_imgp[current_lm_row:current_lm_row+n_row_pts, :, :] = imgp_direct
 
             # calculate object points here for this specific frame
-            cbcol = merged_row['dir']['n_cols']
-            cbrow = merged_row['dir']['n_rows']
+            cbcol = min(board.squaresX, board.squaresY)   # workaround to make sure number of columns is smaller; this is true for our SR experiments but may not be universally true  # merged_row['dir']['n_cols']
+            cbrow = max(board.squaresX, board.squaresY)    # merged_row['dir']['n_rows']
             objp = np.zeros((n_row_pts, 3), np.float32)
             objp[:, :2] = np.mgrid[0:cbcol, 0:cbrow].T.reshape(-1, 2)
             objp *= board.get_square_length()
+            # objp = board.objPoints
 
             left_objp[current_lm_row:current_lm_row+n_row_pts, :] = objp
 
@@ -1675,8 +1722,8 @@ def collect_matched_mirror_points(merged, board):
             directright_imgp[current_rm_row:current_rm_row + n_row_pts, :, :] = imgp_direct
 
             # calculate object points here for this specific frame
-            cbcol = merged_row['dir']['n_cols']
-            cbrow = merged_row['dir']['n_rows']
+            cbcol = min(board.squaresX, board.squaresY)   # workaround to make sure number of columns is smaller; this is true for our SR experiments but may not be universally true  # merged_row['dir']['n_cols']
+            cbrow = max(board.squaresX, board.squaresY)    # merged_row['dir']['n_rows']
             objp = np.zeros((n_row_pts, 3), np.float32)
             objp[:, :2] = np.mgrid[0:cbcol, 0:cbrow].T.reshape(-1, 2)
             objp *= board.get_square_length()
@@ -2126,6 +2173,65 @@ def test_board_reconstruction(pts1, pts2, mtx, rot, t, board):
     pass
 
 
+def overlay_merged_on_calibration_video(merged, cam_intrinsics, full_calib_vid_name):
+    vid_folder, vid_name = os.path.split(full_calib_vid_name)
+    labeledvids_folder = os.path.join(vid_folder, 'labeled_vids')
+    if not os.path.exists(labeledvids_folder):
+        os.makedirs(labeledvids_folder)
+    labeled_vid_name = vid_name.replace('.avi', '_labeled_merged.avi')
+    labeled_vid_name = os.path.join(labeledvids_folder, labeled_vid_name)
+
+    cv_cap = cv2.VideoCapture(full_calib_vid_name)
+    n_frames = int(cv_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    w = int(cv_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cv_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cv_cap.get(cv2.CAP_PROP_FPS)
+
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    cv_out = cv2.VideoWriter(labeled_vid_name, fourcc, fps, (w, h))
+
+    mtx = cam_intrinsics['mtx']
+    dist = cam_intrinsics['dist']
+
+    # create a list of framenums with identified points
+    frames_with_identified_points = []
+    for merged_row in merged:
+        keys = list(merged_row.keys())
+        frames_with_identified_points.append(merged_row[keys[0]]['framenum'])
+
+    for i_frame in range(n_frames):
+        # overlay points
+        row_idx = [0, 0, 0]
+        ret, img = cv_cap.read()
+        if not ret:
+            break
+        img_ud = cv2.undistort(img, mtx, dist)
+        # fig = plt.figure()
+        # ax = fig.add_subplot()
+
+        if i_frame in frames_with_identified_points:
+            # find which merged row this is
+            for i_mr, mr in enumerate(merged):
+                if list(mr.items())[0][1]['framenum'] == i_frame:
+                    for merged_view in list(mr.items()):
+                        corners = merged_view[1]['corners']
+                        ids = np.squeeze(merged_view[1]['ids'])
+                        n_corners = np.shape(corners)[0]
+                        for ii in range(n_corners):
+                            text_loc = (int(corners[ii, 0, 0]), int(corners[ii, 0, 1]))
+                            id = ids[ii]
+                            cv2.putText(img_ud, '{:d}'.format(id), text_loc, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1.0,
+                                        color=(0, 0, 255))
+                            cv2.circle(img_ud, (int(corners[ii, 0, 0]), int(corners[ii, 0, 1])),
+                                       radius=4, color=(0, 0, 255), thickness=-1)
+                    break
+
+        cv_out.write(img_ud)
+
+    cv_cap.release()
+    cv_out.release()
+
+
 def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, board):
 
     vid_folder, vid_name = os.path.split(full_calib_vid_name)
@@ -2147,11 +2253,19 @@ def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, boa
 
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     cv_out = cv2.VideoWriter(labeled_vid_name, fourcc, fps, (w, h))
+
     mtx = calibration_data['cam_intrinsics']['mtx']
     dist = calibration_data['cam_intrinsics']['dist']
     cam_names = calibration_data['cgroup_3view'].get_names()
     merged = merge_rows(all_rows, cam_names=cam_names)
 
+    # create a list of framenums with identified points
+    frames_with_identified_points = []
+    for merged_row in merged:
+        keys = list(merged_row.keys())
+        frames_with_identified_points.append(merged_row[keys[0]]['framenum'])
+
+    n_frames_with_views = np.zeros(4)
     for i_frame in range(n_frames):
         # overlay points
         row_idx = [0, 0, 0]
@@ -2175,16 +2289,28 @@ def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, boa
         merged_row = None
         # merged_row = next(filter(lambda x: x['dir']['framenum'] == i_frame, merged), None)
         for test_row in merged:
-            if 'dir' in list(test_row.keys()):
-                if test_row['dir']['framenum'] == i_frame:
+            # todo: this should be modified to check 1) if the current frame is represented in merged, and 2) if it is,
+            # are there at least 2 views for triangulation?
+            if list(test_row.items())[0][1]['framenum'] == i_frame:
+                n_valid_views = len(test_row.keys())
+                n_frames_with_views[n_valid_views] += 1
+                if n_valid_views > 1:
                     merged_row = test_row
                     break
+            # if 'dir' in list(test_row.keys()):
+            #     if test_row['dir']['framenum'] == i_frame:
+            #         merged_row = test_row
+            #         break
         if merged_row is None:
             projected_pts = None
         else:
             merged_pts = match_2d_merged_pts(merged_row, cam_names, board=board, pt_type='corners')
-            pts3d = calibration_data['cgroup_3view'].triangulate(merged_pts, undistort=False, progress=False)
-            projected_pts = calibration_data['cgroup_3view'].project(pts3d)
+            try:
+                pts3d = calibration_data['cgroup_3view'].triangulate(merged_pts, undistort=False, progress=False)
+                projected_pts = calibration_data['cgroup_3view'].project(pts3d)
+            except:
+                # if hasn't been calibrated yet
+                projected_pts = None
         # except:
         #     # this should mean that there was no row with the current frame (i_frame) available in the direct view
         #     projected_pts = None
@@ -2193,19 +2319,19 @@ def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, boa
             if not row_idx[i_view] is None:
                 frame_row = rows[row_idx[i_view]]
                 for ii, id in enumerate(np.squeeze(frame_row['ids'])):
-                    try:
-                        plt.text(frame_row['corners'][ii, 0, 0], frame_row['corners'][ii, 0, 1],
-                                 '{:d}'.format(id), c='r', fontsize='small')
-                    except:
-                        pass
+                    # try:
+                    #     plt.text(frame_row['corners'][ii, 0, 0], frame_row['corners'][ii, 0, 1],
+                    #              '{:d}'.format(id), c='r', fontsize='medium')
+                    # except:
+                    #     pass
                     text_loc = (int(frame_row['corners'][ii, 0, 0]), int(frame_row['corners'][ii, 0, 1]))
-                    cv2.putText(img_ud, '{:d}'.format(id), text_loc, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=0.8, color=(0, 0, 255))
-                    cv2.circle(img_ud, (int(frame_row['corners'][ii, 0, 0]), int(frame_row['corners'][ii, 0, 1])), radius=1, color=(0, 0, 255), thickness=-1)
+                    cv2.putText(img_ud, '{:d}'.format(id), text_loc, fontFace=cv2.FONT_HERSHEY_PLAIN, fontScale=1.0, color=(0, 0, 255))
+                    cv2.circle(img_ud, (int(frame_row['corners'][ii, 0, 0]), int(frame_row['corners'][ii, 0, 1])), radius=4, color=(0, 0, 255), thickness=-1)
             if projected_pts is not None:
                 for ii in range(np.shape(projected_pts)[1]):
                     if not np.isnan(projected_pts[i_view, ii, 0]):
                         cv2.circle(img_ud, (int(projected_pts[i_view, ii, 0]), int(projected_pts[i_view, ii, 1])),
-                                   radius=3, color=(255, 0, 0), thickness=-1)
+                                   radius=2, color=(255, 0, 0), thickness=-1)
         try:
             cv_out.write(img_ud)
         except:
@@ -2245,7 +2371,6 @@ def match_2d_merged_pts(merged_row, cam_names, board=None, pt_type='corners'):
             except:
                 frame_pts[i_cam, merged_row[cam_name]['ids'], :] = merged_row[cam_name][pt_type]
 
-
     return frame_pts
 
 
@@ -2273,7 +2398,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
                            full_calib_vid_name=None, view_names=[['directleft', 'leftmirror'], ['directright', 'rightmirror']], init_extrinsics=True, max_dist_from_epiline=5, verbose=True):
     CALIBRATION_FLAGS = cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_ZERO_TANGENT_DIST + cv2.CALIB_FIX_ASPECT_RATIO + cv2.CALIB_USE_INTRINSIC_GUESS
 
-    dest_folder = navigation_utilities.cal_frames_folder_from_cal_vids_name(full_calib_vid_name)
+    # dest_folder = navigation_utilities.cal_frames_folder_from_cal_vids_name(full_calib_vid_name)
     # crop_videos.write_video_frames(full_calib_vid_name, img_type='.jpg')
     # return None, None
     if os.path.exists(calibration_pickle_name):
@@ -2282,6 +2407,10 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
         # working here... check to see if there is a .csv file with points in it for all 3 views; if so, load them and use them for bundle adjustment
         overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, board)
         cgroup = calibration_data['cgroup_3view']
+
+        if ('cgroup_3view' in calibration_data.keys()) and ('cgroup_dlc' not in calibration_data.keys()):
+            # check to see if there is deeplabcut point identification for this session
+            skilled_reaching_calibration.refine_calibration_from_deeplabcut(calibration_pickle_name, parent_directories)
         return cgroup, None
     else:
         cgroup = CameraGroup.from_names(cam_names, fisheye=False)
@@ -2323,6 +2452,7 @@ def calibrate_mirror_views(cropped_vids, cam_intrinsics, board, cam_names, paren
 
     # calculate the fundamental matrices for direct-->left mirror and direct-->right mirror
     merged = merge_rows(all_rows, cam_names=cam_names)
+    overlay_merged_on_calibration_video(merged, cam_intrinsics, full_calib_vid_name)
     stereo_cal_points, matched_points_metadata = collect_matched_mirror_points(merged, mirror_board)
     # if calibration_data['E'] is None:
     # stereo_cal_points are undistorted (this occurs in get_rows_cropped_vids)
@@ -2593,7 +2723,7 @@ def collect_3view_pts(full_calib_vid_name, calibration_data):
         for i_file, csv_file in enumerate(csv_list):
             csv_metadata = navigation_utilities.parse_frame_csv_name(csv_file)
             csv_table = pd.read_csv(csv_file)
-            pts_3view_list.append(sort_3view_pts(csv_table, calibration_data, dirview_lims=[400, 1600]))
+            pts_3view_list.append(sort_3view_pts(csv_table, calibration_data, dirview_lims=[400, 1550]))
 
         pts_3view = np.concatenate(pts_3view_list, axis=1)
 
@@ -2648,7 +2778,10 @@ def match_3view_pts(pts_ud, calibration_data, dirview_lims=[400, 1500]):
     p2ds_array = np.empty((n_cams, n_matchedpairs, 2))
     p2ds_array[:] = np.nan
 
-    p2ds_array[0, :, :], p2ds_array[1, :, :], _ = match_mirror_points_3views(p2ds_dict['dir'], p2ds_dict['lm'], board=None)
+    try:
+        p2ds_array[0, :, :], p2ds_array[1, :, :], _ = match_mirror_points_3views(p2ds_dict['dir'], p2ds_dict['lm'], board=None)
+    except:
+        pass
     dir_pts, rm_pts, _ = match_mirror_points_3views(p2ds_dict['dir'], p2ds_dict['rm'], board=None)
 
     # match direct view points matched with right mirror view with the order for the left mirror view
@@ -3038,8 +3171,8 @@ def get_rows_cropped_vids(cropped_vids, cam_intrinsics, board, parent_directorie
             for i_row, row in enumerate(rows):
                 if np.shape(row['corners'])[0] != len(row['ids']):
                     continue
-                orig_coord_x = row['corners'][:,:,0] + cropped_vid_metadata['crop_params'][0]
-                orig_coord_y = row['corners'][:,:,1] + cropped_vid_metadata['crop_params'][2]
+                orig_coord_x = row['corners'][:, :, 0] + cropped_vid_metadata['crop_params'][0]
+                orig_coord_y = row['corners'][:, :, 1] + cropped_vid_metadata['crop_params'][2]
                 orig_coord = np.hstack((orig_coord_x, orig_coord_y))
 
                 # not sure what the difference is between 'filled' and 'corners' in each row dictionary, just trying to make
@@ -3924,11 +4057,15 @@ def detect_video_pts(calibration_video, board, camera, is2sided=False, prefix=No
                 rows.append(row)
 
             go = max(0, go - 1)
+
         elif isinstance(board, CharucoBoard) and is2sided:
+            # if the board is visible in both views, sometimes the board is flipped left-right, sometimes not. Actually,
+            # it will always be flipped in one of the mirrors, always orieneted the right way in one of the mirrors, and
+            # in the direct view it depends on whether it's slanted to the left or right
             charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame, board, camera=camera)
             if charucoCorners is None:
                 # try flipping the image
-                frame_flipped = frame = cv2.flip(frame, 1)
+                frame_flipped = cv2.flip(frame, 1)
                 charucoCorners, charucoIds, markerCorners, markerIds = detect_markers(frame_flipped, board, camera=camera)
                 if charucoCorners is not None and len(charucoCorners) > 0:
                     w = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
@@ -3947,7 +4084,6 @@ def detect_video_pts(calibration_video, board, camera, is2sided=False, prefix=No
 
             go = max(0, go - 1)
 
-            pass
         elif isinstance(board, Checkerboard):
             corners, ids = board.detect_image(frame, subpix=True)
 

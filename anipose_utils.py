@@ -275,7 +275,7 @@ def crop_all_points_2_full_frame(pose_data, h5_group, cam_intrinsics):
 
 
 
-def match_dlc_points_from_all_views(h5_list, cam_names, calibration_data, parent_directories, min_valid_score=0.99, filtered=False, pctile_to_keep=10):
+def match_dlc_points_from_all_views(h5_list, cam_names, calibration_data, parent_directories, min_conf=0.99, filtered=False, pctile_to_keep=10):
     # in general, use a very restrictive score cutoff since this is just to optimize the calibration (don't need full paw tracking)
 
     fname_dict = dict.fromkeys(cam_names)
@@ -324,12 +324,8 @@ def match_dlc_points_from_all_views(h5_list, cam_names, calibration_data, parent
         scores = d['scores']
 
         # remove points that are below threshold
-        points[scores < min_valid_score] = np.nan
+        points[scores < min_conf] = np.nan
         imgp = match_camera_view_pts(points)
-
-        # todo: calculate reconstruction errors with current stereo parameters, maybe eliminate points with errors that are too large (presumably at least one is a mistake)
-        # p3ds_flat = cgroup.triangulate(imgp, progress=True, undistort=False)
-        # reprojerr_flat = cgroup.reprojection_error(p3ds_flat, imgp, mean=True)
 
         if num_matched_pts == 0:
             all_imgp = imgp
@@ -339,7 +335,10 @@ def match_dlc_points_from_all_views(h5_list, cam_names, calibration_data, parent
             # all_err = [np.vstack((prev_err, vid_imgp)) for (prev_err, vid_imgp) in zip(all_err, reprojerr_flat)]
         num_matched_pts += np.shape(imgp)[1]
 
-    cgroup = calibration_data['cgroup']
+    if 'cgroup_3view' in calibration_data.keys():
+        cgroup = copy.deepcopy(calibration_data['cgroup_3view'])
+    else:
+        cgroup = copy.deepcopy(calibration_data['cgroup'])
     all_imgp = np.array(all_imgp)
     p3ds_flat = cgroup.triangulate(all_imgp, progress=True, undistort=False)
     reprojerr_flat = cgroup.reprojection_error(p3ds_flat, all_imgp, mean=True)

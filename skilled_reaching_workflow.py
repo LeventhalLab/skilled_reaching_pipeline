@@ -185,7 +185,13 @@ def label_videos_in_cropped_folder(folder_to_mark, rat_db, analysis_params, expt
     shuffle = analysis_params['shuffles'][expt][dlc_name]
     dlc_config = view_config_paths[dlc_name]
 
-    # scorername = navigation_utilities.scorername_from_cropped_folder(folder_to_mark, cropped_vid_type=cropped_vid_type)
+    scorernames = navigation_utilities.scorername_from_cropped_folder(folder_to_mark, cropped_vid_type=cropped_vid_type)
+    cfg = deeplabcut.utils.auxiliaryfunctions.read_config(dlc_config)
+    trainingsetindex = 0
+    trainFraction = cfg["TrainingFraction"][trainingsetindex]
+    DLCscorername, _ = deeplabcut.utils.auxiliaryfunctions.get_scorer_name(
+        cfg, shuffle, trainFraction, modelprefix=""
+    )
     #todo: make sure not to include marked vids
     cropped_video_list = glob.glob(os.path.join(folder_to_mark, '*' + cropped_vid_type))
 
@@ -200,8 +206,7 @@ def label_videos_in_cropped_folder(folder_to_mark, rat_db, analysis_params, expt
 
         if len(pickle_list) > 0:
             analyzed_vid_list.append(cropped_vid)
-
-    deeplabcut.create_video_with_all_detections(dlc_config, analyzed_vid_list, shuffle=shuffle)
+        deeplabcut.create_video_with_all_detections(dlc_config, analyzed_vid_list, shuffle=shuffle)
 
 
 def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_paths, scorernames,
@@ -236,6 +241,7 @@ def create_labeled_videos(folders_to_analyze, marked_vids_parent, view_config_pa
         else:
             print(view + ' does not contain the keyword "direct" or "mirror"')
             continue
+
         config_path = view_config_paths[dlc_network]
         scorername = scorernames[dlc_network]
         current_view_folders = folders_to_analyze[view]
@@ -347,14 +353,14 @@ def calibrate_all_sessions(parent_directories,
                 session_row,
                 filtertype=filtertype)
             print('calibrating {}'.format(mirror_calib_vid_name))
-            if mirror_calib_vid_name in ['GridCalibration_b01_20251218_16-11-33.avi']:
-                # continue
-                cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, session_row, calibration_pickle_name, is2sided=is2sided, full_calib_vid_name=full_calib_vid_name)
-            # cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids,
-            #                                                                     cam_intrinsics, mirror_board, cam_names,
-            #                                                                     parent_directories, session_row,
-            #                                                                     calibration_pickle_name, is2sided=is2sided,
-            #                                                                     full_calib_vid_name=full_calib_vid_name)
+            # if mirror_calib_vid_name in ['GridCalibration_b01_20230314_13-27-15.avi']:
+            #     # continue
+            #     cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids, cam_intrinsics, mirror_board, cam_names, parent_directories, session_row, calibration_pickle_name, is2sided=is2sided, full_calib_vid_name=full_calib_vid_name)
+            cgroup, error = skilled_reaching_calibration.calibrate_mirror_views(current_cropped_calibration_vids,
+                                                                                cam_intrinsics, mirror_board, cam_names,
+                                                                                parent_directories, session_row,
+                                                                                calibration_pickle_name, is2sided=is2sided,
+                                                                                full_calib_vid_name=full_calib_vid_name)
             # note that calibrate_mirror_views writes a pickle file with updated calibration parameters including cgroup
 
 
@@ -472,10 +478,10 @@ def initialize_analysis_params(experiment_list=('dLight', 'GRABAch-rDA', 'sr6OHD
     for expt in experiment_list:
         if expt in ['dLight', 'sr6OHDA']:
             strain = "LE"
-            engine = 'tensorflow'
+            engine = 'pytorch'
             # to find the config files for each DLC network for each view
             view_keys = ('direct', 'nearpaw', 'farpaw')  # list(DLC_folder_names.keys())
-            anipose_config_path[expt] = os.path.join(DLC_top_folder, 'sr_anipose', 'config.toml')
+            anipose_config_path[expt] = os.path.join(DLC_top_folder, 'sr_anipose2', 'config.toml')
             anipose_config = toml.load(anipose_config_path[expt])
             if expt in shuffles.keys():
                 if shuffles[expt] is None:
@@ -552,38 +558,36 @@ def initialize_analysis_params(experiment_list=('dLight', 'GRABAch-rDA', 'sr6OHD
 
 if __name__ == '__main__':
 
-    # experiment_list = ['dLight', 'sr6OHDA', 'PavcaMotorflex', 'DYT1', 'GRABAch-rDA']
-    # experiment_list = ['PavcaMotorflex', 'DYT1']
-    experiment_list = ['dLight', 'DYT1'] # ['PavcaMotorflex', 'GRABAch-rDA']
+    experiment_list = ['dLight', 'sr6OHDA', 'PavcaMotorflex', 'DYT1', 'GRABAch-rDA']
+    # experiment_list = ['DYT1', 'PavcaMotorflex']
+    # experiment_list = ['dLight', 'DYT1'] # ['PavcaMotorflex', 'GRABAch-rDA']
     rats_to_analyze = [468, 469, 470, 471, 472, 473, 474, 482, 484, 485, 486, 487, 514,
                        519, 520, 521, 522, 526, 528, 529, 530, 532, 533, 534, 535, 536, 537, 548, 549, 550, 551, 552,
                        553, 554, 555, 556, 557, 558, 561, 562, 565, 568, 575, 576, 577, 578, 579, 580, 581, 582, 585,
                        586, 587, 588, 589, 590, 591, 592, 595, 596, 597, 598, 599, 600, 601, 602, 611, 612, 614,
                        615, 616, 617, 618, 603, 604, 605, 607, 608, 619, 620, 621, 622, 623, 624, 625, 626]
 
-    # rats_to_analyze = [558, 561, 562, 565, 568, 603, 604, 605, 607, 608, 673, 675, 677]
-    rats_to_analyze = [654, 655, 658, 659, 660, 661, 662, 663, 664, 666, 667]
-    # rats_to_analyze = [603]
-    rats_to_analyze = [673]
+    # rats_to_analyze = [469]
+    # rats_to_analyze = [692, 694]
 
     ratIDs_to_analyze = ['R{:04d}'.format(rn) for rn in rats_to_analyze]
     gputouse = 0
 
     analyses_to_perform = [
                            # 'crop_calibration_vids',
-                           'calibrate_videos',
+                           # 'calibrate_videos',
                            # 'crop_sr_vids',
                            # 'standard_crop_sr_vids',
                            # 'analyze_sr_vids',
-                           # 'create_marked_vids',
+                           'create_marked_vids',
                            # 'reconstruct_3d'
                            ]
 
     # analyses_to_perform = ['reconstruct_3d']
 
     shuffles = dict.fromkeys(experiment_list)
-    shuffles['DYT1'] = {'direct': 4, 'mirror': 2}
-    shuffles['PavcaMotorflex'] = {'direct': 4, 'mirror': 2}
+    shuffles['DYT1'] = {'direct': 1, 'mirror': 1}
+    shuffles['PavcaMotorflex'] = {'direct': 1, 'mirror': 1}
     analysis_params = initialize_analysis_params(experiment_list=experiment_list,
                                                  gputouse=gputouse,
                                                  analyses_to_perform=analyses_to_perform,
@@ -599,8 +603,8 @@ if __name__ == '__main__':
     #                                            cam_names=analysis_params['cam_names'], filtered=False)
 
     # use the code below to write a charuco board to a file
-    # ncols = 5
-    # nrows = 4
+    # ncols = 4
+    # nrows = 6
     # square_length = 16
     # marker_length = 12
     # board = skilled_reaching_calibration.create_charuco(nrows, ncols, square_length, marker_length)
@@ -782,6 +786,9 @@ if __name__ == '__main__':
 
             # folders_to_analyze is a dictionary whose keys are the views ('dir', 'lm', 'rm')
             for view in folders_to_analyze.keys():
+                if 'dir' in view:
+                    # take out this if... to avoid skipping direct views
+                    continue
                 for crop_folder in folders_to_analyze[view]:
 
                     label_videos_in_cropped_folder(crop_folder, rat_db, analysis_params, expt)

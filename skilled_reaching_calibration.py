@@ -483,9 +483,6 @@ def match_trial_points(dlc_output, pickle_metadata, dlc_metadata, min_conf=0.98)
     return pts_wrt_orig_img, dlc_conf
 
 
-def estimate_E_from_dlc(single_trial_dlc_output, cal_data):
-    pass
-
 def refine_calibrations_from_orig_vids(vid_folder_list, parent_directories):
     # this doesn't seem to be working so well. Perhaps better to refine from matched points identified by DLC
     cal_data_parent = parent_directories['cal_data_parent']
@@ -2233,7 +2230,13 @@ def overlay_merged_on_calibration_video(merged, cam_intrinsics, full_calib_vid_n
 
 
 def overlay_rows_on_calibration_video(calibration_data, full_calib_vid_name, board):
+    '''
 
+    :param calibration_data:
+    :param full_calib_vid_name: path to the calibration video
+    :param board: anipose board object
+    :return:
+    '''
     vid_folder, vid_name = os.path.split(full_calib_vid_name)
     labeledvids_folder = os.path.join(vid_folder, 'labeled_vids')
     if not os.path.exists(labeledvids_folder):
